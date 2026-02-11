@@ -1,0 +1,41 @@
+export const dynamic = "force-dynamic";
+
+import { requireSession } from "@/lib/auth/guards";
+import { getUserById } from "@/lib/services/user.service";
+import { listAllRoles } from "@/lib/services/role.service";
+import { redirect } from "next/navigation";
+import { AppShell } from "@/components/layout/app-shell";
+import type { CurrentUserResponse } from "@/lib/api/types";
+
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await requireSession();
+  const user = await getUserById(session.userId);
+  if (!user) redirect("/login");
+
+  const allRoles = await listAllRoles();
+  const userRoles = allRoles.filter((r) => user.roles.includes(r.name));
+
+  const currentUser: CurrentUserResponse = {
+    _id: user._id.toString(),
+    username: user.username,
+    email: user.email,
+    enabled: user.enabled,
+    roles: userRoles.map((r) => ({
+      _id: r._id.toString(),
+      name: r.name,
+      description: r.description,
+      permissions: r.permissions,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+    permissions: user.permissions,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+  };
+
+  return <AppShell currentUser={currentUser}>{children}</AppShell>;
+}
