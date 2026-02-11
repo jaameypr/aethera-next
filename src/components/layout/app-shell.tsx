@@ -1,0 +1,193 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import {
+  LayoutDashboard,
+  Users,
+  ShieldCheck,
+  Mail,
+  Upload,
+  HardDrive,
+  Files,
+  FolderKanban,
+  ChevronLeft,
+  Menu,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { UserProfileButton } from "./user-profile-button";
+import type { CurrentUserResponse } from "@/lib/api/types";
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  disabled?: boolean;
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    title: "Workspace",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      {
+        label: "Projekte",
+        href: "/projects",
+        icon: FolderKanban,
+        disabled: true,
+      },
+    ],
+  },
+  {
+    title: "Verzeichnis",
+    items: [
+      { label: "Upload", href: "/upload", icon: Upload, disabled: true },
+      { label: "Backups", href: "/backups", icon: HardDrive, disabled: true },
+      { label: "Dateien", href: "/files", icon: Files, disabled: true },
+    ],
+  },
+  {
+    title: "Admin",
+    items: [
+      { label: "Benutzer", href: "/admin/users", icon: Users },
+      { label: "Rollen", href: "/admin/roles", icon: ShieldCheck },
+      {
+        label: "Mail Templates",
+        href: "/admin/mail",
+        icon: Mail,
+        disabled: true,
+      },
+    ],
+  },
+];
+
+interface AppShellProps {
+  children: React.ReactNode;
+  currentUser: CurrentUserResponse;
+}
+
+export function AppShell({ children, currentUser }: AppShellProps) {
+  const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-950">
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-zinc-200 bg-zinc-50 transition-all duration-200 dark:border-zinc-800 dark:bg-zinc-900 lg:static lg:z-auto",
+          collapsed ? "w-16" : "w-64",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        )}
+      >
+        {/* Logo / Header */}
+        <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-4 dark:border-zinc-800">
+          {!collapsed && (
+            <Link
+              href="/dashboard"
+              className="text-lg font-bold text-zinc-900 dark:text-zinc-50"
+            >
+              Aethera
+            </Link>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className="hidden lg:flex"
+          >
+            <ChevronLeft
+              className={cn(
+                "h-4 w-4 transition-transform",
+                collapsed && "rotate-180",
+              )}
+            />
+          </Button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-2">
+          {navGroups.map((group) => (
+            <div key={group.title} className="mb-4">
+              {!collapsed && (
+                <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  {group.title}
+                </p>
+              )}
+              {collapsed && <Separator className="mb-2" />}
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.disabled ? "#" : item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                        : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                      item.disabled &&
+                        "cursor-not-allowed opacity-40 hover:bg-transparent dark:hover:bg-transparent",
+                      collapsed && "justify-center px-0",
+                    )}
+                    aria-disabled={item.disabled}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
+                    {!collapsed && item.disabled && (
+                      <span className="ml-auto text-[10px] uppercase text-zinc-400">
+                        Soon
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* User profile button */}
+        <div className="border-t border-zinc-200 p-2 dark:border-zinc-800">
+          <UserProfileButton user={currentUser} collapsed={collapsed} />
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Mobile header */}
+        <header className="flex h-14 items-center border-b border-zinc-200 px-4 lg:hidden dark:border-zinc-800">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <span className="ml-3 text-lg font-bold">Aethera</span>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      </div>
+    </div>
+  );
+}
