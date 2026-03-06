@@ -26,6 +26,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "discord-api-types": "^0.38.41",
     "framer-motion": "^12.34.0",
     "geist": "^1.7.0",
     "jose": "^6.1.3",

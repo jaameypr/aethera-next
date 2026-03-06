@@ -14,6 +14,7 @@ export interface IUser extends Document {
   enabled: boolean;
   roles: string[];
   permissions: IPermission[];
+  discordId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +48,7 @@ const UserSchema = new Schema<IUser>(
     enabled: { type: Boolean, default: true },
     roles: [{ type: String }],
     permissions: [PermissionSchema],
+    discordId: { type: String, sparse: true },
   },
   { timestamps: true },
 );
