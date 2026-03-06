@@ -10,12 +10,14 @@ import {
   recreateServer,
   deleteServer,
   updateServer,
+  createServer,
   getServer,
   fetchLogs,
   sendConsoleCommand,
   isPortAvailable,
   getRamRemaining,
   type LogEntry,
+  type ServerCreateInput,
 } from "@/lib/services/server.service";
 
 // ---------------------------------------------------------------------------
@@ -29,6 +31,38 @@ function revalidateServer(serverId: string, projectKey?: string) {
     revalidatePath(`/projects/${projectKey}/servers`);
   }
   revalidatePath("/dashboard");
+}
+
+// ---------------------------------------------------------------------------
+// Create
+// ---------------------------------------------------------------------------
+
+export async function createServerAction(data: {
+  projectKey: string;
+  input: ServerCreateInput;
+  autoStartNow?: boolean;
+}): Promise<{ serverId: string }> {
+  const session = await requireSession();
+
+  try {
+    const server = await createServer(data.projectKey, data.input, session.userId);
+    const serverId = String(server._id);
+
+    if (data.autoStartNow) {
+      try {
+        await startServer(serverId, session.userId);
+      } catch {
+        // server created but start failed — non-fatal
+      }
+    }
+
+    revalidateServer(serverId, data.projectKey);
+    return { serverId };
+  } catch (err) {
+    throw new Error(
+      err instanceof Error ? err.message : "Failed to create server",
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
