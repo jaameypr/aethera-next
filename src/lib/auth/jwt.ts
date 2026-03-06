@@ -47,7 +47,7 @@ export async function signAccessToken(
   const ttl = process.env.JWT_ACCESS_TTL || "15m";
   const expiresIn = parseTTL(ttl);
 
-  return new SignJWT({ roles, type: "access" } as unknown as Record<string, unknown>)
+  return new SignJWT({ roles: Array.from(roles), type: "access" } as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuer(getIssuer())

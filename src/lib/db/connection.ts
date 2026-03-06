@@ -10,13 +10,13 @@ declare global {
   };
 }
 
-let cached = global.mongooseConnection;
-
-if (!cached) {
-  cached = global.mongooseConnection = { conn: null, promise: null };
+if (!global.mongooseConnection) {
+  global.mongooseConnection = { conn: null, promise: null };
 }
 
 export async function connectDB(): Promise<typeof mongoose> {
+  const cached = global.mongooseConnection;
+
   if (cached.conn) {
     return cached.conn;
   }
