@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    container_name: aethera-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file: .env
+    volumes:
+      # Docker socket — required for container orchestration
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Server data directories (must match inside & outside the container)
+      - ${AETHERA_DATA_DIR:-./.aethera/run}:${AETHERA_DATA_DIR:-./.aethera/run}
+      - ${AETHERA_BACKUP_DIR:-./.aethera/backup}:${AETHERA_BACKUP_DIR:-./.aethera/backup}
+      - ${AETHERA_WORLD_UPLOAD_DIR:-./.aethera/world_upload}:${AETHERA_WORLD_UPLOAD_DIR:-./.aethera/world_upload}
+    depends_on:
+      mongo:
+        condition: service_started
+    networks:
+      - aethera-net
+
+  mongo:
+    image: mongo:7
+    container_name: aethera-mongo
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - aethera-net
+
+volumes:
+  mongo-data:
+
+networks:
+  aethera-net:
+    name: aethera-net
+    driver: bridge
