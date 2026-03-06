@@ -10,9 +10,9 @@ services:
       # Docker socket — required for container orchestration
       - /var/run/docker.sock:/var/run/docker.sock
       # Server data directories (must match inside & outside the container)
-      - ${AETHERA_DATA_DIR:-./.aethera/run}:${AETHERA_DATA_DIR:-./.aethera/run}
-      - ${AETHERA_BACKUP_DIR:-./.aethera/backup}:${AETHERA_BACKUP_DIR:-./.aethera/backup}
-      - ${AETHERA_WORLD_UPLOAD_DIR:-./.aethera/world_upload}:${AETHERA_WORLD_UPLOAD_DIR:-./.aethera/world_upload}
+      - ${AETHERA_DATA_DIR:-/app/.aethera/run}:${AETHERA_DATA_DIR:-/app/.aethera/run}
+      - ${AETHERA_BACKUP_DIR:-/app/.aethera/backup}:${AETHERA_BACKUP_DIR:-/app/.aethera/backup}
+      - ${AETHERA_WORLD_UPLOAD_DIR:-/app/.aethera/world_upload}:${AETHERA_WORLD_UPLOAD_DIR:-/app/.aethera/world_upload}
     depends_on:
       mongo:
         condition: service_started
