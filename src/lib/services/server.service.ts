@@ -1,0 +1,358 @@
+import os from "node:os";
+import { connectDB } from "@/lib/db/connection";
+import { ServerModel, type IServer } from "@/lib/db/models/server";
+import { ProjectModel } from "@/lib/db/models/project";
+import { logAction } from "@/lib/services/project.service";
+import {
+  getOrchestrator,
+  getDockerClient,
+} from "@/lib/docker/orchestrator";
+import { containerName, deployConfigFromDoc } from "@/lib/docker/helpers";
+import {
+  getServerDataPath,
+  ensureServerDir,
+} from "@/lib/docker/storage";
+import {
+  inspectContainer,
+  tailLogs,
+  checkPortAvailable,
+  type LogEntry,
+} from "@pruefertit/docker-orchestrator";
+
+export type { LogEntry };
+
+// ---------------------------------------------------------------------------
+// Input types
+// ---------------------------------------------------------------------------
+
+export interface ServerCreateInput {
+  name: string;
+  identifier: string;
+  runtime: "minecraft" | "hytale";
+  image: string;
+  tag: string;
+  port: number;
+  rconPort?: number;
+  memory: number;
+  version?: string;
+  modLoader?: IServer["modLoader"];
+  javaArgs?: string;
+  env?: Record<string, string>;
+  properties?: Record<string, string>;
+  autoStart?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// CRUD
+// ---------------------------------------------------------------------------
+
+export async function listServers(
+  projectKey: string,
+  userId: string,
+): Promise<IServer[]> {
+  await connectDB();
+
+  const project = await ProjectModel.findOne({ key: projectKey }).lean();
+  if (!project) return [];
+
+  const isOwner = project.owner.toString() === userId;
+  const isMember = project.members.some(
+    (m) => m.userId.toString() === userId,
+  );
+  if (!isOwner && !isMember) return [];
+
+  return ServerModel.find({ projectKey }).sort({ name: 1 }).lean<IServer[]>();
+}
+
+export async function getServer(serverId: string): Promise<IServer | null> {
+  await connectDB();
+  return ServerModel.findById(serverId).lean<IServer>();
+}
+
+export async function createServer(
+  projectKey: string,
+  data: ServerCreateInput,
+  actorId: string,
+): Promise<IServer> {
+  await connectDB();
+
+  const server = await ServerModel.create({
+    ...data,
+    projectKey,
+    status: "stopped",
+    env: data.env ?? {},
+    properties: data.properties ?? {},
+    autoStart: data.autoStart ?? false,
+    access: [],
+  });
+
+  await ensureServerDir(server.identifier);
+
+  await logAction(projectKey, "SERVER_CREATED", actorId, {
+    serverId: server._id.toString(),
+    name: data.name,
+    identifier: data.identifier,
+  });
+
+  return server.toObject() as IServer;
+}
+
+const CONFIG_FIELDS = new Set([
+  "image",
+  "tag",
+  "port",
+  "rconPort",
+  "memory",
+  "version",
+  "modLoader",
+  "javaArgs",
+  "env",
+  "properties",
+]);
+
+export async function updateServer(
+  serverId: string,
+  patch: Partial<IServer>,
+): Promise<IServer> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+
+  const changesConfig = Object.keys(patch).some((k) => CONFIG_FIELDS.has(k));
+  if (changesConfig && server.status !== "stopped") {
+    throw new Error(
+      "Server must be stopped before changing configuration fields",
+    );
+  }
+
+  const updated = await ServerModel.findByIdAndUpdate(serverId, patch, {
+    new: true,
+  }).lean<IServer>();
+  if (!updated) throw new Error("Server not found");
+
+  return updated;
+}
+
+export async function deleteServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+
+  if (server.containerId && server.status !== "stopped") {
+    const orch = await getOrchestrator();
+    try {
+      await orch.destroy(server.containerId, { force: true, removeVolumes: false });
+    } catch {
+      // container may already be gone
+    }
+  }
+
+  await logAction(server.projectKey, "SERVER_DELETED", actorId, {
+    serverId: server._id.toString(),
+    name: server.name,
+    identifier: server.identifier,
+  });
+
+  await ServerModel.findByIdAndDelete(serverId);
+}
+
+// ---------------------------------------------------------------------------
+// LIFECYCLE
+// ---------------------------------------------------------------------------
+
+export async function startServer(
+  serverId: string,
+  actorId: string,
+): Promise<{ containerId: string }> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (server.status === "running" || server.status === "starting") {
+    throw new Error(`Server is already ${server.status}`);
+  }
+
+  await ServerModel.findByIdAndUpdate(serverId, { status: "starting" });
+
+  try {
+    const orch = await getOrchestrator();
+    const dataDir = getServerDataPath(server.identifier);
+    await ensureServerDir(server.identifier);
+
+    const config = deployConfigFromDoc(server, dataDir);
+    const result = await orch.deploy(config);
+
+    await ServerModel.findByIdAndUpdate(serverId, {
+      containerId: result.containerId,
+      containerStatus: result.status,
+      status: "running",
+    });
+
+    await logAction(server.projectKey, "SERVER_STARTED", actorId, {
+      serverId: server._id.toString(),
+      containerId: result.containerId,
+    });
+
+    return { containerId: result.containerId };
+  } catch (err) {
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "error",
+      containerStatus: err instanceof Error ? err.message : "deploy failed",
+    });
+    throw err;
+  }
+}
+
+export async function stopServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (!server.containerId) throw new Error("Server has no container");
+
+  await ServerModel.findByIdAndUpdate(serverId, { status: "stopping" });
+
+  try {
+    const orch = await getOrchestrator();
+    await orch.destroy(server.containerId, { timeout: 30 });
+
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "stopped",
+      containerId: undefined,
+      containerStatus: undefined,
+    });
+
+    await logAction(server.projectKey, "SERVER_STOPPED", actorId, {
+      serverId: server._id.toString(),
+    });
+  } catch (err) {
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "error",
+      containerStatus: err instanceof Error ? err.message : "stop failed",
+    });
+    throw err;
+  }
+}
+
+export async function recreateServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+
+  if (
+    server.containerId &&
+    server.status !== "stopped"
+  ) {
+    await stopServer(serverId, actorId);
+  }
+
+  await startServer(serverId, actorId);
+}
+
+export async function getServerStatus(
+  serverId: string,
+): Promise<{
+  status: IServer["status"];
+  containerStatus?: string;
+  uptime?: number;
+}> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+
+  if (!server.containerId) {
+    return { status: server.status };
+  }
+
+  try {
+    const docker = await getDockerClient();
+    const info = await inspectContainer(docker, server.containerId);
+
+    const dbStatus = info.state.running ? "running" : "stopped";
+    if (server.status !== dbStatus) {
+      await ServerModel.findByIdAndUpdate(serverId, {
+        status: dbStatus,
+        containerStatus: info.state.status,
+      });
+    }
+
+    const uptime = info.state.running
+      ? Date.now() - new Date(info.state.startedAt).getTime()
+      : undefined;
+
+    return {
+      status: dbStatus,
+      containerStatus: info.state.status,
+      uptime,
+    };
+  } catch {
+    // Container gone — sync DB
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "stopped",
+      containerId: undefined,
+      containerStatus: undefined,
+    });
+    return { status: "stopped" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ADVANCED
+// ---------------------------------------------------------------------------
+
+export async function fetchLogs(
+  serverId: string,
+  lines?: number,
+): Promise<LogEntry[]> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (!server.containerId) return [];
+
+  const docker = await getDockerClient();
+  return tailLogs(docker, server.containerId, lines ?? 200);
+}
+
+export async function sendConsoleCommand(
+  serverId: string,
+  command: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (!server.containerId || server.status !== "running") {
+    throw new Error("Server is not running");
+  }
+
+  const orch = await getOrchestrator();
+  await orch.attach.send(server.containerId, command);
+}
+
+export async function isPortAvailable(port: number): Promise<boolean> {
+  return checkPortAvailable(port);
+}
+
+export async function getRamRemaining(): Promise<{
+  total: number;
+  used: number;
+  available: number;
+}> {
+  const total = os.totalmem();
+  const free = os.freemem();
+  return { total, used: total - free, available: free };
+}
