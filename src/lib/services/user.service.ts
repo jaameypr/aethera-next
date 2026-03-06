@@ -1,3 +1,5 @@
+import "server-only";
+
 import { connectDB } from "@/lib/db/connection";
 import { UserModel, type IUser } from "@/lib/db/models/user";
 import {

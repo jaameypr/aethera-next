@@ -1,3 +1,5 @@
+import "server-only";
+
 import crypto from "node:crypto";
 import { connectDB } from "@/lib/db/connection";
 import { ProjectModel, type IProject } from "@/lib/db/models/project";

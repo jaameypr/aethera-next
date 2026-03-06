@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, rm, stat, readdir } from "node:fs/promises";
 import path from "node:path";

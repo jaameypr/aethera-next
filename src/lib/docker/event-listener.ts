@@ -1,3 +1,5 @@
+import "server-only";
+
 import { connectDB } from "@/lib/db/connection";
 import { ServerModel } from "@/lib/db/models/server";
 import { getDockerClient } from "@/lib/docker/orchestrator";

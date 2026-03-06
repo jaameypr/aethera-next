@@ -1,3 +1,5 @@
+import "server-only";
+
 import { connectDB } from "@/lib/db/connection";
 import { ProjectModel } from "@/lib/db/models/project";
 import type { IServer } from "@/lib/db/models/server";

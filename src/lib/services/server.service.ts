@@ -1,3 +1,5 @@
+import "server-only";
+
 import os from "node:os";
 import { connectDB } from "@/lib/db/connection";
 import { ServerModel, type IServer } from "@/lib/db/models/server";

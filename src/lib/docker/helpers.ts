@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { ContainerConfig } from "@pruefertit/docker-orchestrator";
 import type { IServer } from "../db/models/server";
 import { CONTAINER_PREFIX_MC, CONTAINER_PREFIX_HYT } from "./orchestrator";

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { connectDB } from "@/lib/db/connection";
 import { RoleModel, type IRole } from "@/lib/db/models/role";
 import { UserModel } from "@/lib/db/models/user";

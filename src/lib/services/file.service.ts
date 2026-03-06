@@ -1,3 +1,5 @@
+import "server-only";
+
 import { readdir, readFile as fsReadFile, writeFile as fsWriteFile, rm, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { connectDB } from "@/lib/db/connection";
