@@ -28,6 +28,10 @@ export default async function AdminLayout({
     user.permissions,
     rolePermissions,
     "admin.roles",
+  ) || hasPermission(
+    user.permissions,
+    rolePermissions,
+    "admin.system",
   );
 
   if (!hasAdmin) {
