@@ -10,12 +10,11 @@ import {
 } from "@/lib/services/file.service";
 import { canAccessServer } from "@/lib/services/server-access";
 
-function extractFilepath(params: Record<string, string>): string {
-  // [...path] catch-all is joined with /
-  return params.path;
+function extractFilepath(params: { path: string[] }): string {
+  return params.path.join("/");
 }
 
-export const GET = withAuth(async (_req: NextRequest, { session, params }) => {
+export const GET = withAuth<{ id: string; path: string[] }>(async (_req: NextRequest, { session, params }) => {
   try {
     const server = await getServer(params.id);
     if (!server) throw notFound("Server not found");
@@ -29,7 +28,7 @@ export const GET = withAuth(async (_req: NextRequest, { session, params }) => {
   }
 });
 
-export const PUT = withAuth(async (req: NextRequest, { session, params }) => {
+export const PUT = withAuth<{ id: string; path: string[] }>(async (req: NextRequest, { session, params }) => {
   try {
     const server = await getServer(params.id);
     if (!server) throw notFound("Server not found");
@@ -44,7 +43,7 @@ export const PUT = withAuth(async (req: NextRequest, { session, params }) => {
   }
 });
 
-export const DELETE = withAuth(
+export const DELETE = withAuth<{ id: string; path: string[] }>(
   async (_req: NextRequest, { session, params }) => {
     try {
       const server = await getServer(params.id);
@@ -60,7 +59,7 @@ export const DELETE = withAuth(
   },
 );
 
-export const POST = withAuth(async (req: NextRequest, { session, params }) => {
+export const POST = withAuth<{ id: string; path: string[] }>(async (req: NextRequest, { session, params }) => {
   try {
     const server = await getServer(params.id);
     if (!server) throw notFound("Server not found");

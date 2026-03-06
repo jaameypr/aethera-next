@@ -52,13 +52,15 @@ export async function requirePermission(permissionName: string): Promise<Session
 }
 
 // API route wrappers
-export function withAuth(
+type RouteParams = Record<string, string | string[]>;
+
+export function withAuth<P extends RouteParams = Record<string, string>>(
   handler: (
     req: NextRequest,
-    context: { session: Session; params: Record<string, string> },
+    context: { session: Session; params: P },
   ) => Promise<Response>,
 ) {
-  return async (req: NextRequest, segmentData: { params: Promise<Record<string, string>> }) => {
+  return async (req: NextRequest, segmentData: { params: Promise<P> }) => {
     const accessToken = req.cookies.get("access_token")?.value;
     if (!accessToken) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -75,14 +77,14 @@ export function withAuth(
   };
 }
 
-export function withPermission(
+export function withPermission<P extends RouteParams = Record<string, string>>(
   permission: string,
   handler: (
     req: NextRequest,
-    context: { session: Session; params: Record<string, string> },
+    context: { session: Session; params: P },
   ) => Promise<Response>,
 ) {
-  return withAuth(async (req, context) => {
+  return withAuth<P>(async (req, context) => {
     await connectDB();
     const user = await UserModel.findById(context.session.userId).lean();
     if (!user) {
