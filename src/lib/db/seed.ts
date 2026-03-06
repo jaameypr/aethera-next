@@ -49,23 +49,22 @@ export async function seed() {
     const password = process.env.ADMIN_PASSWORD;
 
     if (!password) {
-      console.error(
-        "ADMIN_PASSWORD environment variable is required for seeding.",
+      console.warn(
+        "[seed] ADMIN_PASSWORD not set — skipping admin user creation.",
       );
-      console.error("Set it in .env or pass it as an environment variable.");
-      process.exit(1);
+      console.warn("[seed] Set it in .env or use the /setup wizard.");
+    } else {
+      const passwordHash = await hashPassword(password);
+      await UserModel.create({
+        username,
+        email,
+        passwordHash,
+        enabled: true,
+        roles: [adminRole.name],
+        permissions: [],
+      });
+      console.log(`Created admin user: ${username}`);
     }
-
-    const passwordHash = await hashPassword(password);
-    await UserModel.create({
-      username,
-      email,
-      passwordHash,
-      enabled: true,
-      roles: [adminRole.name],
-      permissions: [],
-    });
-    console.log(`Created admin user: ${username}`);
   } else {
     console.log("Admin user already exists, skipping");
   }
