@@ -105,6 +105,5 @@ export function deployConfigFromDoc(
     },
     stopTimeout: 30,
     interactive: true,
-    tty: true,
   };
 }
