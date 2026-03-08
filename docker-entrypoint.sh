@@ -7,7 +7,7 @@ for dir in \
   "${AETHERA_BACKUP_DIR:-/app/.aethera/backup}" \
   "${AETHERA_WORLD_UPLOAD_DIR:-/app/.aethera/world_upload}"; do
   mkdir -p "$dir"
-  chown -R nextjs:nodejs "$dir"
+  chown -R 1001:1001 "$dir"
 done
 
 # Drop privileges and exec the main process
