@@ -48,7 +48,13 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
 
   // Merge user-defined env vars (override defaults)
   if (server.env) {
-    Object.assign(env, server.env);
+    if (server.env instanceof Map) {
+      server.env.forEach((value, key) => {
+        env[key] = String(value);
+      });
+    } else {
+      Object.assign(env, server.env);
+    }
   }
 
   return env;
