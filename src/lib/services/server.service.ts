@@ -9,6 +9,10 @@ import {
   getOrchestrator,
   getDockerClient,
 } from "@/lib/docker/orchestrator";
+import {
+  stopContainer,
+  startContainer,
+} from "@pruefertit/docker-orchestrator";
 import { containerName, deployConfigFromDoc } from "@/lib/docker/helpers";
 import {
   getServerDataPath,
@@ -182,6 +186,25 @@ export async function startServer(
   await ServerModel.findByIdAndUpdate(serverId, { status: "starting" });
 
   try {
+    // If a stopped container already exists, just start it
+    if (server.containerId) {
+      const docker = await getDockerClient();
+      await startContainer(docker, server.containerId);
+
+      await ServerModel.findByIdAndUpdate(serverId, {
+        status: "running",
+        containerStatus: "running",
+      });
+
+      await logAction(server.projectKey, "SERVER_STARTED", actorId, {
+        serverId: server._id.toString(),
+        containerId: server.containerId,
+      });
+
+      return { containerId: server.containerId };
+    }
+
+    // No container exists — full deploy
     const orch = await getOrchestrator();
     const dataDir = getServerDataPath(server.identifier);
     await ensureServerDir(server.identifier);
@@ -210,6 +233,45 @@ export async function startServer(
   }
 }
 
+/**
+ * Soft-stop: stop the container but keep it (can be restarted quickly).
+ */
+export async function softStopServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (!server.containerId) throw new Error("Server has no container");
+
+  await ServerModel.findByIdAndUpdate(serverId, { status: "stopping" });
+
+  try {
+    const docker = await getDockerClient();
+    await stopContainer(docker, server.containerId, 30);
+
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "stopped",
+      containerStatus: "exited",
+    });
+
+    await logAction(server.projectKey, "SERVER_STOPPED", actorId, {
+      serverId: server._id.toString(),
+    });
+  } catch (err) {
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "error",
+      containerStatus: err instanceof Error ? err.message : "stop failed",
+    });
+    throw err;
+  }
+}
+
+/**
+ * Hard-stop: stop and remove the container entirely.
+ */
 export async function stopServer(
   serverId: string,
   actorId: string,

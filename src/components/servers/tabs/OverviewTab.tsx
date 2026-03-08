@@ -3,9 +3,15 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Play, Square, RotateCcw, Loader2 } from "lucide-react";
+import { Play, Square, RotateCcw, Loader2, ChevronDown, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -131,15 +137,38 @@ export function OverviewTab({ server }: OverviewTabProps) {
             {spinnerOrIcon(Play)}
             Starten
           </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => handleAction("stop", "Server wird gestoppt")}
-            disabled={isPending || !isRunning}
-          >
-            {spinnerOrIcon(Square)}
-            Stoppen
-          </Button>
+          <div className="inline-flex items-center rounded-md">
+            <Button
+              size="sm"
+              variant="destructive"
+              className="rounded-r-none"
+              onClick={() => handleAction("soft-stop", "Server wird gestoppt")}
+              disabled={isPending || !isRunning}
+            >
+              {spinnerOrIcon(Square)}
+              Stoppen
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="rounded-l-none border-l border-red-700 px-2"
+                  disabled={isPending || !isRunning}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => handleAction("stop", "Server wird entfernt")}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Hardclose (Container löschen)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <Button
             size="sm"
             className="bg-amber-500 text-white hover:bg-amber-600"

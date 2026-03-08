@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ConsoleTab } from "./tabs/ConsoleTab";
 import { ServerLogsTab } from "./ServerLogsTab";
-import { PropertiesTab } from "./tabs/PropertiesTab";
+
 import { ServerFilesTab } from "./ServerFilesTab";
 import { ServerAddonsTab } from "./ServerAddonsTab";
 import { ServerBackupsTab } from "./ServerBackupsTab";
@@ -42,7 +42,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
     { value: "overview", label: "Übersicht" },
     { value: "console", label: "Konsole" },
     { value: "logs", label: "Logs" },
-    { value: "properties", label: "Eigenschaften" },
+
     { value: "files", label: "Dateien" },
     { value: "addons", label: "Mods/Plugins" },
     { value: "backups", label: "Backups" },
@@ -74,13 +74,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
         <TabsContent value="logs">
           <ServerLogsTab serverId={server._id} />
         </TabsContent>
-        <TabsContent value="properties">
-          <PropertiesTab
-            serverId={server._id}
-            projectKey={projectKey}
-            serverStatus={server.status}
-          />
-        </TabsContent>
+
         <TabsContent value="files">
           <ServerFilesTab serverId={server._id} />
         </TabsContent>
