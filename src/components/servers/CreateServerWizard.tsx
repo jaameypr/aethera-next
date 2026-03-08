@@ -161,7 +161,7 @@ function slugify(str: string): string {
     .slice(0, 40);
 }
 
-function parseErrors(issues: { path: (string | number)[]; message: string }[]) {
+function parseErrors(issues: { path: PropertyKey[]; message: string }[]) {
   const out: Record<string, string> = {};
   for (const issue of issues) {
     const key = String(issue.path[0] ?? "");
