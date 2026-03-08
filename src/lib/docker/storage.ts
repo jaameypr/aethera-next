@@ -16,17 +16,24 @@ export interface FileEntry {
 // ---------------------------------------------------------------------------
 
 export function getDataDir(): string {
-  return path.resolve(process.env.AETHERA_DATA_DIR || "./.aethera/run");
+  if (process.env.AETHERA_DATA_DIR) {
+    return path.resolve(process.env.AETHERA_DATA_DIR);
+  }
+  return path.resolve(process.cwd(), ".aethera", "run");
 }
 
 export function getBackupDir(): string {
-  return path.resolve(process.env.AETHERA_BACKUP_DIR || "./.aethera/backup");
+  if (process.env.AETHERA_BACKUP_DIR) {
+    return path.resolve(process.env.AETHERA_BACKUP_DIR);
+  }
+  return path.resolve(process.cwd(), ".aethera", "backup");
 }
 
 export function getUploadDir(): string {
-  return path.resolve(
-    process.env.AETHERA_WORLD_UPLOAD_DIR || "./.aethera/world_upload",
-  );
+  if (process.env.AETHERA_WORLD_UPLOAD_DIR) {
+    return path.resolve(process.env.AETHERA_WORLD_UPLOAD_DIR);
+  }
+  return path.resolve(process.cwd(), ".aethera", "world_upload");
 }
 
 // ---------------------------------------------------------------------------
