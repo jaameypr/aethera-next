@@ -104,5 +104,7 @@ export function deployConfigFromDoc(
       memory: { limit: `${server.memory}m` },
     },
     stopTimeout: 30,
+    interactive: true,
+    tty: true,
   };
 }
