@@ -19,7 +19,6 @@ export interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
-const MAX_FILE_SIZE = 1024 * 1024; // 1 MB
 const MAX_DEPTH = 5;
 
 // ---------------------------------------------------------------------------
@@ -118,9 +117,6 @@ export async function readFile(
 
   const s = await stat(resolved);
   if (s.isDirectory()) throw new Error("Cannot read a directory");
-  if (s.size > MAX_FILE_SIZE) {
-    throw new Error(`File too large (${s.size} bytes, max ${MAX_FILE_SIZE})`);
-  }
 
   const content = await fsReadFile(resolved, "utf-8");
   return { content, size: s.size };
