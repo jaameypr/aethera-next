@@ -1,30 +1,33 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ServerOverviewTab } from "./ServerOverviewTab";
-import { ServerConsoleTab } from "./ServerConsoleTab";
+import { OverviewTab } from "./tabs/OverviewTab";
+import { ConsoleTab } from "./tabs/ConsoleTab";
 import { ServerLogsTab } from "./ServerLogsTab";
-import { ServerPropertiesTab } from "./ServerPropertiesTab";
+import { PropertiesTab } from "./tabs/PropertiesTab";
 import { ServerFilesTab } from "./ServerFilesTab";
 import { ServerAddonsTab } from "./ServerAddonsTab";
 import { ServerBackupsTab } from "./ServerBackupsTab";
 import { ServerAccessTab } from "./ServerAccessTab";
-import { ServerSettingsTab } from "./ServerSettingsTab";
+import { SettingsTab } from "./tabs/SettingsTab";
 
 interface ServerPlain {
   _id: string;
   name: string;
+  identifier: string;
   status: string;
+  runtime: string;
+  version?: string;
+  modLoader?: string;
   port: number;
   rconPort?: number;
   memory: number;
-  version?: string;
-  modLoader?: string;
-  runtime: string;
   image: string;
   tag: string;
   containerId?: string;
+  containerStatus?: string;
   javaArgs?: string;
+  autoStart: boolean;
   access: { userId: string; permissions: string[] }[];
   createdAt: string;
 }
@@ -59,16 +62,24 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
 
       <div className="mt-4">
         <TabsContent value="overview">
-          <ServerOverviewTab server={server} />
+          <OverviewTab server={server} projectKey={projectKey} />
         </TabsContent>
         <TabsContent value="console">
-          <ServerConsoleTab serverId={server._id} />
+          <ConsoleTab
+            serverId={server._id}
+            projectKey={projectKey}
+            serverStatus={server.status}
+          />
         </TabsContent>
         <TabsContent value="logs">
           <ServerLogsTab serverId={server._id} />
         </TabsContent>
         <TabsContent value="properties">
-          <ServerPropertiesTab serverId={server._id} />
+          <PropertiesTab
+            serverId={server._id}
+            projectKey={projectKey}
+            serverStatus={server.status}
+          />
         </TabsContent>
         <TabsContent value="files">
           <ServerFilesTab serverId={server._id} />
@@ -83,19 +94,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
           <ServerAccessTab serverId={server._id} access={server.access} />
         </TabsContent>
         <TabsContent value="settings">
-          <ServerSettingsTab
-            serverId={server._id}
-            projectKey={projectKey}
-            serverName={server.name}
-            defaults={{
-              memory: server.memory,
-              port: server.port,
-              rconPort: server.rconPort,
-              version: server.version,
-              modLoader: server.modLoader,
-              javaArgs: server.javaArgs,
-            }}
-          />
+          <SettingsTab server={server} projectKey={projectKey} />
         </TabsContent>
       </div>
     </Tabs>

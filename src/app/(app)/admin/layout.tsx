@@ -20,19 +20,11 @@ export default async function AdminLayout({
     (r) => r.permissions,
   );
 
-  const hasAdmin = hasPermission(
-    user.permissions,
-    rolePermissions,
-    "admin.users",
-  ) || hasPermission(
-    user.permissions,
-    rolePermissions,
-    "admin.roles",
-  ) || hasPermission(
-    user.permissions,
-    rolePermissions,
-    "admin.system",
-  );
+  const hasAdmin =
+    hasPermission(user.permissions, rolePermissions, "admin.users") ||
+    hasPermission(user.permissions, rolePermissions, "admin.roles") ||
+    hasPermission(user.permissions, rolePermissions, "admin.system") ||
+    hasPermission(user.permissions, rolePermissions, "admin.mail");
 
   if (!hasAdmin) {
     redirect("/unauthorized");

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { requireSession } from "@/lib/auth/guards";
 import { getUserById } from "@/lib/services/user.service";
 import { listAllRoles } from "@/lib/services/role.service";
+import { listProjects } from "@/lib/services/project.service";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import type { CurrentUserResponse } from "@/lib/api/types";
@@ -16,8 +17,16 @@ export default async function AppLayout({
   const user = await getUserById(session.userId);
   if (!user) redirect("/login");
 
-  const allRoles = await listAllRoles();
+  const [allRoles, projectDocs] = await Promise.all([
+    listAllRoles(),
+    listProjects(session.userId),
+  ]);
   const userRoles = allRoles.filter((r) => user.roles.includes(r.name));
+  const projects = projectDocs.map((p) => ({
+    _id: p._id.toString(),
+    key: p.key,
+    name: p.name,
+  }));
 
   const currentUser: CurrentUserResponse = {
     _id: user._id.toString(),
@@ -37,5 +46,5 @@ export default async function AppLayout({
     updatedAt: user.updatedAt.toISOString(),
   };
 
-  return <AppShell currentUser={currentUser}>{children}</AppShell>;
+  return <AppShell currentUser={currentUser} projects={projects}>{children}</AppShell>;
 }

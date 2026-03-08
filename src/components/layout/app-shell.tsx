@@ -38,20 +38,15 @@ const navGroups: NavGroup[] = [
     title: "Workspace",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      {
-        label: "Projekte",
-        href: "/projects",
-        icon: FolderKanban,
-        disabled: true,
-      },
+      { label: "Projekte", href: "/projects", icon: FolderKanban },
     ],
   },
   {
     title: "Verzeichnis",
     items: [
-      { label: "Upload", href: "/upload", icon: Upload, disabled: true },
-      { label: "Backups", href: "/backups", icon: HardDrive, disabled: true },
-      { label: "Dateien", href: "/files", icon: Files, disabled: true },
+      { label: "Upload", href: "/verzeichnis/upload", icon: Upload },
+      { label: "Backups", href: "/verzeichnis/backups", icon: HardDrive },
+      { label: "Dateien", href: "/verzeichnis/dateien", icon: Files },
     ],
   },
   {
@@ -59,12 +54,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Benutzer", href: "/admin/users", icon: Users },
       { label: "Rollen", href: "/admin/roles", icon: ShieldCheck },
-      {
-        label: "Mail Templates",
-        href: "/admin/mail",
-        icon: Mail,
-        disabled: true,
-      },
+      { label: "Mail Templates", href: "/admin/mail-templates", icon: Mail },
     ],
   },
 ];
@@ -72,9 +62,10 @@ const navGroups: NavGroup[] = [
 interface AppShellProps {
   children: React.ReactNode;
   currentUser: CurrentUserResponse;
+  projects?: Array<{ _id: string; key: string; name: string }>;
 }
 
-export function AppShell({ children, currentUser }: AppShellProps) {
+export function AppShell({ children, currentUser, projects }: AppShellProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -164,6 +155,41 @@ export function AppShell({ children, currentUser }: AppShellProps) {
               })}
             </div>
           ))}
+
+          {/* Projekt-Links */}
+          {!collapsed && (
+            <div className="mb-4">
+              <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Projekte
+              </p>
+              {projects && projects.length > 0 ? (
+                projects.map((project) => {
+                  const href = `/projects/${project.key}`;
+                  const isActive = pathname === href || pathname.startsWith(href + "/");
+                  return (
+                    <Link
+                      key={project._id}
+                      href={href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                      )}
+                    >
+                      <FolderKanban className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{project.name}</span>
+                    </Link>
+                  );
+                })
+              ) : (
+                <p className="px-3 py-2 text-xs text-zinc-400 dark:text-zinc-500">
+                  Noch keine Projekte
+                </p>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* User profile button */}

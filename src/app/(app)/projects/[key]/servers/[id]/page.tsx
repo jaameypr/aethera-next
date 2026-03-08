@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import mongoose from "mongoose";
 import { requireSession } from "@/lib/auth/guards";
 import { getServer } from "@/lib/services/server.service";
 import { ServerDetailTabs } from "@/components/servers/ServerDetailTabs";
@@ -10,6 +11,8 @@ interface Props {
 export default async function ServerDetailPage({ params }: Props) {
   const { key, id } = await params;
   await requireSession();
+
+  if (!mongoose.isValidObjectId(id)) return notFound();
 
   const server = await getServer(id);
   if (!server || server.projectKey !== key) return notFound();
