@@ -10,6 +10,9 @@ import {
   type ProjectLogAction,
 } from "@/lib/db/models/project-log";
 import { badRequest, conflict, notFound } from "@/lib/api/errors";
+import { UserModel } from "@/lib/db/models/user";
+import { RoleModel } from "@/lib/db/models/role";
+import { grantIfAbsent } from "@/lib/services/permission-grant.service";
 
 const KEY_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -49,6 +52,33 @@ export async function createProject(data: {
     );
   }
 
+  // --- Projekt-Limit Enforcement ---
+  const user = await UserModel.findById(data.owner);
+  if (!user) throw new Error("User not found");
+
+  const roleDocs = await RoleModel.find({ name: { $in: user.roles } }).lean();
+  const allPermissions = [
+    ...roleDocs.flatMap((r: any) => r.permissions || []),
+    ...(user.permissions || []),
+  ];
+
+  const hasWildcard = allPermissions.some((p: any) => p.name === "*" && p.allow !== false);
+  if (!hasWildcard) {
+    const createPerm = allPermissions.find((p: any) => p.name === "projects.create" && p.allow !== false);
+    if (!createPerm) {
+      throw new Error("Keine Berechtigung zum Erstellen von Projekten");
+    }
+    if (createPerm.value != null) {
+      const limit = parseInt(String(createPerm.value), 10);
+      if (!isNaN(limit) && limit > 0) {
+        const existingCount = await ProjectModel.countDocuments({ owner: data.owner });
+        if (existingCount >= limit) {
+          throw new Error(`Projektlimit erreicht (${limit})`);
+        }
+      }
+    }
+  }
+
   const existing = await ProjectModel.findOne({ key }).lean();
   if (existing) {
     throw conflict(`A project with key "${key}" already exists`);
@@ -60,6 +90,10 @@ export async function createProject(data: {
     owner: data.owner,
     members: [],
   });
+
+  // --- Auto-Permissions für den Ersteller ---
+  await grantIfAbsent(data.owner, `project.read:${key}`);
+  await grantIfAbsent(data.owner, `project.write:${key}`);
 
   return project.toObject() as IProject;
 }

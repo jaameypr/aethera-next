@@ -14,7 +14,7 @@ const PermissionSchema = new Schema<IPermission>(
   {
     name: { type: String, required: true },
     allow: { type: Boolean, required: true },
-    value: { type: String },
+    value: { type: Schema.Types.Mixed },
   },
   { _id: false },
 );

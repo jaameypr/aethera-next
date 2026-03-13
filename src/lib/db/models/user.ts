@@ -3,7 +3,7 @@ import mongoose, { Schema, type Document, type Model } from "mongoose";
 export interface IPermission {
   name: string;
   allow: boolean;
-  value?: string;
+  value?: string | number;
 }
 
 export interface IUser extends Document {
@@ -23,7 +23,7 @@ const PermissionSchema = new Schema<IPermission>(
   {
     name: { type: String, required: true },
     allow: { type: Boolean, required: true },
-    value: { type: String },
+    value: { type: Schema.Types.Mixed },
   },
   { _id: false },
 );

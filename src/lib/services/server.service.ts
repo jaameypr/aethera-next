@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/db/connection";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
 import { ProjectModel } from "@/lib/db/models/project";
 import { logAction } from "@/lib/services/project.service";
+import { grantIfAbsent } from "@/lib/services/permission-grant.service";
 import {
   getOrchestrator,
   getDockerClient,
@@ -49,6 +50,46 @@ export interface ServerCreateInput {
 }
 
 // ---------------------------------------------------------------------------
+// RAM-Limit Enforcement
+// ---------------------------------------------------------------------------
+
+async function enforceRamLimit(userId: string, requestedRamMb: number): Promise<void> {
+  const { UserModel } = await import("@/lib/db/models/user");
+  const { RoleModel } = await import("@/lib/db/models/role");
+
+  const user = await UserModel.findById(userId);
+  if (!user) throw new Error("User not found");
+
+  const roleDocs = await RoleModel.find({ name: { $in: user.roles } }).lean();
+  const allPerms = [
+    ...roleDocs.flatMap((r: any) => r.permissions || []),
+    ...(user.permissions || []),
+  ];
+
+  if (allPerms.some((p: any) => p.name === "*" && p.allow !== false)) return;
+
+  const ramPerm = allPerms.find((p: any) => p.name === "user.ram" && p.allow !== false);
+  if (!ramPerm?.value) return; // Kein RAM-Limit konfiguriert
+
+  const limitMb = parseInt(String(ramPerm.value), 10);
+  if (isNaN(limitMb) || limitMb <= 0) return;
+
+  const ownedProjects = await ProjectModel.find({ owner: userId }).lean();
+  const projectKeys = ownedProjects.map((p: any) => p.key);
+  const servers = await ServerModel.find({
+    projectKey: { $in: projectKeys },
+    status: { $ne: "stopped" },
+  }).lean();
+  const currentRamMb = servers.reduce((sum: number, s: any) => sum + (s.memory || 0), 0);
+
+  if (currentRamMb + requestedRamMb > limitMb) {
+    throw new Error(
+      `RAM-Limit überschritten: ${currentRamMb}MB belegt + ${requestedRamMb}MB angefordert = ${currentRamMb + requestedRamMb}MB, erlaubt sind ${limitMb}MB`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CRUD
 // ---------------------------------------------------------------------------
 
@@ -82,6 +123,8 @@ export async function createServer(
 ): Promise<IServer> {
   await connectDB();
 
+  await enforceRamLimit(actorId, data.memory);
+
   const server = await ServerModel.create({
     ...data,
     projectKey,
@@ -99,6 +142,10 @@ export async function createServer(
     name: data.name,
     identifier: data.identifier,
   });
+
+  // --- Auto-Permissions für den Ersteller ---
+  await grantIfAbsent(actorId, `server.read:${server._id.toString()}`);
+  await grantIfAbsent(actorId, `server.write:${server._id.toString()}`);
 
   return server.toObject() as IServer;
 }
@@ -205,6 +252,8 @@ export async function startServer(
     }
 
     // No container exists — full deploy
+    await enforceRamLimit(actorId, server.memory);
+
     const orch = await getOrchestrator();
     const dataDir = getServerDataPath(server.identifier);
     await ensureServerDir(server.identifier);

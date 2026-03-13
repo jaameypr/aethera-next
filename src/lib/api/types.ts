@@ -1,7 +1,7 @@
 export interface PermissionEntry {
   name: string;
   allow: boolean;
-  value?: string;
+  value?: string | number;
 }
 
 export interface TokenResponse {
