@@ -6,15 +6,13 @@ import { renderHook, act } from "@testing-library/react";
 // EventSource mock
 // ---------------------------------------------------------------------------
 
-type Handler = ((event: MessageEvent) => void) | null;
-
 class MockEventSource {
   static instances: MockEventSource[] = [];
 
   url: string;
-  onopen: Handler = null;
-  onmessage: Handler = null;
-  onerror: Handler = null;
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
   private listeners: Record<string, ((e: Event) => void)[]> = {};
 
   constructor(url: string) {

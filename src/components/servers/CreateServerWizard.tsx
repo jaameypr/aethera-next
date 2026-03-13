@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useEffect, useRef, useCallback } from "react";
+import { useReducer, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,7 +21,10 @@ import { cn } from "@/lib/utils";
 import {
   createServerAction,
   checkPortAction,
+  ramRemainingAction,
 } from "@/app/(app)/actions/servers";
+import { JVM_FLAG_PRESETS, type JvmPreset } from "@/lib/constants/jvm-presets";
+import JvmPresetSelector from "@/components/servers/JvmPresetSelector";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -82,6 +85,8 @@ const step2Schema = z.object({
 // State / Reducer
 // ---------------------------------------------------------------------------
 
+const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "aikars")!;
+
 interface WizardState {
   step: 1 | 2 | 3;
   direction: 1 | -1;
@@ -93,6 +98,10 @@ interface WizardState {
   memory: number;
   port: number;
   rconPort: number | undefined;
+  jvmPresetId: string;
+  javaArgs: string;
+  ramLimitMb: number | null;
+  ramUsedMb: number | null;
   autoStart: boolean;
   errors: Partial<Record<string, string>>;
   submitting: boolean;
@@ -103,7 +112,10 @@ type WizardAction =
   | { type: "NEXT" }
   | { type: "PREV" }
   | { type: "SET_ERRORS"; errors: Partial<Record<string, string>> }
-  | { type: "SET_SUBMITTING"; value: boolean };
+  | { type: "SET_SUBMITTING"; value: boolean }
+  | { type: "SET_RAM_QUOTA"; limitMb: number; usedMb: number; availableMb: number }
+  | { type: "SET_JVM_PRESET"; preset: JvmPreset }
+  | { type: "SET_JAVA_ARGS"; value: string };
 
 const initialState: WizardState = {
   step: 1,
@@ -116,6 +128,10 @@ const initialState: WizardState = {
   memory: 2048,
   port: 25565,
   rconPort: undefined,
+  jvmPresetId: DEFAULT_JVM_PRESET.id,
+  javaArgs: DEFAULT_JVM_PRESET.flags,
+  ramLimitMb: null,
+  ramUsedMb: null,
   autoStart: false,
   errors: {},
   submitting: false,
@@ -143,6 +159,27 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, errors: action.errors };
     case "SET_SUBMITTING":
       return { ...state, submitting: action.value };
+    case "SET_RAM_QUOTA": {
+      const { limitMb, usedMb, availableMb } = action;
+      const hasQuota = limitMb > 0;
+      const maxRam = hasQuota ? Math.min(availableMb, 32768) : 32768;
+      return {
+        ...state,
+        ramLimitMb: hasQuota ? limitMb : null,
+        ramUsedMb: hasQuota ? usedMb : null,
+        memory: Math.min(state.memory, maxRam),
+      };
+    }
+    case "SET_JVM_PRESET": {
+      const { preset } = action;
+      return {
+        ...state,
+        jvmPresetId: preset.id,
+        javaArgs: preset.id === "custom" ? state.javaArgs : preset.flags,
+      };
+    }
+    case "SET_JAVA_ARGS":
+      return { ...state, javaArgs: action.value };
     default:
       return state;
   }
@@ -318,11 +355,6 @@ function Step2({
     dispatch({ type: "SET", field, value });
 
   const portTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [portAvailable, setPortAvailable] = [
-    null as boolean | null,
-    (_: boolean | null) => {},
-  ];
-  // Local port-available state (not in reducer to avoid noise)
   const portCheckRef = useRef<boolean | null>(null);
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
@@ -350,7 +382,20 @@ function Step2({
     };
   }, [state.port, checkPort]);
 
-  void portAvailable; // suppress unused warning
+  const maxRam = state.ramLimitMb !== null
+    ? Math.min(Math.max(0, state.ramLimitMb - (state.ramUsedMb ?? 0)), 32768)
+    : 32768;
+  const ramExhausted = state.ramLimitMb !== null && maxRam < 512;
+
+  const quotaBannerColor = useMemo(() => {
+    if (!state.ramLimitMb) return null;
+    const usedPct = ((state.ramUsedMb ?? 0) / state.ramLimitMb) * 100;
+    if (usedPct >= 90) return "red";
+    if (usedPct >= 70) return "amber";
+    return "green";
+  }, [state.ramLimitMb, state.ramUsedMb]);
+
+  const isMinecraft = state.runtime === "minecraft";
 
   return (
     <div className="space-y-4">
@@ -365,25 +410,59 @@ function Step2({
           />
         </div>
 
-        <div className="space-y-1.5">
-          <Label>Mod-Loader</Label>
-          <Select
-            value={state.modLoader}
-            onValueChange={(v) => set("modLoader")(v as ModLoader)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MOD_LOADERS.map((l) => (
-                <SelectItem key={l.value} value={l.value}>
-                  {l.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {isMinecraft && (
+          <div className="space-y-1.5">
+            <Label>Mod-Loader</Label>
+            <Select
+              value={state.modLoader}
+              onValueChange={(v) => set("modLoader")(v as ModLoader)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MOD_LOADERS.map((l) => (
+                  <SelectItem key={l.value} value={l.value}>
+                    {l.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
+
+      {/* RAM Quota Banner */}
+      {state.ramLimitMb !== null && (
+        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="mb-1.5 flex items-center justify-between text-xs">
+            <span className="text-zinc-500">RAM-Kontingent</span>
+            <span className="font-mono font-medium">
+              {formatMemory(state.ramUsedMb ?? 0)} / {formatMemory(state.ramLimitMb)} belegt
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                quotaBannerColor === "red"
+                  ? "bg-red-500"
+                  : quotaBannerColor === "amber"
+                    ? "bg-amber-500"
+                    : "bg-emerald-500",
+              )}
+              style={{
+                width: `${Math.min(100, (((state.ramUsedMb ?? 0) / state.ramLimitMb) * 100))}%`,
+              }}
+            />
+          </div>
+          {ramExhausted && (
+            <p className="mt-1.5 text-xs text-red-500">
+              RAM-Kontingent erschöpft — kein weiterer Server möglich.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* RAM */}
       <div className="space-y-2">
@@ -395,16 +474,33 @@ function Step2({
         </div>
         <Slider
           min={512}
-          max={8192}
+          max={Math.max(512, maxRam)}
           step={512}
           value={[state.memory]}
           onValueChange={([v]) => set("memory")(v)}
+          disabled={ramExhausted}
         />
         <div className="flex justify-between text-xs text-zinc-400">
           <span>512 MB</span>
-          <span>8 GB</span>
+          <span>{formatMemory(Math.max(512, maxRam))}</span>
         </div>
       </div>
+
+      {/* JVM Flags (Minecraft only) */}
+      {isMinecraft && (
+        <div className="space-y-1.5">
+          <Label>JVM Flags</Label>
+          <JvmPresetSelector
+            memory={state.memory}
+            selectedPresetId={state.jvmPresetId}
+            onPresetChange={(presetId, flags) =>
+              dispatch({ type: "SET_JVM_PRESET", preset: { id: presetId, flags } as JvmPreset })
+            }
+            javaArgs={state.javaArgs}
+            onJavaArgsChange={(value) => dispatch({ type: "SET_JAVA_ARGS", value })}
+          />
+        </div>
+      )}
 
       {/* Port */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -418,7 +514,6 @@ function Step2({
               onChange={(e) => {
                 const v = Number(e.target.value);
                 set("port")(v);
-                // Auto-set rconPort
                 if (!state.rconPort || state.rconPort === state.port + 10) {
                   set("rconPort")(v + 10);
                 }
@@ -428,9 +523,7 @@ function Step2({
               <span
                 className={cn(
                   "absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium",
-                  portCheckRef.current
-                    ? "text-emerald-600"
-                    : "text-red-500",
+                  portCheckRef.current ? "text-emerald-600" : "text-red-500",
                 )}
               >
                 {portCheckRef.current ? "frei" : "belegt"}
@@ -474,10 +567,13 @@ function Step3({
     ["Identifier", state.identifier],
     ["Runtime", state.runtime],
     ["Version", state.version],
-    ["Mod-Loader", state.modLoader],
+    ...(state.runtime === "minecraft" ? [["Mod-Loader", state.modLoader]] : []),
     ["RAM", formatMemory(state.memory)],
     ["Port", String(state.port)],
     ...(state.rconPort ? [["RCON Port", String(state.rconPort)]] : []),
+    ...(state.runtime === "minecraft" && state.jvmPresetId !== "minimal"
+      ? [["JVM Preset", JVM_FLAG_PRESETS.find((p) => p.id === state.jvmPresetId)?.label ?? state.jvmPresetId]]
+      : []),
   ];
 
   return (
@@ -531,6 +627,22 @@ export function CreateServerWizard({ projectKey }: Props) {
   const router = useRouter();
   const [state, dispatch] = useReducer(reducer, initialState);
 
+  // Load RAM quota on mount
+  useEffect(() => {
+    ramRemainingAction()
+      .then(({ limitMb, usedMb, availableMb }) => {
+        if (limitMb > 0) {
+          dispatch({ type: "SET_RAM_QUOTA", limitMb, usedMb, availableMb });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const ramExhaustedOnStep2 =
+    state.step === 2 &&
+    state.ramLimitMb !== null &&
+    Math.min(Math.max(0, state.ramLimitMb - (state.ramUsedMb ?? 0)), 32768) < 512;
+
   function validateStep(): boolean {
     const schema = state.step === 1 ? step1Schema : step2Schema;
     const data =
@@ -581,6 +693,7 @@ export function CreateServerWizard({ projectKey }: Props) {
           memory: state.memory,
           version: state.version !== "latest" ? state.version : undefined,
           modLoader: state.modLoader,
+          javaArgs: state.javaArgs || undefined,
           autoStart: state.autoStart,
         },
         autoStartNow: state.autoStart,
@@ -651,7 +764,7 @@ export function CreateServerWizard({ projectKey }: Props) {
               {state.submitting ? "Erstelle…" : "Server erstellen"}
             </Button>
           ) : (
-            <Button onClick={handleNext}>
+            <Button onClick={handleNext} disabled={ramExhaustedOnStep2}>
               Weiter
               <ChevronRight className="ml-1.5 h-4 w-4" />
             </Button>
