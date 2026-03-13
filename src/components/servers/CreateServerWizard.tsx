@@ -1,11 +1,17 @@
 "use client";
 
-import { useReducer, useEffect, useRef, useCallback, useMemo } from "react";
+import { useReducer, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronDown, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -354,6 +360,8 @@ function Step2({
   const set = (field: keyof WizardState) => (value: unknown) =>
     dispatch({ type: "SET", field, value });
 
+  const [jvmOpen, setJvmOpen] = useState(false);
+
   const portTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const portCheckRef = useRef<boolean | null>(null);
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
@@ -486,19 +494,32 @@ function Step2({
         </div>
       </div>
 
-      {/* JVM Flags (Minecraft only) */}
+      {/* JVM Flags (Minecraft only, collapsed by default) */}
       {isMinecraft && (
-        <div className="space-y-1.5">
-          <Label>JVM Flags</Label>
-          <JvmPresetSelector
-            memory={state.memory}
-            selectedPresetId={state.jvmPresetId}
-            onPresetChange={(presetId, flags) =>
-              dispatch({ type: "SET_JVM_PRESET", preset: { id: presetId, flags } as JvmPreset })
-            }
-            javaArgs={state.javaArgs}
-            onJavaArgsChange={(value) => dispatch({ type: "SET_JAVA_ARGS", value })}
-          />
+        <div className="rounded-md border border-zinc-200 dark:border-zinc-700">
+          <button
+            type="button"
+            onClick={() => setJvmOpen((o) => !o)}
+            className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            <span>JVM Flags</span>
+            <ChevronDown
+              className={cn("h-4 w-4 transition-transform", jvmOpen && "rotate-180")}
+            />
+          </button>
+          {jvmOpen && (
+            <div className="border-t border-zinc-200 p-3 dark:border-zinc-700">
+              <JvmPresetSelector
+                memory={state.memory}
+                selectedPresetId={state.jvmPresetId}
+                onPresetChange={(presetId, flags) =>
+                  dispatch({ type: "SET_JVM_PRESET", preset: { id: presetId, flags } as JvmPreset })
+                }
+                javaArgs={state.javaArgs}
+                onJavaArgsChange={(value) => dispatch({ type: "SET_JAVA_ARGS", value })}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -511,23 +532,22 @@ function Step2({
               id="w-port"
               type="number"
               value={state.port}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                set("port")(v);
-                if (!state.rconPort || state.rconPort === state.port + 10) {
-                  set("rconPort")(v + 10);
-                }
-              }}
+              onChange={(e) => set("port")(Number(e.target.value))}
             />
-            {portCheckRef.current !== null && (
-              <span
-                className={cn(
-                  "absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium",
-                  portCheckRef.current ? "text-emerald-600" : "text-red-500",
-                )}
-              >
-                {portCheckRef.current ? "frei" : "belegt"}
-              </span>
+            {portCheckRef.current === true && (
+              <CheckCircle2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500" />
+            )}
+            {portCheckRef.current === false && (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertCircle className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 cursor-default text-red-500" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Dieser Port ist bereits belegt. Wähle einen anderen Port.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
           {state.errors.port && (
