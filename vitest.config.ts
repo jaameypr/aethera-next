@@ -12,10 +12,14 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["src/__tests__/**/*.test.ts"],
+    include: ["src/__tests__/**/*.test.{ts,tsx}"],
     setupFiles: ["src/__tests__/setup.ts"],
     testTimeout: 30_000,
     hookTimeout: 60_000,
     fileParallelism: false,
+    environmentMatchGlobs: [
+      ["src/__tests__/hooks/**", "jsdom"],
+      ["src/__tests__/components/**", "jsdom"],
+    ],
   },
 });

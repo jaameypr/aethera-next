@@ -568,7 +568,7 @@ export function CreateServerWizard({ projectKey }: Props) {
           : "zacheri/hytale-server";
       const tag = state.runtime === "minecraft" ? "stable" : "latest";
 
-      const { serverId } = await createServerAction({
+      const result = await createServerAction({
         projectKey,
         input: {
           name: state.name,
@@ -586,8 +586,14 @@ export function CreateServerWizard({ projectKey }: Props) {
         autoStartNow: state.autoStart,
       });
 
+      if ("error" in result) {
+        toast.error(result.message);
+        dispatch({ type: "SET_SUBMITTING", value: false });
+        return;
+      }
+
       toast.success("Server erstellt");
-      router.push(`/projects/${projectKey}/servers/${serverId}`);
+      router.push(`/projects/${projectKey}/servers/${result.serverId}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Fehler beim Erstellen");
       dispatch({ type: "SET_SUBMITTING", value: false });

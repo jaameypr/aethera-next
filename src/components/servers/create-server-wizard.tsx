@@ -39,6 +39,8 @@ import {
   checkPortAction,
   ramRemainingAction,
 } from "@/app/(app)/actions/servers";
+import { type JvmPreset } from "@/lib/constants/jvm-presets";
+import JvmPresetSelector from "@/components/servers/JvmPresetSelector";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,11 +66,15 @@ interface WizardState {
   // Step 2 — Version
   version: string;
   modLoader: ModLoader;
+  jvmPresetId: string;
+  javaArgs: string;
   // Step 3 — Resources
   memory: number;
   port: number;
   portStatus: "idle" | "checking" | "available" | "taken";
   maxRam: number;
+  ramLimitMb: number | null;
+  ramUsedMb: number | null;
   // Step 4 — Confirmation
   autoStart: boolean;
   // Global
@@ -84,7 +90,12 @@ type WizardAction =
   | { type: "SET_ERRORS"; errors: Record<string, string> }
   | { type: "SET_PORT_STATUS"; status: WizardState["portStatus"] }
   | { type: "SET_MAX_RAM"; value: number }
+  | { type: "SET_RAM_QUOTA"; limitMb: number; usedMb: number; availableMb: number }
+  | { type: "SET_JVM_PRESET"; preset: JvmPreset }
+  | { type: "SET_JAVA_ARGS"; value: string }
   | { type: "RESET" };
+
+const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "aikars")!;
 
 const INITIAL_STATE: WizardState = {
   step: 0,
@@ -95,10 +106,14 @@ const INITIAL_STATE: WizardState = {
   runtime: "minecraft",
   version: "",
   modLoader: "vanilla",
+  jvmPresetId: DEFAULT_JVM_PRESET.id,
+  javaArgs: DEFAULT_JVM_PRESET.flags,
   memory: 2048,
   port: 25565,
   portStatus: "idle",
   maxRam: 8192,
+  ramLimitMb: null,
+  ramUsedMb: null,
   autoStart: false,
   errors: {},
 };
@@ -156,6 +171,30 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
         maxRam: action.value,
         memory: Math.min(state.memory, action.value),
       };
+    case "SET_RAM_QUOTA": {
+      const { limitMb, usedMb, availableMb } = action;
+      const hasQuota = limitMb > 0;
+      return {
+        ...state,
+        ramLimitMb: hasQuota ? limitMb : null,
+        ramUsedMb: hasQuota ? usedMb : null,
+        maxRam: hasQuota ? Math.min(availableMb, 32768) : state.maxRam,
+        memory: hasQuota
+          ? Math.min(state.memory, Math.min(availableMb, 32768))
+          : state.memory,
+      };
+    }
+    case "SET_JVM_PRESET": {
+      const { preset } = action;
+      return {
+        ...state,
+        jvmPresetId: preset.id,
+        // For custom, keep whatever javaArgs the user had (or prior preset flags)
+        javaArgs: preset.id === "custom" ? state.javaArgs : preset.flags,
+      };
+    }
+    case "SET_JAVA_ARGS":
+      return { ...state, javaArgs: action.value };
     case "RESET":
       return INITIAL_STATE;
     default:
@@ -282,10 +321,14 @@ function StepVersion({
     { value: "purpur", label: "Purpur" },
   ];
 
+  const isMinecraft = state.runtime === "minecraft";
+
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="w-version">Minecraft-Version</Label>
+        <Label htmlFor="w-version">
+          {isMinecraft ? "Minecraft-Version" : "Version"}
+        </Label>
         <Input
           id="w-version"
           value={state.version}
@@ -303,31 +346,51 @@ function StepVersion({
         </p>
       </div>
 
-      <div className="space-y-1.5">
-        <Label>Mod-Loader</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {loaders.map((loader) => (
-            <button
-              key={loader.value}
-              type="button"
-              onClick={() =>
-                dispatch({
-                  type: "SET_FIELD",
-                  field: "modLoader",
-                  value: loader.value,
-                })
-              }
-              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                state.modLoader === loader.value
-                  ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600"
-              }`}
-            >
-              {loader.label}
-            </button>
-          ))}
+      {isMinecraft && (
+        <div className="space-y-1.5">
+          <Label>Mod-Loader</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {loaders.map((loader) => (
+              <button
+                key={loader.value}
+                type="button"
+                onClick={() =>
+                  dispatch({
+                    type: "SET_FIELD",
+                    field: "modLoader",
+                    value: loader.value,
+                  })
+                }
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  state.modLoader === loader.value
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600"
+                }`}
+              >
+                {loader.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {isMinecraft && (
+        <div className="space-y-1.5">
+          <Label>JVM Flags</Label>
+          <JvmPresetSelector
+            memory={state.memory}
+            selectedPresetId={state.jvmPresetId}
+            onPresetChange={(presetId, flags) => {
+              const preset = { id: presetId, flags } as JvmPreset;
+              dispatch({ type: "SET_JVM_PRESET", preset });
+            }}
+            javaArgs={state.javaArgs}
+            onJavaArgsChange={(value) =>
+              dispatch({ type: "SET_JAVA_ARGS", value })
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -353,8 +416,43 @@ function StepResources({
           ? "❌"
           : "";
 
+  const showQuota = state.ramLimitMb !== null && state.ramLimitMb > 0;
+  const availableMb = showQuota
+    ? Math.max(0, state.ramLimitMb! - (state.ramUsedMb ?? 0))
+    : 0;
+  const ramExhausted = showQuota && availableMb < 512;
+
+  let quotaBarColor = "bg-emerald-500";
+  if (showQuota) {
+    const pct = (state.ramUsedMb ?? 0) / state.ramLimitMb!;
+    if (pct > 0.8) quotaBarColor = "bg-red-500";
+    else if (pct >= 0.6) quotaBarColor = "bg-amber-400";
+  }
+
   return (
     <div className="space-y-6">
+      {showQuota && (
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs text-zinc-500">
+            <span>{state.ramUsedMb} MB belegt — {availableMb} MB verfügbar</span>
+            <span>{state.ramLimitMb} MB gesamt</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+            <div
+              className={`h-full rounded-full transition-all ${quotaBarColor}`}
+              style={{
+                width: `${Math.min(100, ((state.ramUsedMb ?? 0) / state.ramLimitMb!) * 100)}%`,
+              }}
+            />
+          </div>
+          {ramExhausted && (
+            <p className="text-xs text-red-500">
+              Kein RAM-Kontingent mehr verfügbar.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label>RAM</Label>
@@ -368,6 +466,7 @@ function StepResources({
           min={512}
           max={state.maxRam}
           step={256}
+          disabled={ramExhausted}
         />
         <div className="flex justify-between text-xs text-zinc-500">
           <span>512 MB</span>
@@ -431,6 +530,11 @@ function StepConfirmation({ state }: { state: WizardState }) {
 
   return (
     <div className="space-y-4">
+      {state.errors.submit && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+          {state.errors.submit}
+        </div>
+      )}
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">
         {rows.map((row, i) => (
           <div
@@ -496,19 +600,15 @@ export function CreateServerWizard({
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const [isPending, startTransition] = useTransition();
 
-  // Fetch max RAM on mount
+  // Fetch RAM quota on open
   useEffect(() => {
     if (!open) return;
     ramRemainingAction()
-      .then(({ available }) => {
-        const maxMb = Math.floor(available / (1024 * 1024));
-        const capped = Math.min(maxMb, 32768);
-        if (capped > 512) {
-          dispatch({ type: "SET_MAX_RAM", value: capped });
-        }
+      .then(({ limitMb, usedMb, availableMb }) => {
+        dispatch({ type: "SET_RAM_QUOTA", limitMb, usedMb, availableMb });
       })
       .catch(() => {
-        // fallback to default
+        // fallback to defaults
       });
   }, [open]);
 
@@ -585,7 +685,7 @@ export function CreateServerWizard({
             ? process.env.NEXT_PUBLIC_MINECRAFT_IMAGE || "itzg/minecraft-server"
             : process.env.NEXT_PUBLIC_HYTALE_IMAGE || "zacheri/hytale-server:latest";
 
-        const { serverId } = await createServerAction({
+        const result = await createServerAction({
           projectKey,
           input: {
             name: state.name,
@@ -597,14 +697,24 @@ export function CreateServerWizard({
             memory: state.memory,
             version: state.version || undefined,
             modLoader: state.modLoader,
+            javaArgs: state.javaArgs || undefined,
             autoStart: state.autoStart,
           },
           autoStartNow: state.autoStart,
         });
 
+        if ("error" in result) {
+          if (result.error === "RAM_QUOTA_EXCEEDED") {
+            dispatch({ type: "SET_ERRORS", errors: { submit: result.message } });
+          } else {
+            toast.error(result.message || "Fehler beim Erstellen");
+          }
+          return;
+        }
+
         toast.success("Server erstellt!");
         onOpenChange(false);
-        router.push(`/projects/${projectKey}/servers/${serverId}`);
+        router.push(`/projects/${projectKey}/servers/${result.serverId}`);
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : "Fehler beim Erstellen",
@@ -615,6 +725,12 @@ export function CreateServerWizard({
 
   const isLastStep = state.step === STEPS.length - 1;
   const CurrentStepIcon = STEPS[state.step].icon;
+
+  const ramExhaustedOnStep2 =
+    state.step === 2 &&
+    state.ramLimitMb !== null &&
+    state.ramLimitMb > 0 &&
+    Math.max(0, state.ramLimitMb - (state.ramUsedMb ?? 0)) < 512;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -721,7 +837,7 @@ export function CreateServerWizard({
               {isPending ? "Erstelle…" : "Server erstellen"}
             </Button>
           ) : (
-            <Button onClick={handleNext}>
+            <Button onClick={handleNext} disabled={ramExhaustedOnStep2}>
               Weiter
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>

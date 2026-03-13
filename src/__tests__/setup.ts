@@ -5,6 +5,7 @@
  * (server-only is a build-time guard, not needed in tests).
  */
 import { vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
 // server-only throws when imported outside of a React Server Component context.
 // We mock it as a no-op so service files can be imported in tests.

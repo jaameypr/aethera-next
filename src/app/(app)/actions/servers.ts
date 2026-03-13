@@ -15,7 +15,8 @@ import {
   fetchLogs,
   sendConsoleCommand,
   isPortAvailable,
-  getRamRemaining,
+  getRamQuota,
+  RamQuotaExceededError,
   type LogEntry,
   type ServerCreateInput,
 } from "@/lib/services/server.service";
@@ -41,7 +42,7 @@ export async function createServerAction(data: {
   projectKey: string;
   input: ServerCreateInput;
   autoStartNow?: boolean;
-}): Promise<{ serverId: string }> {
+}): Promise<{ serverId: string } | { error: "RAM_QUOTA_EXCEEDED"; message: string }> {
   const session = await requireSession();
 
   try {
@@ -59,6 +60,9 @@ export async function createServerAction(data: {
     revalidateServer(serverId, data.projectKey);
     return { serverId };
   } catch (err) {
+    if (err instanceof RamQuotaExceededError) {
+      return { error: "RAM_QUOTA_EXCEEDED", message: err.message };
+    }
     throw new Error(
       err instanceof Error ? err.message : "Failed to create server",
     );
@@ -334,14 +338,14 @@ export async function checkPortAction(data: {
 }
 
 export async function ramRemainingAction(): Promise<{
-  total: number;
-  used: number;
-  available: number;
+  limitMb: number;
+  usedMb: number;
+  availableMb: number;
 }> {
-  await requireSession();
+  const session = await requireSession();
 
   try {
-    return await getRamRemaining();
+    return await getRamQuota(session.userId);
   } catch (err) {
     throw new Error(
       err instanceof Error ? err.message : "Failed to get RAM info",

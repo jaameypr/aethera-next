@@ -5,7 +5,6 @@ import {
   Activity,
   Server,
   HardDrive,
-  MemoryStick,
   RefreshCw,
   Circle,
 } from "lucide-react";
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import SystemMetricsCharts from "@/components/admin/SystemMetricsCharts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,6 +30,10 @@ interface ContainerInfo {
   status: string;
   ports: { privatePort: number; publicPort?: number; type: string }[];
   created: number;
+  // per-container metrics enriched by the API route
+  cpuPct?: number;
+  memPct?: number;
+  memUsedMb?: number;
 }
 
 interface OrchestratorHealth {
@@ -132,6 +136,27 @@ function StatCard({
 }
 
 // ---------------------------------------------------------------------------
+// Metric Badge
+// ---------------------------------------------------------------------------
+
+function MetricBadge({ value }: { value?: number }) {
+  if (value === undefined) {
+    return <span className="text-xs text-zinc-400">—</span>;
+  }
+  const cls =
+    value > 80
+      ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400"
+      : value >= 50
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
+        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400";
+  return (
+    <span className={cn("inline-flex rounded px-1.5 py-0.5 text-xs font-medium tabular-nums", cls)}>
+      {value.toFixed(1)}%
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Container Table
 // ---------------------------------------------------------------------------
 
@@ -149,18 +174,12 @@ function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">
-              Name
-            </th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">
-              Image
-            </th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">
-              Status
-            </th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">
-              Ports
-            </th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">Name</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">Image</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">Status</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">CPU</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">RAM</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">Ports</th>
           </tr>
         </thead>
         <tbody>
@@ -170,9 +189,7 @@ function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
               className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
             >
               <td className="px-3 py-2 font-mono text-xs">{c.name}</td>
-              <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                {c.image}
-              </td>
+              <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{c.image}</td>
               <td className="px-3 py-2">
                 <span className="inline-flex items-center gap-1.5">
                   <Circle
@@ -187,6 +204,12 @@ function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
                   />
                   {c.status}
                 </span>
+              </td>
+              <td className="px-3 py-2">
+                <MetricBadge value={c.cpuPct} />
+              </td>
+              <td className="px-3 py-2">
+                <MetricBadge value={c.memPct} />
               </td>
               <td className="px-3 py-2 font-mono text-xs text-zinc-500">
                 {c.ports
@@ -235,32 +258,21 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
     }
   }
 
-  // Auto-refresh every 30s
+  // Auto-refresh every 10s (drives container metrics polling)
   useEffect(() => {
-    const interval = setInterval(refresh, 30_000);
+    const interval = setInterval(refresh, 10_000);
     return () => clearInterval(interval);
   }, []);
 
-  const memUsedPct =
-    systemData.memory.total > 0
-      ? ((systemData.memory.used / systemData.memory.total) * 100).toFixed(1)
-      : "0";
-
   return (
     <div className="space-y-6">
-      {/* Quick stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Quick stats — 3 cards (RAM-Nutzung replaced by live chart below) */}
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           title="Container"
           value={`${systemData.containerCount.running} / ${systemData.containerCount.total}`}
           subtitle="Running / Total"
           icon={Server}
-        />
-        <StatCard
-          title="RAM-Nutzung"
-          value={`${memUsedPct}%`}
-          subtitle={`${formatBytes(systemData.memory.used)} / ${formatBytes(systemData.memory.total)}`}
-          icon={MemoryStick}
         />
         <StatCard
           title="Docker Daemon"
@@ -279,6 +291,9 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
           icon={HardDrive}
         />
       </div>
+
+      {/* Live system metrics charts (replaces static RAM-Nutzung card) */}
+      <SystemMetricsCharts />
 
       {/* Docker Health */}
       {systemData.docker && (
@@ -313,37 +328,45 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
         </Card>
       )}
 
-      {/* RAM progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Arbeitsspeicher</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-zinc-500">Belegt</span>
-            <span className="font-medium">
-              {formatBytes(systemData.memory.used)}
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all",
-                Number(memUsedPct) > 90
-                  ? "bg-red-500"
-                  : Number(memUsedPct) > 70
-                    ? "bg-amber-500"
-                    : "bg-emerald-500",
-              )}
-              style={{ width: `${memUsedPct}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-zinc-500">
-            <span>Frei: {formatBytes(systemData.memory.free)}</span>
-            <span>Total: {formatBytes(systemData.memory.total)}</span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* RAM progress (static snapshot from last poll) */}
+      {(() => {
+        const memUsedPct =
+          systemData.memory.total > 0
+            ? ((systemData.memory.used / systemData.memory.total) * 100).toFixed(1)
+            : "0";
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Arbeitsspeicher</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">Belegt</span>
+                <span className="font-medium">
+                  {formatBytes(systemData.memory.used)}
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    Number(memUsedPct) > 90
+                      ? "bg-red-500"
+                      : Number(memUsedPct) > 70
+                        ? "bg-amber-500"
+                        : "bg-emerald-500",
+                  )}
+                  style={{ width: `${memUsedPct}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-zinc-500">
+                <span>Frei: {formatBytes(systemData.memory.free)}</span>
+                <span>Total: {formatBytes(systemData.memory.total)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Container list */}
       <Card>
