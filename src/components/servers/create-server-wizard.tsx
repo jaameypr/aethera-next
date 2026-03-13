@@ -39,7 +39,7 @@ import {
   checkPortAction,
   ramRemainingAction,
 } from "@/app/(app)/actions/servers";
-import { type JvmPreset } from "@/lib/constants/jvm-presets";
+import { JVM_FLAG_PRESETS, type JvmPreset } from "@/lib/constants/jvm-presets";
 import JvmPresetSelector from "@/components/servers/JvmPresetSelector";
 
 // ---------------------------------------------------------------------------
