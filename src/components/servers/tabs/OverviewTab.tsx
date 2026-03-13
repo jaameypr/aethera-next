@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import MetricsCharts from "@/components/servers/MetricsCharts";
 
 const STATUS_STYLES: Record<string, string> = {
   running:
@@ -180,6 +181,9 @@ export function OverviewTab({ server }: OverviewTabProps) {
           </Button>
         </div>
       </div>
+
+      {/* Live Metrics */}
+      {isRunning && <MetricsCharts serverId={server._id} />}
 
       {/* Info Grid */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
