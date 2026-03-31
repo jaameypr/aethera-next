@@ -15,11 +15,16 @@ import {
   fetchLogs,
   sendConsoleCommand,
   isPortAvailable,
-  getRamQuota,
-  RamQuotaExceededError,
   type LogEntry,
   type ServerCreateInput,
 } from "@/lib/services/server.service";
+import {
+  listBlueprints,
+  createBlueprint,
+  deleteBlueprint,
+  initializeBlueprint,
+  type IBlueprint,
+} from "@/lib/services/blueprint.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,7 +47,7 @@ export async function createServerAction(data: {
   projectKey: string;
   input: ServerCreateInput;
   autoStartNow?: boolean;
-}): Promise<{ serverId: string } | { error: "RAM_QUOTA_EXCEEDED"; message: string }> {
+}): Promise<{ serverId: string }> {
   const session = await requireSession();
 
   try {
@@ -60,9 +65,6 @@ export async function createServerAction(data: {
     revalidateServer(serverId, data.projectKey);
     return { serverId };
   } catch (err) {
-    if (err instanceof RamQuotaExceededError) {
-      return { error: "RAM_QUOTA_EXCEEDED", message: err.message };
-    }
     throw new Error(
       err instanceof Error ? err.message : "Failed to create server",
     );
@@ -337,18 +339,84 @@ export async function checkPortAction(data: {
   }
 }
 
-export async function ramRemainingAction(): Promise<{
-  limitMb: number;
-  usedMb: number;
-  availableMb: number;
-}> {
+// ---------------------------------------------------------------------------
+// Blueprint Actions
+// ---------------------------------------------------------------------------
+
+export async function listBlueprintsAction(data: {
+  projectKey: string;
+}): Promise<IBlueprint[]> {
+  const session = await requireSession();
+  return listBlueprints(data.projectKey, session.userId);
+}
+
+export async function createBlueprintAction(data: {
+  projectKey: string;
+  name: string;
+  maxRam: number;
+}): Promise<IBlueprint> {
   const session = await requireSession();
 
   try {
-    return await getRamQuota(session.userId);
+    const blueprint = await createBlueprint(
+      data.projectKey,
+      { name: data.name, maxRam: data.maxRam },
+      session.userId,
+    );
+    revalidatePath(`/projects/${data.projectKey}`);
+    return blueprint;
   } catch (err) {
     throw new Error(
-      err instanceof Error ? err.message : "Failed to get RAM info",
+      err instanceof Error ? err.message : "Failed to create blueprint",
+    );
+  }
+}
+
+export async function deleteBlueprintAction(data: {
+  blueprintId: string;
+  projectKey: string;
+}): Promise<void> {
+  const session = await requireSession();
+
+  try {
+    await deleteBlueprint(data.blueprintId, session.userId);
+    revalidatePath(`/projects/${data.projectKey}`);
+  } catch (err) {
+    throw new Error(
+      err instanceof Error ? err.message : "Failed to delete blueprint",
+    );
+  }
+}
+
+export async function initializeBlueprintAction(data: {
+  blueprintId: string;
+  projectKey: string;
+  input: ServerCreateInput;
+  autoStartNow?: boolean;
+}): Promise<{ serverId: string }> {
+  const session = await requireSession();
+
+  try {
+    const { serverId } = await initializeBlueprint(
+      data.blueprintId,
+      data.input,
+      session.userId,
+    );
+
+    if (data.autoStartNow) {
+      try {
+        await startServer(serverId, session.userId);
+      } catch {
+        // non-fatal
+      }
+    }
+
+    revalidateServer(serverId, data.projectKey);
+    revalidatePath(`/projects/${data.projectKey}`);
+    return { serverId };
+  } catch (err) {
+    throw new Error(
+      err instanceof Error ? err.message : "Failed to initialize blueprint",
     );
   }
 }

@@ -50,78 +50,6 @@ export interface ServerCreateInput {
 }
 
 // ---------------------------------------------------------------------------
-// RAM-Limit Enforcement
-// ---------------------------------------------------------------------------
-
-export class RamQuotaExceededError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RamQuotaExceededError";
-  }
-}
-
-interface RamQuotaInfo {
-  limitMb: number;
-  usedMb: number;
-}
-
-/** Reads the user's configured RAM quota and current usage. Returns null if no quota is set. */
-async function readRamQuota(userId: string): Promise<RamQuotaInfo | null> {
-  const { UserModel } = await import("@/lib/db/models/user");
-  const { RoleModel } = await import("@/lib/db/models/role");
-
-  const user = await UserModel.findById(userId);
-  if (!user) return null;
-
-  const roleDocs = await RoleModel.find({ name: { $in: user.roles } }).lean();
-  const allPerms = [
-    ...roleDocs.flatMap((r: any) => r.permissions || []),
-    ...(user.permissions || []),
-  ];
-
-  if (allPerms.some((p: any) => p.name === "*" && p.allow !== false)) return null;
-
-  const ramPerm = allPerms.find((p: any) => p.name === "user.ram" && p.allow !== false);
-  if (!ramPerm?.value) return null;
-
-  const limitMb = parseInt(String(ramPerm.value), 10);
-  if (isNaN(limitMb) || limitMb <= 0) return null;
-
-  const ownedProjects = await ProjectModel.find({ owner: userId }).lean();
-  const projectKeys = ownedProjects.map((p: any) => p.key);
-  const servers = await ServerModel.find({
-    projectKey: { $in: projectKeys },
-    status: { $ne: "stopped" },
-  }).lean();
-  const usedMb = servers.reduce((sum: number, s: any) => sum + (s.memory || 0), 0);
-
-  return { limitMb, usedMb };
-}
-
-export async function enforceRamLimit(userId: string, requestedRamMb: number): Promise<void> {
-  const quota = await readRamQuota(userId);
-  if (!quota) return;
-
-  const { limitMb, usedMb } = quota;
-  if (usedMb + requestedRamMb > limitMb) {
-    throw new RamQuotaExceededError(
-      `RAM-Limit überschritten: ${usedMb} MB belegt + ${requestedRamMb} MB angefordert = ${usedMb + requestedRamMb} MB, erlaubt sind ${limitMb} MB`,
-    );
-  }
-}
-
-export async function getRamQuota(userId: string): Promise<{
-  limitMb: number;
-  usedMb: number;
-  availableMb: number;
-}> {
-  const quota = await readRamQuota(userId);
-  if (!quota) return { limitMb: 0, usedMb: 0, availableMb: 0 };
-  const availableMb = Math.max(0, quota.limitMb - quota.usedMb);
-  return { ...quota, availableMb };
-}
-
-// ---------------------------------------------------------------------------
 // CRUD
 // ---------------------------------------------------------------------------
 
@@ -154,8 +82,6 @@ export async function createServer(
   actorId: string,
 ): Promise<IServer> {
   await connectDB();
-
-  await enforceRamLimit(actorId, data.memory);
 
   const server = await ServerModel.create({
     ...data,
@@ -284,8 +210,6 @@ export async function startServer(
     }
 
     // No container exists — full deploy
-    await enforceRamLimit(actorId, server.memory);
-
     const orch = await getOrchestrator();
     const dataDir = getServerDataPath(server.identifier);
     await ensureServerDir(server.identifier);

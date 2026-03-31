@@ -37,7 +37,7 @@ import {
 import {
   createServerAction,
   checkPortAction,
-  ramRemainingAction,
+  initializeBlueprintAction,
 } from "@/app/(app)/actions/servers";
 import { JVM_FLAG_PRESETS, type JvmPreset } from "@/lib/constants/jvm-presets";
 import JvmPresetSelector from "@/components/servers/JvmPresetSelector";
@@ -73,8 +73,6 @@ interface WizardState {
   port: number;
   portStatus: "idle" | "checking" | "available" | "taken";
   maxRam: number;
-  ramLimitMb: number | null;
-  ramUsedMb: number | null;
   // Step 4 — Confirmation
   autoStart: boolean;
   // Global
@@ -90,10 +88,9 @@ type WizardAction =
   | { type: "SET_ERRORS"; errors: Record<string, string> }
   | { type: "SET_PORT_STATUS"; status: WizardState["portStatus"] }
   | { type: "SET_MAX_RAM"; value: number }
-  | { type: "SET_RAM_QUOTA"; limitMb: number; usedMb: number; availableMb: number }
   | { type: "SET_JVM_PRESET"; preset: JvmPreset }
   | { type: "SET_JAVA_ARGS"; value: string }
-  | { type: "RESET" };
+  | { type: "RESET"; maxRam?: number };
 
 const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "aikars")!;
 
@@ -112,8 +109,6 @@ const INITIAL_STATE: WizardState = {
   port: 25565,
   portStatus: "idle",
   maxRam: 8192,
-  ramLimitMb: null,
-  ramUsedMb: null,
   autoStart: false,
   errors: {},
 };
@@ -171,19 +166,6 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
         maxRam: action.value,
         memory: Math.min(state.memory, action.value),
       };
-    case "SET_RAM_QUOTA": {
-      const { limitMb, usedMb, availableMb } = action;
-      const hasQuota = limitMb > 0;
-      return {
-        ...state,
-        ramLimitMb: hasQuota ? limitMb : null,
-        ramUsedMb: hasQuota ? usedMb : null,
-        maxRam: hasQuota ? Math.min(availableMb, 32768) : state.maxRam,
-        memory: hasQuota
-          ? Math.min(state.memory, Math.min(availableMb, 32768))
-          : state.memory,
-      };
-    }
     case "SET_JVM_PRESET": {
       const { preset } = action;
       return {
@@ -196,7 +178,7 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
     case "SET_JAVA_ARGS":
       return { ...state, javaArgs: action.value };
     case "RESET":
-      return INITIAL_STATE;
+      return { ...INITIAL_STATE, maxRam: action.maxRam ?? INITIAL_STATE.maxRam };
     default:
       return state;
   }
@@ -416,43 +398,8 @@ function StepResources({
           ? "❌"
           : "";
 
-  const showQuota = state.ramLimitMb !== null && state.ramLimitMb > 0;
-  const availableMb = showQuota
-    ? Math.max(0, state.ramLimitMb! - (state.ramUsedMb ?? 0))
-    : 0;
-  const ramExhausted = showQuota && availableMb < 512;
-
-  let quotaBarColor = "bg-emerald-500";
-  if (showQuota) {
-    const pct = (state.ramUsedMb ?? 0) / state.ramLimitMb!;
-    if (pct > 0.8) quotaBarColor = "bg-red-500";
-    else if (pct >= 0.6) quotaBarColor = "bg-amber-400";
-  }
-
   return (
     <div className="space-y-6">
-      {showQuota && (
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs text-zinc-500">
-            <span>{state.ramUsedMb} MB belegt — {availableMb} MB verfügbar</span>
-            <span>{state.ramLimitMb} MB gesamt</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
-            <div
-              className={`h-full rounded-full transition-all ${quotaBarColor}`}
-              style={{
-                width: `${Math.min(100, ((state.ramUsedMb ?? 0) / state.ramLimitMb!) * 100)}%`,
-              }}
-            />
-          </div>
-          {ramExhausted && (
-            <p className="text-xs text-red-500">
-              Kein RAM-Kontingent mehr verfügbar.
-            </p>
-          )}
-        </div>
-      )}
-
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label>RAM</Label>
@@ -466,7 +413,6 @@ function StepResources({
           min={512}
           max={state.maxRam}
           step={256}
-          disabled={ramExhausted}
         />
         <div className="flex justify-between text-xs text-zinc-500">
           <span>512 MB</span>
@@ -589,28 +535,24 @@ interface CreateServerWizardProps {
   projectKey: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  blueprintId?: string;
+  maxRam?: number;
 }
 
 export function CreateServerWizard({
   projectKey,
   open,
   onOpenChange,
+  blueprintId,
+  maxRam,
 }: CreateServerWizardProps) {
   const router = useRouter();
-  const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  const [state, dispatch] = useReducer(reducer, {
+    ...INITIAL_STATE,
+    maxRam: maxRam ?? INITIAL_STATE.maxRam,
+    memory: Math.min(INITIAL_STATE.memory, maxRam ?? INITIAL_STATE.maxRam),
+  });
   const [isPending, startTransition] = useTransition();
-
-  // Fetch RAM quota on open
-  useEffect(() => {
-    if (!open) return;
-    ramRemainingAction()
-      .then(({ limitMb, usedMb, availableMb }) => {
-        dispatch({ type: "SET_RAM_QUOTA", limitMb, usedMb, availableMb });
-      })
-      .catch(() => {
-        // fallback to defaults
-      });
-  }, [open]);
 
   // Check port availability when port changes
   const checkPort = useCallback(
@@ -638,8 +580,8 @@ export function CreateServerWizard({
 
   // Reset on close
   useEffect(() => {
-    if (!open) dispatch({ type: "RESET" });
-  }, [open]);
+    if (!open) dispatch({ type: "RESET", maxRam: maxRam ?? INITIAL_STATE.maxRam });
+  }, [open, maxRam]);
 
   function validateStep(): boolean {
     const schema = stepSchemas[state.step];
@@ -685,32 +627,32 @@ export function CreateServerWizard({
             ? process.env.NEXT_PUBLIC_MINECRAFT_IMAGE || "itzg/minecraft-server"
             : process.env.NEXT_PUBLIC_HYTALE_IMAGE || "zacheri/hytale-server:latest";
 
-        const result = await createServerAction({
-          projectKey,
-          input: {
-            name: state.name,
-            identifier: state.identifier,
-            runtime: state.runtime,
-            image,
-            tag: "stable",
-            port: state.port,
-            memory: state.memory,
-            version: state.version || undefined,
-            modLoader: state.modLoader,
-            javaArgs: state.javaArgs || undefined,
-            autoStart: state.autoStart,
-          },
-          autoStartNow: state.autoStart,
-        });
+        const input = {
+          name: state.name,
+          identifier: state.identifier,
+          runtime: state.runtime,
+          image,
+          tag: "stable",
+          port: state.port,
+          memory: state.memory,
+          version: state.version || undefined,
+          modLoader: state.modLoader,
+          javaArgs: state.javaArgs || undefined,
+          autoStart: state.autoStart,
+        };
 
-        if ("error" in result) {
-          if (result.error === "RAM_QUOTA_EXCEEDED") {
-            dispatch({ type: "SET_ERRORS", errors: { submit: result.message } });
-          } else {
-            toast.error(result.message || "Fehler beim Erstellen");
-          }
-          return;
-        }
+        const result = blueprintId
+          ? await initializeBlueprintAction({
+              blueprintId,
+              projectKey,
+              input,
+              autoStartNow: state.autoStart,
+            })
+          : await createServerAction({
+              projectKey,
+              input,
+              autoStartNow: state.autoStart,
+            });
 
         toast.success("Server erstellt!");
         onOpenChange(false);
@@ -725,12 +667,6 @@ export function CreateServerWizard({
 
   const isLastStep = state.step === STEPS.length - 1;
   const CurrentStepIcon = STEPS[state.step].icon;
-
-  const ramExhaustedOnStep2 =
-    state.step === 2 &&
-    state.ramLimitMb !== null &&
-    state.ramLimitMb > 0 &&
-    Math.max(0, state.ramLimitMb - (state.ramUsedMb ?? 0)) < 512;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -837,7 +773,7 @@ export function CreateServerWizard({
               {isPending ? "Erstelle…" : "Server erstellen"}
             </Button>
           ) : (
-            <Button onClick={handleNext} disabled={ramExhaustedOnStep2}>
+            <Button onClick={handleNext}>
               Weiter
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
