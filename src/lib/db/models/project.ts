@@ -2,7 +2,7 @@ import mongoose, { Schema, type Document, type Model } from "mongoose";
 
 export interface IMember {
   userId: mongoose.Types.ObjectId;
-  role: "admin" | "member";
+  role: "admin" | "manager" | "viewer" | "member"; // "member" kept for backward compat (treated as manager)
 }
 
 export interface IProject extends Document {
@@ -22,7 +22,7 @@ export interface IProject extends Document {
 const MemberSchema = new Schema<IMember>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    role: { type: String, enum: ["admin", "member"], default: "member" },
+    role: { type: String, enum: ["admin", "manager", "viewer", "member"], default: "manager" },
   },
   { _id: false },
 );

@@ -8,7 +8,9 @@ import {
   deleteProject,
   addMember,
   removeMember,
+  updateMemberRole,
   logAction,
+  type ProjectMemberRole,
 } from "@/lib/services/project.service";
 
 function revalidateProject(projectKey?: string) {
@@ -70,7 +72,7 @@ export async function deleteProjectAction(data: {
 export async function addProjectMemberAction(data: {
   projectKey: string;
   userId: string;
-  role: "admin" | "member";
+  role: ProjectMemberRole;
 }): Promise<void> {
   const session = await requireSession();
 
@@ -82,6 +84,26 @@ export async function addProjectMemberAction(data: {
     });
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : "Failed to add member");
+  }
+
+  revalidateProject(data.projectKey);
+}
+
+export async function updateProjectMemberRoleAction(data: {
+  projectKey: string;
+  userId: string;
+  role: ProjectMemberRole;
+}): Promise<void> {
+  const session = await requireSession();
+
+  try {
+    await updateMemberRole(data.projectKey, data.userId, data.role);
+    await logAction(data.projectKey, "MEMBER_ROLE_CHANGED", session.userId, {
+      userId: data.userId,
+      role: data.role,
+    });
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : "Failed to update member role");
   }
 
   revalidateProject(data.projectKey);
@@ -104,3 +126,25 @@ export async function removeProjectMemberAction(data: {
 
   revalidateProject(data.projectKey);
 }
+
+export async function searchUsersAction(data: {
+  q: string;
+}): Promise<{ _id: string; username: string }[]> {
+  await requireSession();
+  if (!data.q.trim()) return [];
+
+  const { connectDB } = await import("@/lib/db/connection");
+  const { UserModel } = await import("@/lib/db/models/user");
+  await connectDB();
+
+  const users = await UserModel.find({
+    username: { $regex: data.q.trim(), $options: "i" },
+    enabled: true,
+  })
+    .select("_id username")
+    .limit(10)
+    .lean();
+
+  return users.map((u) => ({ _id: u._id.toString(), username: u.username as string }));
+}
+

@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth/guards";
-import { getProject } from "@/lib/services/project.service";
+import { getProject, getMembersWithUsernames } from "@/lib/services/project.service";
 import { listServers } from "@/lib/services/server.service";
 import { listBlueprints } from "@/lib/services/blueprint.service";
+import { UserModel } from "@/lib/db/models/user";
+import { connectDB } from "@/lib/db/connection";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Plus, Play, Square } from "lucide-react";
 import { BlueprintsList } from "@/components/projects/BlueprintsList";
+import { ProjectMembersPanel } from "@/components/projects/ProjectMembersPanel";
 
 interface Props {
   params: Promise<{ key: string }>;
@@ -26,10 +29,15 @@ export default async function ProjectDetailPage({ params }: Props) {
   );
   const isAdmin = isOwner || member?.role === "admin";
 
-  const [servers, blueprints] = await Promise.all([
+  const [servers, blueprints, membersData] = await Promise.all([
     listServers(key, session.userId),
     listBlueprints(key, session.userId),
+    getMembersWithUsernames(key),
   ]);
+
+  await connectDB();
+  const ownerUser = await UserModel.findById(project.owner).select("username").lean();
+  const ownerUsername = (ownerUser as { username?: string } | null)?.username ?? "Unknown";
   const running = servers.filter((s) => s.status === "running");
 
   return (
@@ -63,6 +71,14 @@ export default async function ProjectDetailPage({ params }: Props) {
           status: b.status,
           serverId: b.serverId?.toString(),
         }))}
+        isAdmin={!!isAdmin}
+      />
+
+      {/* Members */}
+      <ProjectMembersPanel
+        projectKey={key}
+        ownerUsername={ownerUsername}
+        members={membersData}
         isAdmin={!!isAdmin}
       />
 

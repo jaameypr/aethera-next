@@ -17,7 +17,57 @@ import { grantIfAbsent } from "@/lib/services/permission-grant.service";
 const KEY_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // ---------------------------------------------------------------------------
-// Queries
+// Role → server permission presets
+// ---------------------------------------------------------------------------
+
+export type ProjectMemberRole = "admin" | "manager" | "viewer" | "member";
+
+export const ROLE_SERVER_PERMISSIONS: Record<ProjectMemberRole, string[]> = {
+  admin:   ["server.start", "server.stop", "server.console", "server.files", "server.backups", "server.settings"],
+  manager: ["server.start", "server.stop", "server.console", "server.files", "server.backups"],
+  member:  ["server.start", "server.stop", "server.console", "server.files", "server.backups"], // same as manager
+  viewer:  [],
+};
+
+/** Auto-grant server-level permissions across all servers in a project for a given role. */
+async function grantServerPermissionsForRole(
+  projectKey: string,
+  userId: string,
+  role: ProjectMemberRole,
+): Promise<void> {
+  const perms = ROLE_SERVER_PERMISSIONS[role] ?? [];
+  if (perms.length === 0) return;
+
+  const servers = await ServerModel.find({ projectKey }).select("_id").lean();
+  for (const server of servers) {
+    const sid = server._id.toString();
+    const existing = await ServerModel.findOne({ _id: sid, "access.userId": userId });
+    if (existing) {
+      await ServerModel.updateOne(
+        { _id: sid, "access.userId": userId },
+        { $set: { "access.$.permissions": perms } },
+      );
+    } else {
+      await ServerModel.updateOne(
+        { _id: sid },
+        { $push: { access: { userId, permissions: perms } } },
+      );
+    }
+  }
+}
+
+/** Remove a user's server-level access from all servers in a project. */
+async function revokeServerPermissionsForProject(
+  projectKey: string,
+  userId: string,
+): Promise<void> {
+  await ServerModel.updateMany(
+    { projectKey },
+    { $pull: { access: { userId } } },
+  );
+}
+
+
 // ---------------------------------------------------------------------------
 
 export async function listProjects(userId: string): Promise<IProject[]> {
@@ -32,6 +82,52 @@ export async function listProjects(userId: string): Promise<IProject[]> {
 export async function getProject(key: string): Promise<IProject | null> {
   await connectDB();
   return ProjectModel.findOne({ key }).lean<IProject>();
+}
+
+export interface MemberWithUsername {
+  userId: string;
+  username: string;
+  role: ProjectMemberRole;
+  serverAccess: { serverId: string; serverName: string; permissions: string[] }[];
+}
+
+export async function getMembersWithUsernames(
+  projectKey: string,
+): Promise<MemberWithUsername[]> {
+  await connectDB();
+
+  const project = await ProjectModel.findOne({ key: projectKey }).lean<IProject>();
+  if (!project || project.members.length === 0) return [];
+
+  const memberIds = project.members.map((m) => m.userId.toString());
+
+  const [users, servers] = await Promise.all([
+    UserModel.find({ _id: { $in: memberIds } }).select("_id username").lean(),
+    ServerModel.find({ projectKey }).select("_id name access").lean(),
+  ]);
+
+  const usernameMap = new Map(users.map((u) => [u._id.toString(), u.username as string]));
+
+  return project.members.map((m) => {
+    const uid = m.userId.toString();
+    const serverAccess = servers
+      .map((s) => {
+        const entry = (s.access as { userId: unknown; permissions: string[] }[]).find(
+          (a) => a.userId?.toString() === uid,
+        );
+        return entry
+          ? { serverId: s._id.toString(), serverName: s.name as string, permissions: entry.permissions }
+          : null;
+      })
+      .filter(Boolean) as { serverId: string; serverName: string; permissions: string[] }[];
+
+    return {
+      userId: uid,
+      username: usernameMap.get(uid) ?? uid,
+      role: m.role as ProjectMemberRole,
+      serverAccess,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +242,7 @@ export async function deleteProject(
 export async function addMember(
   projectKey: string,
   userId: string,
-  role: "admin" | "member",
+  role: ProjectMemberRole,
 ): Promise<void> {
   await connectDB();
 
@@ -164,6 +260,30 @@ export async function addMember(
     { key: projectKey },
     { $push: { members: { userId, role } } },
   );
+
+  // Auto-grant server permissions based on role
+  await grantServerPermissionsForRole(projectKey, userId, role);
+}
+
+export async function updateMemberRole(
+  projectKey: string,
+  userId: string,
+  role: ProjectMemberRole,
+): Promise<void> {
+  await connectDB();
+
+  const result = await ProjectModel.updateOne(
+    { key: projectKey, "members.userId": userId },
+    { $set: { "members.$.role": role } },
+  );
+
+  if (result.matchedCount === 0) {
+    throw notFound("Member not found in project");
+  }
+
+  // Re-apply server permissions for new role
+  await revokeServerPermissionsForProject(projectKey, userId);
+  await grantServerPermissionsForRole(projectKey, userId, role);
 }
 
 export async function removeMember(
@@ -180,6 +300,9 @@ export async function removeMember(
   if (result.matchedCount === 0) {
     throw notFound(`Project "${projectKey}" not found`);
   }
+
+  // Revoke all server-level permissions in this project
+  await revokeServerPermissionsForProject(projectKey, userId);
 }
 
 // ---------------------------------------------------------------------------

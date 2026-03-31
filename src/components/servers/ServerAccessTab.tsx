@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Terminal, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Select,
@@ -24,6 +25,7 @@ import {
   removeServerMemberAction,
   updateServerAccessAction,
 } from "@/app/(app)/actions/servers";
+import { searchUsersAction } from "@/app/(app)/actions/projects";
 
 interface AccessEntry {
   userId: string;
@@ -50,9 +52,59 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
   const [newRole, setNewRole] = useState("server.start");
   const [isPending, startTransition] = useTransition();
 
+  // Console invite state
+  const [consoleQuery, setConsoleQuery] = useState("");
+  const [consoleResults, setConsoleResults] = useState<{ _id: string; username: string }[]>([]);
+  const [consoleSearching, setConsoleSearching] = useState(false);
+  const [consoleSelected, setConsoleSelected] = useState<{ _id: string; username: string } | null>(null);
+  const [showConsoleDropdown, setShowConsoleDropdown] = useState(false);
+  const [consoleDebounce, setConsoleDebounce] = useState<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     setEntries(access);
   }, [access]);
+
+  function handleConsoleQueryChange(value: string) {
+    setConsoleQuery(value);
+    setConsoleSelected(null);
+    setShowConsoleDropdown(true);
+    if (consoleDebounce) clearTimeout(consoleDebounce);
+    if (!value.trim()) { setConsoleResults([]); return; }
+    setConsoleSearching(true);
+    setConsoleDebounce(setTimeout(async () => {
+      try {
+        const res = await searchUsersAction({ q: value });
+        setConsoleResults(res);
+      } finally {
+        setConsoleSearching(false);
+      }
+    }, 300));
+  }
+
+  function handleConsoleInvite() {
+    if (!consoleSelected) return;
+    const existing = entries.find((e) => e.userId === consoleSelected._id);
+    startTransition(async () => {
+      try {
+        if (existing) {
+          if (!existing.permissions.includes("server.console")) {
+            const newPerms = [...existing.permissions, "server.console"];
+            await updateServerAccessAction({ serverId, userId: consoleSelected._id, permissions: newPerms });
+            setEntries((prev) => prev.map((e) => e.userId === consoleSelected._id ? { ...e, permissions: newPerms } : e));
+          }
+        } else {
+          await grantServerAccessAction({ serverId, userId: consoleSelected._id, permissions: ["server.console"] });
+          setEntries((prev) => [...prev, { userId: consoleSelected._id, permissions: ["server.console"] }]);
+        }
+        toast.success(`${consoleSelected.username} hat Konsolen-Zugriff`);
+        setConsoleQuery("");
+        setConsoleSelected(null);
+        setConsoleResults([]);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Fehler");
+      }
+    });
+  }
 
   function handleGrant() {
     if (!newUserId.trim()) return;
@@ -98,11 +150,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
 
     startTransition(async () => {
       try {
-        await updateServerAccessAction({
-          serverId,
-          userId,
-          permissions: newPermissions,
-        });
+        await updateServerAccessAction({ serverId, userId, permissions: newPermissions });
         setEntries((prev) =>
           prev.map((e) =>
             e.userId === userId ? { ...e, permissions: newPermissions } : e,
@@ -116,10 +164,66 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Add member */}
+      {/* Quick Console Invite */}
+      <Card className="border-blue-200 dark:border-blue-900">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base text-blue-700 dark:text-blue-400">
+            <Terminal className="h-4 w-4" />
+            Konsolen-Zugriff einladen
+          </CardTitle>
+          <CardDescription>
+            Benutzer erhält ausschließlich Konsolen-Zugriff auf diesen Server.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                className="pl-9"
+                placeholder="Benutzername suchen…"
+                value={consoleQuery}
+                onChange={(e) => handleConsoleQueryChange(e.target.value)}
+                onFocus={() => consoleQuery && setShowConsoleDropdown(true)}
+                autoComplete="off"
+              />
+              {consoleSearching && (
+                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-400" />
+              )}
+              {showConsoleDropdown && consoleResults.length > 0 && (
+                <div className="absolute z-10 w-full rounded-md border border-zinc-200 bg-white shadow-md dark:border-zinc-700 dark:bg-zinc-900">
+                  {consoleResults.map((u) => (
+                    <button
+                      key={u._id}
+                      type="button"
+                      onClick={() => { setConsoleSelected(u); setConsoleQuery(u.username); setShowConsoleDropdown(false); }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    >
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold uppercase dark:bg-zinc-700">
+                        {u.username[0]}
+                      </div>
+                      {u.username}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button
+              onClick={handleConsoleInvite}
+              disabled={!consoleSelected || isPending}
+              size="sm"
+            >
+              <Terminal className="mr-1.5 h-4 w-4" />
+              Einladen
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add member (granular) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Zugriff hinzufügen</CardTitle>
+          <CardTitle className="text-base">Granularer Zugriff</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-end gap-3">
@@ -174,9 +278,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
                         <button
                           key={opt.value}
                           disabled={isPending}
-                          onClick={() =>
-                            handleTogglePermission(entry.userId, opt.value)
-                          }
+                          onClick={() => handleTogglePermission(entry.userId, opt.value)}
                           className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
                             active
                               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
@@ -205,3 +307,4 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
     </div>
   );
 }
+
