@@ -8,7 +8,7 @@ import {
   Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,8 +126,8 @@ export function ProjectServerSection({
         )}
       </div>
 
-      {/* Server cards */}
-      {servers.length === 0 ? (
+      {/* Unified server + blueprint grid */}
+      {servers.length === 0 && blueprints.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-zinc-500">
             Noch keine Server in diesem Projekt.
@@ -135,6 +135,7 @@ export function ProjectServerSection({
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
+          {/* Server cards */}
           {servers.map((server) => (
             <Link
               key={server._id}
@@ -169,77 +170,64 @@ export function ProjectServerSection({
               </Card>
             </Link>
           ))}
-        </div>
-      )}
 
-      {/* Blueprints subsection */}
-      {(blueprints.length > 0 || isAdmin) && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-zinc-400" />
-            <h3 className="text-sm font-medium text-zinc-500 uppercase tracking-wide">
-              Blueprints
-            </h3>
-          </div>
-
-          {blueprints.length === 0 ? (
-            <p className="text-sm text-zinc-400 pl-6">
-              Keine Blueprints vorhanden. Erstelle einen über den Button oben.
-            </p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {blueprints.map((bp) => (
-                <Card
-                  key={bp._id}
-                  className={`transition-opacity ${bp.status === "claimed" ? "opacity-50" : ""}`}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <CardTitle className="text-sm truncate">{bp.name}</CardTitle>
-                        <CardDescription className="flex items-center gap-1 mt-0.5 text-xs">
-                          <MemoryStick className="h-3 w-3" />
-                          Max. {ramLabel(bp.maxRam)}
-                        </CardDescription>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                          bp.status === "available"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                            : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-                        }`}
-                      >
-                        {bp.status === "available" ? "Verfügbar" : "Belegt"}
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex items-center gap-2">
-                    {bp.status === "available" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 h-8 text-xs"
-                        onClick={() => setInitTarget(bp)}
-                      >
-                        <Zap className="mr-1.5 h-3 w-3" />
-                        Initialisieren
-                      </Button>
-                    )}
-                    {isAdmin && bp.status === "available" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                        onClick={() => setDeleteTarget(bp)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          {/* Blueprint cards — same grid, after servers */}
+          {blueprints.map((bp) => (
+            <Card
+              key={bp._id}
+              className={`transition-opacity ${bp.status === "claimed" ? "opacity-50" : ""}`}
+            >
+              <CardHeader>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Layers className="h-4 w-4 shrink-0 text-zinc-400" />
+                    <CardTitle className="text-base truncate">{bp.name}</CardTitle>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      bp.status === "available"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                    }`}
+                  >
+                    {bp.status === "available" ? "Verfügbar" : "Belegt"}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-zinc-500 space-y-1 mb-3">
+                  <p className="flex items-center gap-1">
+                    <MemoryStick className="h-3.5 w-3.5" />
+                    Max. {ramLabel(bp.maxRam)} RAM
+                  </p>
+                  <p className="text-xs text-zinc-400">Blueprint · nicht initialisiert</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {bp.status === "available" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 h-8 text-xs"
+                      onClick={() => setInitTarget(bp)}
+                    >
+                      <Zap className="mr-1.5 h-3 w-3" />
+                      Initialisieren
+                    </Button>
+                  )}
+                  {isAdmin && bp.status === "available" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
+                      onClick={() => setDeleteTarget(bp)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
