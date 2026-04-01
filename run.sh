@@ -45,6 +45,19 @@ if [ ! -f .env ]; then
   warn "Review .env and set ADMIN_PASSWORD before first run!"
 fi
 
+# Migrate: ensure MONGO_PASS exists in older .env files
+if ! grep -q "^MONGO_PASS=" .env 2>/dev/null; then
+  MONGO_PASS=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p | tr -d '\n' | head -c 32)
+  echo "" >> .env
+  echo "# MongoDB auth (auto-generated)" >> .env
+  echo "MONGO_USER=aethera" >> .env
+  echo "MONGO_PASS=${MONGO_PASS}" >> .env
+  # Remove legacy MONGODB_URI if present (now built by docker-compose)
+  sed -i '/^MONGODB_URI=/d' .env
+  warn "Migrated .env — added MONGO_USER/MONGO_PASS, removed legacy MONGODB_URI"
+  warn "⚠  Run 'docker compose down -v && ./run.sh up' to re-init MongoDB with auth"
+fi
+
 # ── Data directories ─────────────────────────
 
 source .env 2>/dev/null || true
