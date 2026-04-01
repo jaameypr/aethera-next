@@ -81,8 +81,8 @@ case "$CMD" in
     ;;
 
   rebuild)
-    info "Rebuilding and restarting..."
-    docker compose -f "$COMPOSE_FILE" up -d --build --force-recreate
+    info "Rebuilding and restarting app (keeping database intact)..."
+    docker compose -f "$COMPOSE_FILE" up -d --build --force-recreate app
     info "✅  Rebuilt and running."
     ;;
 

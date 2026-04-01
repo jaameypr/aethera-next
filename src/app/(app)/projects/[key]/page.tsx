@@ -48,7 +48,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       </div>
 
       {/* Main grid: servers (3/4) + members sidebar (1/4) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_440px]">
         {/* Left: servers + blueprints */}
         <ProjectServerSection
           projectKey={key}

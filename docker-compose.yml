@@ -15,7 +15,7 @@ services:
       - ${AETHERA_WORLD_UPLOAD_DIR:-/app/.aethera/world_upload}:${AETHERA_WORLD_UPLOAD_DIR:-/app/.aethera/world_upload}
     depends_on:
       mongo:
-        condition: service_started
+        condition: service_healthy
     networks:
       - aethera-net
 
@@ -27,6 +27,12 @@ services:
       - "${MONGO_PORT:-27017}:27017"
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - aethera-net
 
