@@ -81,6 +81,19 @@ case "$CMD" in
     ;;
 
   rebuild)
+    # Pull latest changes, discarding local modifications
+    OLD_HASH=$(md5sum "$0" 2>/dev/null | cut -d' ' -f1)
+    info "Pulling latest changes..."
+    git reset --hard HEAD
+    git pull
+
+    # Re-exec if run.sh itself was updated
+    NEW_HASH=$(md5sum "$0" 2>/dev/null | cut -d' ' -f1)
+    if [ "$OLD_HASH" != "$NEW_HASH" ]; then
+      warn "run.sh was updated — re-executing..."
+      exec "$0" rebuild
+    fi
+
     info "Rebuilding and restarting app (keeping database intact)..."
     docker compose -f "$COMPOSE_FILE" up -d --build --force-recreate app
     info "✅  Rebuilt and running."
