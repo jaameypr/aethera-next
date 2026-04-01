@@ -37,7 +37,11 @@ if [ ! -f .env ]; then
   JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p | tr -d '\n' | head -c 64)
   sed -i "s|<random-64-char-hex>|${JWT_SECRET}|" .env
 
-  info "Generated JWT_SECRET in .env"
+  # Generate a random MongoDB password
+  MONGO_PASS=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p | tr -d '\n' | head -c 32)
+  sed -i "s|<random-32-char-hex>|${MONGO_PASS}|" .env
+
+  info "Generated JWT_SECRET and MONGO_PASS in .env"
   warn "Review .env and set ADMIN_PASSWORD before first run!"
 fi
 

@@ -6,6 +6,8 @@ services:
     ports:
       - "${APP_PORT:-3000}:3000"
     env_file: .env
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER:-aethera}:${MONGO_PASS}@mongo:27017/aethera?authSource=admin
     volumes:
       # Docker socket — required for container orchestration
       - /var/run/docker.sock:/var/run/docker.sock
@@ -24,11 +26,14 @@ services:
     container_name: aethera-mongo
     restart: unless-stopped
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-aethera}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "-u", "${MONGO_USER:-aethera}", "-p", "${MONGO_PASS}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
