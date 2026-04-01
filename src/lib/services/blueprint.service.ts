@@ -96,6 +96,33 @@ export async function deleteBlueprint(
   await BlueprintModel.findByIdAndDelete(blueprintId);
 }
 
+export async function updateBlueprint(
+  blueprintId: string,
+  data: { name?: string; maxRam?: number },
+  actorId: string,
+): Promise<IBlueprint> {
+  await connectDB();
+
+  const blueprint = await BlueprintModel.findById(blueprintId);
+  if (!blueprint) throw notFound("Blueprint not found");
+  if (blueprint.status !== "available") {
+    throw new Error("Nur verfügbare Blueprints können bearbeitet werden");
+  }
+
+  const role = await resolveProjectRole(blueprint.projectKey, actorId);
+  if (role !== "owner" && role !== "admin") throw forbidden();
+
+  const update: Record<string, unknown> = {};
+  if (data.name !== undefined) update.name = data.name.trim();
+  if (data.maxRam !== undefined) update.maxRam = data.maxRam;
+
+  const updated = await BlueprintModel.findByIdAndUpdate(blueprintId, update, {
+    new: true,
+  }).lean<IBlueprint>();
+
+  return updated!;
+}
+
 export async function initializeBlueprint(
   blueprintId: string,
   serverData: ServerCreateInput,

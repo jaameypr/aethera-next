@@ -3,6 +3,7 @@ import "server-only";
 import os from "node:os";
 import { connectDB } from "@/lib/db/connection";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
+import { BlueprintModel } from "@/lib/db/models/blueprint";
 import { ProjectModel } from "@/lib/db/models/project";
 import { logAction } from "@/lib/services/project.service";
 import { grantIfAbsent } from "@/lib/services/permission-grant.service";
@@ -170,6 +171,12 @@ export async function deleteServer(
   });
 
   await ServerModel.findByIdAndDelete(serverId);
+
+  // Release any blueprint that was linked to this server
+  await BlueprintModel.updateOne(
+    { serverId: server._id, status: "claimed" },
+    { $set: { status: "available" }, $unset: { serverId: "" } },
+  );
 }
 
 // ---------------------------------------------------------------------------

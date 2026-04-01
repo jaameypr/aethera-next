@@ -5,9 +5,12 @@ import Link from "next/link";
 import { toast } from "sonner";
 import {
   Plus, Play, Square, ChevronDown, Zap, Trash2, MemoryStick,
-  Layers,
+  Layers, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -25,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { CreateBlueprintDialog } from "@/components/projects/CreateBlueprintDialog";
 import { CreateServerWizard } from "@/components/servers/create-server-wizard";
-import { deleteBlueprintAction } from "@/app/(app)/actions/servers";
+import { deleteBlueprintAction, updateBlueprintAction } from "@/app/(app)/actions/servers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,7 +79,11 @@ export function ProjectServerSection({
   const [createBlueprintOpen, setCreateBlueprintOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Blueprint | null>(null);
   const [initTarget, setInitTarget] = useState<Blueprint | null>(null);
+  const [editTarget, setEditTarget] = useState<Blueprint | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editMaxRam, setEditMaxRam] = useState(2048);
   const [isDeleting, startDelete] = useTransition();
+  const [isEditing, startEdit] = useTransition();
 
   function handleDelete() {
     if (!deleteTarget) return;
@@ -88,6 +95,31 @@ export function ProjectServerSection({
         toast.error(err instanceof Error ? err.message : "Fehler beim Löschen");
       } finally {
         setDeleteTarget(null);
+      }
+    });
+  }
+
+  function openEdit(bp: Blueprint) {
+    setEditTarget(bp);
+    setEditName(bp.name);
+    setEditMaxRam(bp.maxRam);
+  }
+
+  function handleEdit() {
+    if (!editTarget) return;
+    startEdit(async () => {
+      try {
+        await updateBlueprintAction({
+          blueprintId: editTarget._id,
+          projectKey,
+          name: editName,
+          maxRam: editMaxRam,
+        });
+        toast.success("Blueprint aktualisiert");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Fehler beim Speichern");
+      } finally {
+        setEditTarget(null);
       }
     });
   }
@@ -218,6 +250,16 @@ export function ProjectServerSection({
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-8 w-8 p-0 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                      onClick={() => openEdit(bp)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {isAdmin && bp.status === "available" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="h-8 w-8 p-0 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
                       onClick={() => setDeleteTarget(bp)}
                     >
@@ -262,6 +304,52 @@ export function ProjectServerSection({
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
               {isDeleting ? "Löschen…" : "Löschen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) setEditTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Blueprint bearbeiten</DialogTitle>
+            <DialogDescription>
+              Passe den Namen und das RAM-Limit des Blueprints an.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-bp-name">Name</Label>
+              <Input
+                id="edit-bp-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Maximales RAM</Label>
+                <span className="text-sm font-semibold">{ramLabel(editMaxRam)}</span>
+              </div>
+              <Slider
+                value={[editMaxRam]}
+                onValueChange={([v]) => setEditMaxRam(v)}
+                min={512}
+                max={32768}
+                step={256}
+              />
+              <div className="flex justify-between text-xs text-zinc-500">
+                <span>512 MB</span>
+                <span>32 GB</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)} disabled={isEditing}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleEdit} disabled={isEditing || !editName.trim()}>
+              {isEditing ? "Speichere…" : "Speichern"}
             </Button>
           </DialogFooter>
         </DialogContent>

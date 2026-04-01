@@ -22,6 +22,7 @@ import {
   listBlueprints,
   createBlueprint,
   deleteBlueprint,
+  updateBlueprint,
   initializeBlueprint,
   type IBlueprint,
 } from "@/lib/services/blueprint.service";
@@ -384,6 +385,28 @@ export async function deleteBlueprintAction(data: {
   } catch (err) {
     throw new Error(
       err instanceof Error ? err.message : "Failed to delete blueprint",
+    );
+  }
+}
+
+export async function updateBlueprintAction(data: {
+  blueprintId: string;
+  projectKey: string;
+  name?: string;
+  maxRam?: number;
+}): Promise<void> {
+  const session = await requireSession();
+
+  try {
+    await updateBlueprint(
+      data.blueprintId,
+      { name: data.name, maxRam: data.maxRam },
+      session.userId,
+    );
+    revalidatePath(`/projects/${data.projectKey}`);
+  } catch (err) {
+    throw new Error(
+      err instanceof Error ? err.message : "Failed to update blueprint",
     );
   }
 }
