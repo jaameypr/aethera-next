@@ -55,6 +55,7 @@ info "Data directories ready"
 # ── Parse command ────────────────────────────
 
 CMD="${1:-up}"
+shift || true
 
 case "$CMD" in
   up|start)
@@ -88,11 +89,29 @@ case "$CMD" in
     git pull
     chmod +x "$0"
 
-    # Re-exec if run.sh itself was updated
+    # Re-exec if run.sh itself was updated (forward all args)
     NEW_HASH=$(md5sum "$0" 2>/dev/null | cut -d' ' -f1)
     if [ "$OLD_HASH" != "$NEW_HASH" ]; then
       warn "run.sh was updated — re-executing..."
-      exec "$0" rebuild
+      exec "$0" rebuild "$@"
+    fi
+
+    # Optional: wipe game-server containers and data
+    if [[ " $* " == *" --wipe-servers "* ]]; then
+      warn "Wiping all game-server containers and data..."
+      CONTAINERS=$(docker ps -a --filter "name=aethera-mc-" --filter "name=aethera-hyt-" -q)
+      if [ -n "$CONTAINERS" ]; then
+        info "Removing game-server containers..."
+        docker rm -f $CONTAINERS
+      else
+        info "No game-server containers found."
+      fi
+      if [ -d "$DATA_DIR" ]; then
+        info "Deleting server data ($DATA_DIR)..."
+        rm -rf "$DATA_DIR"
+        mkdir -p "$DATA_DIR"
+      fi
+      info "✅  Game-server wipe complete."
     fi
 
     info "Rebuilding and restarting app (keeping database intact)..."
@@ -146,7 +165,7 @@ case "$CMD" in
     echo "  down / stop    Stop all services"
     echo "  restart        Restart services"
     echo "  logs           Tail container logs"
-    echo "  rebuild        Force rebuild and restart"
+    echo "  rebuild        Force rebuild and restart (--wipe-servers to clean MC data)"
     echo "  wipe-servers   Remove all game-server containers and data"
     echo "  status         Show container status"
     echo "  seed           Run the admin seed script"
