@@ -99,6 +99,33 @@ case "$CMD" in
     info "✅  Rebuilt and running."
     ;;
 
+  wipe-servers)
+    warn "This will destroy ALL managed game-server containers and their data!"
+    read -rp "Are you sure? [y/N] " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+      info "Aborted."
+      exit 0
+    fi
+
+    # Stop and remove all aethera-mc-* and aethera-hyt-* containers
+    CONTAINERS=$(docker ps -a --filter "name=aethera-mc-" --filter "name=aethera-hyt-" -q)
+    if [ -n "$CONTAINERS" ]; then
+      info "Removing game-server containers..."
+      docker rm -f $CONTAINERS
+    else
+      info "No game-server containers found."
+    fi
+
+    # Wipe server data directories
+    if [ -d "$DATA_DIR" ]; then
+      info "Deleting server data ($DATA_DIR)..."
+      rm -rf "$DATA_DIR"
+      mkdir -p "$DATA_DIR"
+    fi
+
+    info "✅  All game-server containers and data wiped."
+    ;;
+
   status)
     docker compose -f "$COMPOSE_FILE" ps
     ;;
@@ -119,6 +146,7 @@ case "$CMD" in
     echo "  restart        Restart services"
     echo "  logs           Tail container logs"
     echo "  rebuild        Force rebuild and restart"
+    echo "  wipe-servers   Remove all game-server containers and data"
     echo "  status         Show container status"
     echo "  seed           Run the admin seed script"
     exit 1
