@@ -1,12 +1,16 @@
 import { requireSession } from "@/lib/auth/guards";
 import { listProjects } from "@/lib/services/project.service";
 import { listServers } from "@/lib/services/server.service";
+import { checkPermission } from "@/lib/services/permission-check";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 
 export default async function ProjectsPage() {
   const session = await requireSession();
-  const projects = await listProjects(session.userId);
+  const [projects, canCreate] = await Promise.all([
+    listProjects(session.userId),
+    checkPermission(session.userId, "projects.create"),
+  ]);
 
   const projectsWithServers = await Promise.all(
     projects.map(async (project) => {
@@ -33,7 +37,7 @@ export default async function ProjectsPage() {
               : `${projects.length} Projekt${projects.length !== 1 ? "e" : ""}`}
           </p>
         </div>
-        <CreateProjectDialog />
+        <CreateProjectDialog canCreate={canCreate} />
       </div>
 
       {projectsWithServers.length === 0 ? (

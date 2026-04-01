@@ -34,7 +34,9 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function CreateProjectDialog() {
+export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean } = {}) {
+  if (!canCreate) return null;
+
   const [open, setOpen] = useState(false);
 
   const {

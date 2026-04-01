@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/auth/guards";
 import { getUserById } from "@/lib/services/user.service";
 import { listProjects } from "@/lib/services/project.service";
 import { listServers } from "@/lib/services/server.service";
+import { checkPermission } from "@/lib/services/permission-check";
 import {
   Card,
   CardHeader,
@@ -14,9 +15,11 @@ import { CreateProjectDialog } from "@/components/projects/create-project-dialog
 
 export default async function DashboardPage() {
   const session = await requireSession();
-  const user = await getUserById(session.userId);
-
-  const projects = await listProjects(session.userId);
+  const [user, projects, canCreate] = await Promise.all([
+    getUserById(session.userId),
+    listProjects(session.userId),
+    checkPermission(session.userId, "projects.create"),
+  ]);
 
   // Fetch servers per project in parallel
   const projectsWithServers = await Promise.all(
@@ -73,7 +76,7 @@ export default async function DashboardPage() {
             Willkommen zurück, {user?.username || "User"}
           </p>
         </div>
-        <CreateProjectDialog />
+        <CreateProjectDialog canCreate={canCreate} />
       </div>
 
       {/* Stats */}
