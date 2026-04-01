@@ -86,6 +86,7 @@ case "$CMD" in
     info "Pulling latest changes..."
     git reset --hard HEAD
     git pull
+    chmod +x "$0"
 
     # Re-exec if run.sh itself was updated
     NEW_HASH=$(md5sum "$0" 2>/dev/null | cut -d' ' -f1)
