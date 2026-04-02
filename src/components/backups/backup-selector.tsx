@@ -108,15 +108,16 @@ export function BackupSelector({
   }, []);
 
   async function handleImport() {
+    if (importTab === "url" && !url.trim()) return;
+    if (importTab === "upload" && !file) return;
+
     setImporting(true);
     try {
       const formData = new FormData();
       if (importTab === "url") {
-        if (!url.trim()) return;
         formData.append("url", url.trim());
       } else {
-        if (!file) return;
-        formData.append("file", file);
+        formData.append("file", file!);
       }
 
       const res = await fetch("/api/backups/import", {

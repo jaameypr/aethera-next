@@ -18,6 +18,7 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
       buffer = result.buffer;
       filename = result.filename;
     } else if (file) {
+      console.log(`[backup-import] Receiving file: ${file.name} (${file.size} bytes)`);
       const arrayBuffer = await file.arrayBuffer();
       buffer = Buffer.from(arrayBuffer);
       filename = file.name || "upload.tar.gz";
@@ -25,9 +26,12 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
       throw badRequest("Either 'file' or 'url' is required");
     }
 
+    console.log(`[backup-import] Importing ${filename} (${buffer.length} bytes)`);
     const backup = await importBackup(buffer, filename, session.userId);
+    console.log(`[backup-import] Success: ${backup._id} — components: ${backup.components.join(", ")}`);
     return Response.json(backup, { status: 201 });
   } catch (error) {
+    console.error("[backup-import] Error:", error);
     return errorResponse(error);
   }
 });

@@ -6,8 +6,14 @@ const nextConfig: NextConfig = {
     "bcryptjs",
     "dockerode",
     "tar-stream",
+    "adm-zip",
     "@pruefertit/docker-orchestrator",
   ],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "500mb",
+    },
+  },
 };
 
 export default nextConfig;
