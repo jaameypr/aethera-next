@@ -14,6 +14,13 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  ChevronDown,
+  Settings2,
+  Globe,
+  FileText,
+  Package,
+  Puzzle,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +30,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface Backup {
   _id: string;
@@ -77,12 +100,51 @@ function StatusBadge({ status }: { status?: string }) {
   }
 }
 
+const BACKUP_COMPONENTS = [
+  {
+    id: "world" as const,
+    label: "Welten",
+    description: "Alle Weltdaten und Dimensionen",
+    icon: Globe,
+  },
+  {
+    id: "config" as const,
+    label: "Konfiguration",
+    description: "server.properties und Konfigurationsdateien",
+    icon: FileText,
+  },
+  {
+    id: "mods" as const,
+    label: "Mods",
+    description: "Installierte Modifikationen",
+    icon: Package,
+  },
+  {
+    id: "plugins" as const,
+    label: "Plugins",
+    description: "Installierte Server-Plugins",
+    icon: Puzzle,
+  },
+  {
+    id: "datapacks" as const,
+    label: "Datapacks",
+    description: "Benutzerdefinierte Datenpakete",
+    icon: Database,
+  },
+] as const;
+
+type BackupComponentId = (typeof BACKUP_COMPONENTS)[number]["id"];
+
+const ALL_COMPONENT_IDS: BackupComponentId[] = BACKUP_COMPONENTS.map((c) => c.id);
+
 export function ServerBackupsTab({ serverId }: { serverId: string }) {
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [capabilities, setCapabilities] = useState<BackupCapabilities | null>(null);
   const [isPending, startTransition] = useTransition();
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  const [selectedComponents, setSelectedComponents] = useState<BackupComponentId[]>([...ALL_COMPONENT_IDS]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchBackups = useCallback(async () => {
@@ -126,15 +188,13 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
     };
   }, [backups, fetchBackups]);
 
-  function handleCreate() {
+  function handleCreate(components: BackupComponentId[] = [...ALL_COMPONENT_IDS]) {
     startTransition(async () => {
       try {
         const res = await fetch(`/api/servers/${serverId}/backups`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            components: ["world", "config", "mods", "plugins", "datapacks"],
-          }),
+          body: JSON.stringify({ components }),
         });
         if (!res.ok) throw new Error((await res.json()).error);
         const data = await res.json();
@@ -148,6 +208,27 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
         toast.error(err instanceof Error ? err.message : "Fehler beim Erstellen");
       }
     });
+  }
+
+  function handleCustomBackup() {
+    if (selectedComponents.length === 0) {
+      toast.error("Wähle mindestens eine Komponente aus");
+      return;
+    }
+    setCustomDialogOpen(false);
+    handleCreate(selectedComponents);
+  }
+
+  function toggleComponent(id: BackupComponentId) {
+    setSelectedComponents((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
+    );
+  }
+
+  function toggleAll() {
+    setSelectedComponents((prev) =>
+      prev.length === ALL_COMPONENT_IDS.length ? [] : [...ALL_COMPONENT_IDS],
+    );
   }
 
   function handleRestore(backupId: string) {
@@ -223,10 +304,39 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
             <Badge variant="secondary" className="text-xs">Sharing</Badge>
           )}
         </div>
-        <Button onClick={handleCreate} disabled={isPending} size="sm">
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          {isPending ? "Erstelle…" : "Backup erstellen"}
-        </Button>
+        <div className="flex items-center">
+          <Button
+            onClick={() => handleCreate()}
+            disabled={isPending}
+            size="sm"
+            className="rounded-r-none"
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            {isPending ? "Erstelle…" : "Backup erstellen"}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                disabled={isPending}
+                className="rounded-l-none border-l border-l-white/20 px-2"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedComponents([...ALL_COMPONENT_IDS]);
+                  setCustomDialogOpen(true);
+                }}
+              >
+                <Settings2 className="mr-2 h-4 w-4" />
+                Benutzerdefiniertes Backup
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {loading ? (
@@ -323,6 +433,87 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
           ))}
         </div>
       )}
+
+      {/* Custom Backup Dialog */}
+      <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Benutzerdefiniertes Backup</DialogTitle>
+            <DialogDescription>
+              Wähle aus, welche Komponenten gesichert werden sollen.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1 py-2">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-200 dark:border-zinc-800">
+              <Label className="text-sm font-medium cursor-pointer" onClick={toggleAll}>
+                Alle auswählen
+              </Label>
+              <Checkbox
+                checked={selectedComponents.length === ALL_COMPONENT_IDS.length}
+                onCheckedChange={toggleAll}
+              />
+            </div>
+
+            {BACKUP_COMPONENTS.map((comp) => {
+              const Icon = comp.icon;
+              const checked = selectedComponents.includes(comp.id);
+              return (
+                <div
+                  key={comp.id}
+                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    checked
+                      ? "border-zinc-900 bg-zinc-50 dark:border-zinc-50 dark:bg-zinc-900"
+                      : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+                  }`}
+                  onClick={() => toggleComponent(comp.id)}
+                >
+                  <div className={`rounded-md p-2 ${
+                    checked
+                      ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                      : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                  }`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{comp.label}</p>
+                    <p className="text-xs text-zinc-500">{comp.description}</p>
+                  </div>
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleComponent(comp.id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCustomDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleCustomBackup}
+              disabled={selectedComponents.length === 0 || isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Erstelle…
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  {selectedComponents.length === ALL_COMPONENT_IDS.length
+                    ? "Vollständiges Backup"
+                    : `${selectedComponents.length} ${selectedComponents.length === 1 ? "Komponente" : "Komponenten"} sichern`}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
