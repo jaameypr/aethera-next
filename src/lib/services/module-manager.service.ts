@@ -73,6 +73,7 @@ function toResponse(doc: IInstalledModule): InstalledModuleResponse {
     exposure: doc.exposure ?? "none",
     status: doc.status,
     internalUrl: doc.internalUrl,
+    publicUrl: doc.publicUrl,
     assignedPort: doc.assignedPort,
     errorMessage: doc.errorMessage,
     sidebar: doc.sidebar,
@@ -377,6 +378,22 @@ export async function updateModuleConfig(
     }
   }
 
+  await doc.save();
+
+  return toResponse(doc);
+}
+
+/** Update the public URL for a module. */
+export async function updateModulePublicUrl(
+  moduleId: string,
+  publicUrl?: string,
+): Promise<InstalledModuleResponse> {
+  await connectDB();
+
+  const doc = await InstalledModuleModel.findOne({ moduleId });
+  if (!doc) throw new Error(`Module "${moduleId}" is not installed`);
+
+  doc.publicUrl = publicUrl || undefined;
   await doc.save();
 
   return toResponse(doc);

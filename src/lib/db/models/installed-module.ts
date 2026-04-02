@@ -35,6 +35,8 @@ export interface IInstalledModule extends Document {
   containerId?: string;
   containerName?: string;
   internalUrl?: string;
+  /** Admin-configurable external URL for this module (e.g. https://files.example.com) */
+  publicUrl?: string;
   assignedPort?: number;
   errorMessage?: string;
   sidebar: IModuleSidebarItem[];
@@ -104,6 +106,7 @@ const InstalledModuleSchema = new Schema<IInstalledModule>(
     containerId: { type: String },
     containerName: { type: String },
     internalUrl: { type: String },
+    publicUrl: { type: String },
     assignedPort: { type: Number },
     errorMessage: { type: String },
     sidebar: [ModuleSidebarItemSchema],

@@ -220,6 +220,7 @@ export interface InstalledModuleResponse {
   status: string;
   exposure: "public" | "internal" | "none";
   internalUrl?: string;
+  publicUrl?: string;
   assignedPort?: number;
   errorMessage?: string;
   sidebar: ModuleManifestSidebarItem[];

@@ -76,6 +76,16 @@ export async function updateModuleConfigAction(
   return JSON.parse(JSON.stringify(result));
 }
 
+export async function updateModulePublicUrlAction(
+  moduleId: string,
+  publicUrl?: string,
+) {
+  await requirePermission("module.manage");
+  const result = await moduleManager.updateModulePublicUrl(moduleId, publicUrl);
+  revalidatePath("/admin/modules");
+  return JSON.parse(JSON.stringify(result));
+}
+
 export async function checkModuleHealthAction(moduleId: string) {
   await requirePermission("module.access");
   return moduleManager.checkModuleHealth(moduleId);

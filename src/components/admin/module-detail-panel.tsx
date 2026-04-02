@@ -29,6 +29,7 @@ import {
   startModuleAction,
   stopModuleAction,
   updateModuleConfigAction,
+  updateModulePublicUrlAction,
   checkModuleHealthAction,
   uninstallModuleAction,
 } from "@/app/(app)/actions/modules";
@@ -42,6 +43,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const [mod, setMod] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
+  const [publicUrl, setPublicUrl] = useState(initial.publicUrl ?? "");
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
 
   // Parse configurable env defs from manifest
@@ -91,6 +93,19 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       setMod(result);
       setConfigValues({});
       toast.success("Konfiguration gespeichert");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fehler");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSavePublicUrl = async () => {
+    setLoading(true);
+    try {
+      const result = await updateModulePublicUrlAction(mod.moduleId, publicUrl.trim() || undefined);
+      setMod(result);
+      toast.success("Öffentliche URL gespeichert");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Fehler");
     } finally {
@@ -176,16 +191,18 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
                 <Square className="mr-1 h-4 w-4" />
                 Stoppen
               </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href={`/api/modules/${mod.moduleId}/launch`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="mr-1 h-4 w-4" />
-                  Öffnen
-                </a>
-              </Button>
+              {mod.exposure === "public" && (
+                <Button variant="outline" asChild>
+                  <a
+                    href={`/api/modules/${mod.moduleId}/launch`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="mr-1 h-4 w-4" />
+                    Öffnen
+                  </a>
+                </Button>
+              )}
             </>
           )}
           <Button variant="outline" onClick={handleHealthCheck}>
@@ -241,6 +258,38 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           </dl>
         </CardContent>
       </Card>
+
+      {/* Public URL (only for public modules) */}
+      {mod.exposure === "public" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Öffentliche URL</CardTitle>
+            <CardDescription>
+              Externe URL unter der das Modul erreichbar ist. Leer lassen für
+              automatische Erkennung (Host + Port {mod.assignedPort}).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Input
+              placeholder={`z.B. https://paperview.example.com oder http://1.2.3.4:${mod.assignedPort}`}
+              value={publicUrl}
+              onChange={(e) => setPublicUrl(e.target.value)}
+            />
+            <Button
+              onClick={handleSavePublicUrl}
+              disabled={loading}
+              size="sm"
+            >
+              {loading ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-1 h-4 w-4" />
+              )}
+              Speichern
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Permissions */}
       {mod.permissions.length > 0 && (

@@ -182,6 +182,7 @@ export async function getModuleCatalog(): Promise<ModuleCatalogEntry[]> {
             exposure: (inst.exposure as "public" | "internal" | "none") ?? "none",
             status: inst.status,
             internalUrl: inst.internalUrl,
+            publicUrl: inst.publicUrl,
             assignedPort: inst.assignedPort,
             errorMessage: inst.errorMessage,
             sidebar: inst.sidebar,
