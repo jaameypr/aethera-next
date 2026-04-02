@@ -95,7 +95,7 @@ export async function uploadBackupToShare(opts: {
   return {
     shareId: share._id,
     title: share.title,
-    shareUrl: `${baseUrl}/pages/shares/${share._id}`,
+    shareUrl: `${baseUrl}/shares/${share._id}`,
   };
 }
 
