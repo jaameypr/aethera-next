@@ -81,10 +81,10 @@ export function ImportBackupDialog({
     e.preventDefault();
     setDragOver(false);
     const f = e.dataTransfer.files[0];
-    if (f && (f.name.endsWith(".tar.gz") || f.name.endsWith(".tgz"))) {
+    if (f && (f.name.endsWith(".tar.gz") || f.name.endsWith(".tgz") || f.name.endsWith(".zip"))) {
       setFile(f);
     } else {
-      toast.error("Nur .tar.gz Dateien werden unterstützt");
+      toast.error("Nur .tar.gz und .zip Dateien werden unterstützt");
     }
   }, []);
 
@@ -246,7 +246,7 @@ export function ImportBackupDialog({
               <input
                 ref={fileRef}
                 type="file"
-                accept=".tar.gz,.tgz"
+                accept=".tar.gz,.tgz,.zip"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -280,7 +280,7 @@ export function ImportBackupDialog({
                     Datei hierher ziehen oder klicken
                   </p>
                   <p className="text-xs text-zinc-500">
-                    Nur .tar.gz Dateien
+                    Nur .tar.gz und .zip Dateien
                   </p>
                 </div>
               )}
