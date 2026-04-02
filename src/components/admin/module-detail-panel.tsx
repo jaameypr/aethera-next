@@ -209,6 +209,20 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
             <Heart className="mr-1 h-4 w-4" />
             Health Check
           </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const res = await fetch(`/api/modules/${mod.moduleId}/provision-key`, { method: "POST" });
+                if (!res.ok) throw new Error((await res.json()).error);
+                toast.success("API Key provisioniert");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Fehler");
+              }
+            }}
+          >
+            🔑 API Key
+          </Button>
           {healthStatus && (
             <span className="flex items-center text-sm text-zinc-500">
               {healthStatus}
