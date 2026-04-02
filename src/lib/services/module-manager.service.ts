@@ -228,6 +228,21 @@ export async function uninstallModule(moduleId: string): Promise<void> {
     console.error(`Error removing container for ${moduleId}:`, err);
   }
 
+  // Drop the module's dedicated database if it had one
+  const manifest = doc.manifest as unknown as ModuleManifest;
+  if (manifest.database?.name) {
+    try {
+      const mongoose = await import("mongoose");
+      const uri = buildMongoUri(manifest.database.name);
+      const conn = await mongoose.default.createConnection(uri).asPromise();
+      await conn.dropDatabase();
+      await conn.close();
+      console.log(`[module-manager] Dropped database ${manifest.database.name} for ${moduleId}`);
+    } catch (err) {
+      console.error(`Error dropping database for ${moduleId}:`, err);
+    }
+  }
+
   await InstalledModuleModel.deleteOne({ moduleId });
 }
 

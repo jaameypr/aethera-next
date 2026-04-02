@@ -44,39 +44,51 @@ export async function provisionApiKey(moduleId: string): Promise<string> {
     throw new Error("Module admin password not configured");
   }
 
-  const res = await fetch(`${doc.internalUrl}${exchangePath}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username,
-      password,
-      description: "Aethera integration",
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
+  console.log(
+    `[module-auth] Exchanging API key for ${moduleId} — user: "${username}", password length: ${password.length}, url: ${doc.internalUrl}${exchangePath}`,
+  );
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`API key exchange failed (${res.status}): ${body}`);
+  // Try configured password first, then fallback to default "changeme"
+  const passwords = [password, ...(password !== "changeme" ? ["changeme"] : [])];
+  let lastError = "";
+
+  for (const pwd of passwords) {
+    const res = await fetch(`${doc.internalUrl}${exchangePath}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username,
+        password: pwd,
+        description: "Aethera integration",
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const apiKey: string = data.key;
+
+      if (!apiKey) {
+        throw new Error("No key returned from exchange endpoint");
+      }
+
+      // Store the key (marked as secret)
+      const idx = doc.config.findIndex((c) => c.key === "__API_KEY");
+      if (idx >= 0) {
+        doc.config[idx].value = apiKey;
+      } else {
+        doc.config.push({ key: "__API_KEY", value: apiKey, secret: true });
+      }
+      await doc.save();
+
+      return apiKey;
+    }
+
+    lastError = await res.text().catch(() => "");
+    console.log(`[module-auth] API key exchange attempt failed for ${moduleId} (${res.status}): ${lastError}`);
   }
 
-  const data = await res.json();
-  const apiKey: string = data.key;
-
-  if (!apiKey) {
-    throw new Error("No key returned from exchange endpoint");
-  }
-
-  // Store the key (marked as secret)
-  const idx = doc.config.findIndex((c) => c.key === "__API_KEY");
-  if (idx >= 0) {
-    doc.config[idx].value = apiKey;
-  } else {
-    doc.config.push({ key: "__API_KEY", value: apiKey, secret: true });
-  }
-  await doc.save();
-
-  return apiKey;
+  throw new Error(`API key exchange failed: ${lastError}`);
 }
 
 /**
