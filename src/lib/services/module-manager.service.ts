@@ -618,7 +618,7 @@ function parseMemoryLimit(limit: string): number {
 }
 
 /**
- * Clone a git repo and build a Docker image from it.
+ * Build a Docker image from a git repository using the Docker Engine API.
  */
 async function buildImageFromRepo(
   imageName: string,
@@ -639,22 +639,37 @@ async function buildImageFromRepo(
     remote: remoteUrl,
   });
 
-  // Wait for the build to complete by consuming the stream
+  // Consume stream and collect errors
+  const buildErrors: string[] = [];
   await new Promise<void>((resolve, reject) => {
     (docker as any).modem.followProgress(
       stream,
       (err: Error | null) => {
         if (err) reject(err);
+        else if (buildErrors.length > 0) reject(new Error(buildErrors.join("\n")));
         else resolve();
       },
-      (event: { stream?: string; error?: string }) => {
-        if (event.stream) process.stdout.write(event.stream);
-        if (event.error) console.error("[module-manager] Build error:", event.error);
+      (event: { stream?: string; error?: string; errorDetail?: { message: string } }) => {
+        if (event.stream) {
+          const line = event.stream.trim();
+          if (line) console.log(`[module-manager] ${line}`);
+        }
+        if (event.error) {
+          console.error("[module-manager] Build error:", event.error);
+          buildErrors.push(event.error);
+        }
       },
     );
   });
 
-  console.log(`[module-manager] Image ${fullTag} built successfully`);
+  // Verify image exists after build
+  try {
+    const img = (docker as any).getImage(fullTag);
+    await img.inspect();
+    console.log(`[module-manager] Image ${fullTag} verified`);
+  } catch {
+    throw new Error(`Image ${fullTag} not found after build — build may have failed silently`);
+  }
 }
 
 /* ------------------------------------------------------------------ */
