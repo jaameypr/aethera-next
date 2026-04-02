@@ -82,7 +82,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
           <ServerAddonsTab serverId={server._id} />
         </TabsContent>
         <TabsContent value="backups">
-          <ServerBackupsTab serverId={server._id} />
+          <ServerBackupsTab serverId={server._id} serverName={server.name} />
         </TabsContent>
         <TabsContent value="access">
           <ServerAccessTab serverId={server._id} access={server.access} />

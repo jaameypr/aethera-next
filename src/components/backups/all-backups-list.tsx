@@ -12,6 +12,7 @@ import {
   Clock,
   HardDrive,
   Server,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ImportBackupDialog } from "@/components/backups/import-backup-dialog";
 
 interface Backup {
   _id: string;
@@ -81,6 +83,7 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
   const [backups, setBackups] = useState(initial);
   const [capabilities, setCapabilities] = useState<BackupCapabilities | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/backups/capabilities")
@@ -123,13 +126,19 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        {capabilities?.async && (
-          <Badge variant="secondary" className="text-xs">Async Backups aktiv</Badge>
-        )}
-        {capabilities?.sharing && (
-          <Badge variant="secondary" className="text-xs">Paperview Sharing aktiv</Badge>
-        )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {capabilities?.async && (
+            <Badge variant="secondary" className="text-xs">Async Backups aktiv</Badge>
+          )}
+          {capabilities?.sharing && (
+            <Badge variant="secondary" className="text-xs">Paperview Sharing aktiv</Badge>
+          )}
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setImportDialogOpen(true)}>
+          <Upload className="mr-1.5 h-3.5 w-3.5" />
+          Backup importieren
+        </Button>
       </div>
 
       <div className="space-y-2">
@@ -208,6 +217,28 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
           </Card>
         ))}
       </div>
+
+      <ImportBackupDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={(backup) => {
+          setBackups((prev) => [
+            {
+              _id: backup._id,
+              serverId: "000000000000000000000000",
+              serverName: "Import",
+              name: backup.filename.replace(/\.tar\.gz$/i, ""),
+              filename: backup.filename,
+              size: backup.size,
+              components: backup.components,
+              status: "completed",
+              strategy: "import",
+              createdAt: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+        }}
+      />
     </div>
   );
 }

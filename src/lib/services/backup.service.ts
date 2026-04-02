@@ -1,10 +1,12 @@
 import "server-only";
 
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, rm, stat, readdir } from "node:fs/promises";
+import { mkdir, rm, stat, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { createGzip, createGunzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
+import mongoose from "mongoose";
 import tar from "tar-stream";
 import { connectDB } from "@/lib/db/connection";
 import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models/backup";
@@ -236,6 +238,147 @@ export async function restoreBackup(
     serverId,
     filename: backup.filename,
   });
+}
+
+export async function restoreBackupSelective(
+  backupId: string,
+  serverId: string,
+  components: BackupComponent[],
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (server.status !== "stopped") {
+    throw new Error("Server must be stopped to restore a backup");
+  }
+
+  const backup = await BackupModel.findById(backupId);
+  if (!backup) throw new Error("Backup not found");
+
+  // Build a set of prefixes that should be extracted
+  const allowedPrefixes: string[] = [];
+  for (const comp of components) {
+    const dirs = COMPONENT_DIRS[comp] ?? [];
+    for (const d of dirs) {
+      allowedPrefixes.push(d + "/");
+      allowedPrefixes.push(d); // exact match for single files like server.properties
+    }
+  }
+
+  const serverDir = getServerDataPath(server.identifier);
+
+  await new Promise<void>((resolve, reject) => {
+    const extract = tar.extract();
+
+    extract.on("entry", (header, stream, next) => {
+      const filePath = header.name;
+      const matches = allowedPrefixes.some(
+        (p) => filePath === p || filePath.startsWith(p.endsWith("/") ? p : p + "/"),
+      );
+
+      if (!matches) {
+        stream.resume();
+        next();
+        return;
+      }
+
+      const destPath = path.resolve(serverDir, filePath);
+
+      // Prevent path traversal
+      if (!destPath.startsWith(serverDir)) {
+        stream.resume();
+        next();
+        return;
+      }
+
+      if (header.type === "directory") {
+        mkdir(destPath, { recursive: true }).then(() => {
+          stream.resume();
+          next();
+        }, reject);
+      } else {
+        const dir = path.dirname(destPath);
+        mkdir(dir, { recursive: true }).then(() => {
+          const ws = createWriteStream(destPath);
+          stream.pipe(ws);
+          ws.on("finish", next);
+          ws.on("error", reject);
+        }, reject);
+      }
+    });
+
+    extract.on("finish", resolve);
+    extract.on("error", reject);
+
+    createReadStream(backup.path).pipe(createGunzip()).pipe(extract);
+  });
+
+  await logAction(server.projectKey, "BACKUP_RESTORED", backup.createdBy.toString(), {
+    backupId,
+    serverId,
+    filename: backup.filename,
+    components,
+  });
+}
+
+export async function importBackup(
+  file: Buffer,
+  filename: string,
+  actorId: string,
+): Promise<IBackup> {
+  await connectDB();
+
+  const importDir = path.join(getBackupDir(), "imports");
+  await mkdir(importDir, { recursive: true });
+
+  const filePath = path.join(importDir, filename);
+  await writeFile(filePath, file);
+
+  // Detect components by reading the tar.gz
+  const detectedComponents: BackupComponent[] = [];
+  const componentSet = new Set<BackupComponent>();
+
+  await new Promise<void>((resolve, reject) => {
+    const extract = tar.extract();
+
+    extract.on("entry", (header, stream, next) => {
+      if (header.type === "file") {
+        const entryPath = header.name;
+        for (const [comp, dirs] of Object.entries(COMPONENT_DIRS)) {
+          if (dirs.some((d) => entryPath.startsWith(d + "/") || entryPath === d)) {
+            componentSet.add(comp as BackupComponent);
+            break;
+          }
+        }
+      }
+      stream.resume();
+      next();
+    });
+
+    extract.on("finish", resolve);
+    extract.on("error", reject);
+
+    Readable.from(file).pipe(createGunzip()).pipe(extract);
+  });
+
+  detectedComponents.push(...componentSet);
+
+  const fileStat = await stat(filePath);
+
+  const backup = await BackupModel.create({
+    serverId: new mongoose.Types.ObjectId("000000000000000000000000"),
+    name: filename.replace(/\.tar\.gz$/i, ""),
+    filename,
+    path: filePath,
+    size: fileStat.size,
+    components: detectedComponents,
+    status: "completed",
+    strategy: "import",
+    createdBy: actorId,
+  });
+
+  return backup.toObject() as IBackup;
 }
 
 export async function describeBackupComponents(

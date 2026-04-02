@@ -21,6 +21,7 @@ import {
   Package,
   Puzzle,
   Database,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { ImportBackupDialog } from "@/components/backups/import-backup-dialog";
+import { RestoreBackupDialog } from "@/components/backups/restore-backup-dialog";
 
 interface Backup {
   _id: string;
@@ -137,7 +140,7 @@ type BackupComponentId = (typeof BACKUP_COMPONENTS)[number]["id"];
 
 const ALL_COMPONENT_IDS: BackupComponentId[] = BACKUP_COMPONENTS.map((c) => c.id);
 
-export function ServerBackupsTab({ serverId }: { serverId: string }) {
+export function ServerBackupsTab({ serverId, serverName }: { serverId: string; serverName: string }) {
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [capabilities, setCapabilities] = useState<BackupCapabilities | null>(null);
@@ -145,6 +148,8 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [selectedComponents, setSelectedComponents] = useState<BackupComponentId[]>([...ALL_COMPONENT_IDS]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<Backup | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchBackups = useCallback(async () => {
@@ -231,21 +236,8 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
     );
   }
 
-  function handleRestore(backupId: string) {
-    startTransition(async () => {
-      try {
-        const res = await fetch(
-          `/api/servers/${serverId}/backups/${backupId}`,
-          { method: "POST" },
-        );
-        if (!res.ok) throw new Error((await res.json()).error);
-        toast.success("Backup wiederhergestellt");
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Fehler beim Wiederherstellen",
-        );
-      }
-    });
+  function handleRestore(backup: Backup) {
+    setRestoreTarget(backup);
   }
 
   function handleDelete(backupId: string) {
@@ -334,6 +326,10 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
                 <Settings2 className="mr-2 h-4 w-4" />
                 Benutzerdefiniertes Backup
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setImportDialogOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Backup importieren
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -412,7 +408,7 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
                       variant="ghost"
                       size="icon"
                       disabled={isPending}
-                      onClick={() => handleRestore(backup._id)}
+                      onClick={() => handleRestore(backup)}
                       title="Wiederherstellen"
                     >
                       <RotateCcw className="h-4 w-4" />
@@ -514,6 +510,27 @@ export function ServerBackupsTab({ serverId }: { serverId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Backup Dialog */}
+      <ImportBackupDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={() => fetchBackups()}
+      />
+
+      {/* Restore Backup Dialog */}
+      {restoreTarget && (
+        <RestoreBackupDialog
+          open={!!restoreTarget}
+          onOpenChange={(open) => !open && setRestoreTarget(null)}
+          backupId={restoreTarget._id}
+          backupName={restoreTarget.filename}
+          serverId={serverId}
+          serverName={serverName}
+          availableComponents={restoreTarget.components}
+          onRestored={() => fetchBackups()}
+        />
+      )}
     </div>
   );
 }

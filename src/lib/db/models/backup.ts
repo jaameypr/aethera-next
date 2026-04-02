@@ -2,7 +2,7 @@ import mongoose, { Schema, type Document, type Model } from "mongoose";
 
 export type BackupComponent = "world" | "config" | "mods" | "plugins" | "datapacks";
 export type BackupStatus = "pending" | "in_progress" | "completed" | "failed";
-export type BackupStrategy = "sync" | "async";
+export type BackupStrategy = "sync" | "async" | "import";
 
 export interface IBackup extends Document {
   _id: mongoose.Types.ObjectId;
@@ -30,7 +30,7 @@ const BackupSchema = new Schema<IBackup>({
   size: { type: Number, default: 0 },
   components: [{ type: String, enum: ["world", "config", "mods", "plugins", "datapacks"] }],
   status: { type: String, enum: ["pending", "in_progress", "completed", "failed"], default: "completed" },
-  strategy: { type: String, enum: ["sync", "async"], default: "sync" },
+  strategy: { type: String, enum: ["sync", "async", "import"], default: "sync" },
   jobId: { type: String },
   shareUrl: { type: String },
   shareId: { type: String },

@@ -41,6 +41,10 @@ import {
 } from "@/app/(app)/actions/servers";
 import { JVM_FLAG_PRESETS, type JvmPreset } from "@/lib/constants/jvm-presets";
 import JvmPresetSelector from "@/components/servers/JvmPresetSelector";
+import {
+  BackupSelector,
+  type BackupSelection,
+} from "@/components/backups/backup-selector";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +79,8 @@ interface WizardState {
   maxRam: number;
   // Step 4 — Confirmation
   autoStart: boolean;
+  // Backup
+  backupSelection: BackupSelection | null;
   // Global
   errors: Record<string, string>;
 }
@@ -90,6 +96,7 @@ type WizardAction =
   | { type: "SET_MAX_RAM"; value: number }
   | { type: "SET_JVM_PRESET"; preset: JvmPreset }
   | { type: "SET_JAVA_ARGS"; value: string }
+  | { type: "SET_BACKUP"; selection: BackupSelection | null }
   | { type: "RESET"; maxRam?: number };
 
 const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "aikars")!;
@@ -110,6 +117,7 @@ const INITIAL_STATE: WizardState = {
   portStatus: "idle",
   maxRam: 8192,
   autoStart: false,
+  backupSelection: null,
   errors: {},
 };
 
@@ -177,6 +185,8 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
     }
     case "SET_JAVA_ARGS":
       return { ...state, javaArgs: action.value };
+    case "SET_BACKUP":
+      return { ...state, backupSelection: action.selection };
     case "RESET":
       return { ...INITIAL_STATE, maxRam: action.maxRam ?? INITIAL_STATE.maxRam };
     default:
@@ -282,6 +292,15 @@ function StepBasis({
             <SelectItem value="hytale">🟦 Hytale</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+        <BackupSelector
+          selection={state.backupSelection}
+          onSelectionChange={(sel) =>
+            dispatch({ type: "SET_BACKUP", selection: sel })
+          }
+        />
       </div>
     </div>
   );
@@ -472,6 +491,14 @@ function StepConfirmation({ state }: { state: WizardState }) {
     { label: "Mod-Loader", value: state.modLoader },
     { label: "RAM", value: memoryLabel },
     { label: "Port", value: String(state.port) },
+    ...(state.backupSelection
+      ? [
+          {
+            label: "Backup",
+            value: `${state.backupSelection.backupName} (${state.backupSelection.components.join(", ")})`,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -492,7 +519,7 @@ function StepConfirmation({ state }: { state: WizardState }) {
             }`}
           >
             <span className="text-zinc-500">{row.label}</span>
-            <span className="font-medium">{row.value}</span>
+            <span className="font-medium max-w-[60%] truncate text-right">{row.value}</span>
           </div>
         ))}
       </div>
@@ -638,7 +665,7 @@ export function CreateServerWizard({
           version: state.version || undefined,
           modLoader: state.modLoader,
           javaArgs: state.javaArgs || undefined,
-          autoStart: state.autoStart,
+          autoStart: state.backupSelection ? false : state.autoStart,
         };
 
         const result = blueprintId
@@ -646,13 +673,39 @@ export function CreateServerWizard({
               blueprintId,
               projectKey,
               input,
-              autoStartNow: state.autoStart,
+              autoStartNow: state.backupSelection ? false : state.autoStart,
             })
           : await createServerAction({
               projectKey,
               input,
-              autoStartNow: state.autoStart,
+              autoStartNow: state.backupSelection ? false : state.autoStart,
             });
+
+        // Restore backup to the newly created server
+        if (state.backupSelection && state.backupSelection.components.length > 0) {
+          try {
+            const restoreRes = await fetch(
+              `/api/backups/${state.backupSelection.backupId}/restore-to/${result.serverId}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  components: state.backupSelection.components,
+                }),
+              },
+            );
+            if (!restoreRes.ok) {
+              const data = await restoreRes.json().catch(() => ({}));
+              toast.error(
+                `Backup-Wiederherstellung fehlgeschlagen: ${data.error || "Unbekannter Fehler"}`,
+              );
+            } else {
+              toast.success("Backup wiederhergestellt!");
+            }
+          } catch {
+            toast.error("Backup-Wiederherstellung fehlgeschlagen");
+          }
+        }
 
         toast.success("Server erstellt!");
         onOpenChange(false);

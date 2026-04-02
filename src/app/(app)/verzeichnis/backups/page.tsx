@@ -32,7 +32,7 @@ export default async function BackupsPage() {
   const serialized = backups.map((b) => ({
     _id: b._id.toString(),
     serverId: b.serverId.toString(),
-    serverName: serverMap[b.serverId.toString()] ?? "Unbekannt",
+    serverName: serverMap[b.serverId.toString()] ?? (b.strategy === "import" ? "Import" : "Unbekannt"),
     name: b.name,
     filename: b.filename,
     size: b.size,
