@@ -101,7 +101,8 @@ export function deployConfigFromDoc(
     },
     restartPolicy: "unless-stopped",
     resources: {
-      memory: { limit: `${server.memory}m` },
+      // JVM needs headroom beyond -Xmx for metaspace, native memory, GC, etc.
+      memory: { limit: `${server.memory + 1024}m` },
     },
     stopTimeout: 30,
     interactive: true,
