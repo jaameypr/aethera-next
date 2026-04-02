@@ -27,10 +27,12 @@ export const GET = withPermission<Params>(
         throw notFound("Module has no public UI");
       }
 
-      // Build external URL using the request's hostname (= public server address)
-      const host = _req.nextUrl.hostname;
+      // Use the Host header to get the actual public address the user connected to
+      const hostHeader = _req.headers.get("host") ?? _req.nextUrl.host;
+      // Strip port from host header (e.g. "myserver.com:3000" → "myserver.com")
+      const hostname = hostHeader.replace(/:\d+$/, "");
       const protocol = _req.nextUrl.protocol; // "http:" or "https:"
-      const moduleUrl = `${protocol}//${host}:${mod.assignedPort}`;
+      const moduleUrl = `${protocol}//${hostname}:${mod.assignedPort}`;
 
       return Response.redirect(moduleUrl, 302);
     } catch (err) {
