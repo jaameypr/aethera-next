@@ -618,14 +618,14 @@ function parseMemoryLimit(limit: string): number {
 }
 
 /**
- * Build a Docker image from a git repository using the Docker Engine API.
+ * Build a Docker image from a git repository using the Docker Engine API directly.
  */
 async function buildImageFromRepo(
   imageName: string,
   imageTag: string,
   build: NonNullable<ModuleManifest["docker"]>["build"] & object,
 ): Promise<void> {
-  const docker = await getDockerClient();
+  const http = await import("node:http");
   const branch = build.branch ?? "main";
   const dockerfile = build.dockerfile ?? "Dockerfile";
   const fullTag = `${imageName}:${imageTag}`;
@@ -633,42 +633,60 @@ async function buildImageFromRepo(
 
   console.log(`[module-manager] Building image ${fullTag} from ${remoteUrl}`);
 
-  const stream = await (docker as any).buildImage(null, {
+  const query = new URLSearchParams({
     t: fullTag,
     dockerfile,
     remote: remoteUrl,
   });
 
-  // Consume stream and collect errors
-  const buildErrors: string[] = [];
+  // Call Docker Engine API directly via Unix socket
   await new Promise<void>((resolve, reject) => {
-    (docker as any).modem.followProgress(
-      stream,
-      (err: Error | null) => {
-        if (err) reject(err);
-        else if (buildErrors.length > 0) reject(new Error(buildErrors.join("\n")));
-        else resolve();
+    const req = http.request(
+      {
+        socketPath: "/var/run/docker.sock",
+        path: `/build?${query.toString()}`,
+        method: "POST",
+        headers: { "Content-Type": "application/tar" },
       },
-      (event: { stream?: string; error?: string; errorDetail?: { message: string } }) => {
-        if (event.stream) {
-          const line = event.stream.trim();
-          if (line) console.log(`[module-manager] ${line}`);
-        }
-        if (event.error) {
-          console.error("[module-manager] Build error:", event.error);
-          buildErrors.push(event.error);
-        }
+      (res) => {
+        const errors: string[] = [];
+        res.on("data", (chunk: Buffer) => {
+          const lines = chunk.toString().split("\n").filter(Boolean);
+          for (const line of lines) {
+            try {
+              const event = JSON.parse(line);
+              if (event.stream) {
+                const msg = event.stream.trim();
+                if (msg) console.log(`[module-manager] ${msg}`);
+              }
+              if (event.error) {
+                console.error("[module-manager] Build error:", event.error);
+                errors.push(event.error);
+              }
+            } catch {
+              // non-JSON line, ignore
+            }
+          }
+        });
+        res.on("end", () => {
+          if (errors.length > 0) reject(new Error(errors.join("\n")));
+          else resolve();
+        });
+        res.on("error", reject);
       },
     );
+    req.on("error", reject);
+    req.end();
   });
 
-  // Verify image exists after build
+  // Verify image exists
+  const docker = await getDockerClient();
   try {
     const img = (docker as any).getImage(fullTag);
     await img.inspect();
     console.log(`[module-manager] Image ${fullTag} verified`);
   } catch {
-    throw new Error(`Image ${fullTag} not found after build — build may have failed silently`);
+    throw new Error(`Image ${fullTag} not found after build`);
   }
 }
 
