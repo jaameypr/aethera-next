@@ -50,7 +50,7 @@ export interface IInstalledModule extends Document {
 const ModuleEnvVarSchema = new Schema<IModuleEnvVar>(
   {
     key: { type: String, required: true },
-    value: { type: String, required: true },
+    value: { type: String, default: "" },
     secret: { type: Boolean, default: false },
   },
   { _id: false },
