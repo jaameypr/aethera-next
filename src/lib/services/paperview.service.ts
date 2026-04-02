@@ -135,7 +135,8 @@ export async function isPaperviewReady(): Promise<boolean> {
   try {
     await getPaperviewConfig();
     return true;
-  } catch {
+  } catch (err) {
+    console.log("[paperview] Not ready:", (err as Error).message);
     return false;
   }
 }
