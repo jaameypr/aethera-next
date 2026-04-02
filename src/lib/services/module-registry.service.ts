@@ -46,6 +46,14 @@ export async function fetchRegistry(
     throw new Error(`Failed to fetch module registry: ${res.status}`);
   }
 
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const preview = (await res.text()).slice(0, 120);
+    throw new Error(
+      `Registry returned non-JSON response (${contentType || "unknown content-type"}): ${preview}`,
+    );
+  }
+
   const data: ModuleRegistry = await res.json();
 
   if (!data.modules || !Array.isArray(data.modules)) {
@@ -81,7 +89,13 @@ export async function fetchManifest(
  * local install status and whether an update is available.
  */
 export async function getModuleCatalog(): Promise<ModuleCatalogEntry[]> {
-  const registry = await fetchRegistry();
+  let registry: ModuleRegistry;
+  try {
+    registry = await fetchRegistry();
+  } catch {
+    // Registry unreachable — return only installed modules
+    registry = { version: 1, updatedAt: "", modules: [] };
+  }
 
   await connectDB();
   const installed = await InstalledModuleModel.find().lean();
