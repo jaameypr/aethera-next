@@ -30,6 +30,7 @@ import type { ModuleManifest, InstalledModuleResponse } from "@/lib/api/types";
 const CONTAINER_PREFIX = "aethera-mod-";
 const NETWORK = "aethera-net";
 const LABEL_PREFIX = "aethera.module";
+const MODULE_PORT_RANGE_START = 4000;
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -37,6 +38,19 @@ const LABEL_PREFIX = "aethera.module";
 
 function moduleContainerName(moduleId: string): string {
   return `${CONTAINER_PREFIX}${moduleId}`;
+}
+
+/** Find the next free host port for a module starting from MODULE_PORT_RANGE_START. */
+async function allocateHostPort(): Promise<number> {
+  await connectDB();
+  const modules = await InstalledModuleModel.find(
+    { assignedPort: { $exists: true, $ne: null } },
+    { assignedPort: 1 },
+  ).lean();
+  const usedPorts = new Set(modules.map((m) => m.assignedPort));
+  let port = MODULE_PORT_RANGE_START;
+  while (usedPorts.has(port)) port++;
+  return port;
 }
 
 function buildMongoUri(dbName: string): string {
@@ -446,7 +460,7 @@ async function deployDockerModule(
   }
 
   const containerNameStr = moduleContainerName(manifest.id);
-  const port = manifest.docker.port;
+  const containerPort = manifest.docker.port;
   const docker = manifest.docker;
 
   // Resolve image: either pre-built or build from source
@@ -454,16 +468,18 @@ async function deployDockerModule(
   let imageTag = "latest";
 
   if (docker.image) {
-    // Pre-built image — just use it
     imageName = docker.image;
   } else if (docker.build) {
-    // Build from git repository
     imageName = `aethera-mod-${manifest.id}`;
     imageTag = manifest.version;
     await buildImageFromRepo(imageName, imageTag, docker.build);
   } else {
     throw new Error("Module manifest must specify docker.image or docker.build");
   }
+
+  // Allocate an external host port so the module is reachable from the browser
+  const hostPort = await allocateHostPort();
+  console.log(`[module-manager] Allocated host port ${hostPort} for ${manifest.id}`);
 
   // Build environment variables
   const env = buildContainerEnv(manifest, doc);
@@ -483,7 +499,7 @@ async function deployDockerModule(
     image: imageName,
     tag: imageTag,
     env,
-    ports: [], // No host port binding — accessed internally via Docker network
+    ports: [{ host: hostPort, container: containerPort, protocol: "tcp" }],
     mounts: volumes.map((v) => ({
       type: "volume" as const,
       source: v.name,
@@ -512,7 +528,8 @@ async function deployDockerModule(
 
   doc.containerId = result.containerId;
   doc.containerName = containerNameStr;
-  doc.internalUrl = `http://${containerNameStr}:${port}`;
+  doc.assignedPort = hostPort;
+  doc.internalUrl = `http://${containerNameStr}:${containerPort}`;
 }
 
 /**
