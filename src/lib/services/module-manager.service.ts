@@ -523,21 +523,35 @@ async function buildImageFromRepo(
   imageTag: string,
   build: NonNullable<ModuleManifest["docker"]>["build"] & object,
 ): Promise<void> {
-  const { execSync } = await import("node:child_process");
-
+  const docker = await getDockerClient();
   const branch = build.branch ?? "main";
   const dockerfile = build.dockerfile ?? "Dockerfile";
-
-  // docker build supports git URLs directly — no need for git in the container
-  // Format: docker build <repoUrl>#<branch>
-  const gitContext = `${build.repository}#${branch}`;
   const fullTag = `${imageName}:${imageTag}`;
+  const remoteUrl = `${build.repository}#${branch}`;
 
-  console.log(`[module-manager] Building image ${fullTag} from ${gitContext}`);
-  execSync(
-    `docker build -t ${fullTag} -f ${dockerfile} ${gitContext}`,
-    { stdio: "pipe", timeout: 600_000 }, // 10 min for build
-  );
+  console.log(`[module-manager] Building image ${fullTag} from ${remoteUrl}`);
+
+  const stream = await (docker as any).buildImage(null, {
+    t: fullTag,
+    dockerfile,
+    remote: remoteUrl,
+  });
+
+  // Wait for the build to complete by consuming the stream
+  await new Promise<void>((resolve, reject) => {
+    (docker as any).modem.followProgress(
+      stream,
+      (err: Error | null) => {
+        if (err) reject(err);
+        else resolve();
+      },
+      (event: { stream?: string; error?: string }) => {
+        if (event.stream) process.stdout.write(event.stream);
+        if (event.error) console.error("[module-manager] Build error:", event.error);
+      },
+    );
+  });
+
   console.log(`[module-manager] Image ${fullTag} built successfully`);
 }
 
