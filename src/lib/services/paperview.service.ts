@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createReadStream, createWriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -200,10 +200,28 @@ export async function downloadFromPaperviewToFile(
 
   const { internalUrl, apiKey } = await getPaperviewConfig();
 
-  const res = await fetch(`${internalUrl}/api/shares/${shareId}/download`, {
+  // Step 1: Fetch share metadata to get currentVersionId
+  const metaRes = await fetch(`${internalUrl}/api/shares/${shareId}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(3_600_000), // 1 hour for large files
+    signal: AbortSignal.timeout(15_000),
   });
+  if (!metaRes.ok) {
+    const body = await metaRes.text().catch(() => "");
+    throw new Error(`Paperview share metadata failed (${metaRes.status}): ${body}`);
+  }
+  const metaData = await metaRes.json();
+  const versionId =
+    metaData?.share?.currentVersionId ?? metaData?.currentVersionId;
+  if (!versionId) throw new Error("Paperview share has no current version");
+
+  // Step 2: Download via the versioned file endpoint
+  const res = await fetch(
+    `${internalUrl}/api/shares/${shareId}/versions/${versionId}/file`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(3_600_000), // 1 hour for large files
+    },
+  );
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -213,14 +231,17 @@ export async function downloadFromPaperviewToFile(
   let filename = "backup.tar.gz";
   const disposition = res.headers.get("content-disposition");
   if (disposition) {
-    const filenameMatch = disposition.match(/filename="?([^";\n]+)"?/i);
-    if (filenameMatch) filename = filenameMatch[1].trim();
+    const filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/i);
+    if (filenameMatch) filename = decodeURIComponent(filenameMatch[1].trim());
   }
 
   if (!res.body) throw new Error("Empty response body from Paperview");
 
   await mkdir(destDir, { recursive: true });
-  const tempPath = path.join(destDir, `download-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const tempPath = path.join(
+    destDir,
+    `download-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   const nodeStream = Readable.fromWeb(res.body as any);
   await pipeline(nodeStream, createWriteStream(tempPath));
 
