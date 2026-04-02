@@ -11,7 +11,6 @@ import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models
 import { ServerModel, type IServer } from "@/lib/db/models/server";
 import { logAction } from "@/lib/services/project.service";
 import { getBackupDir, getServerDataPath } from "@/lib/docker/storage";
-import { HttpError } from "@/lib/api/errors";
 
 // ---------------------------------------------------------------------------
 // Component → directory mapping (relative to server data dir)
@@ -97,9 +96,9 @@ export async function createBackup(
   await connectDB();
 
   const server = await ServerModel.findById(serverId);
-  if (!server) throw new HttpError(404, "Server not found");
+  if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new HttpError(400, "Server muss gestoppt sein, um ein Backup zu erstellen");
+    throw new Error("Server must be stopped to create a backup");
   }
 
   const serverDir = getServerDataPath(server.identifier);
@@ -159,7 +158,7 @@ export async function deleteBackup(backupId: string): Promise<void> {
   await connectDB();
 
   const backup = await BackupModel.findById(backupId);
-  if (!backup) throw new HttpError(404, "Backup not found");
+  if (!backup) throw new Error("Backup not found");
 
   try {
     await rm(backup.path, { force: true });
@@ -186,13 +185,13 @@ export async function restoreBackup(
   await connectDB();
 
   const server = await ServerModel.findById(serverId);
-  if (!server) throw new HttpError(404, "Server not found");
+  if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new HttpError(400, "Server muss gestoppt sein, um ein Backup wiederherzustellen");
+    throw new Error("Server must be stopped to restore a backup");
   }
 
   const backup = await BackupModel.findById(backupId);
-  if (!backup) throw new HttpError(404, "Backup not found");
+  if (!backup) throw new Error("Backup not found");
 
   const serverDir = getServerDataPath(server.identifier);
 
@@ -245,7 +244,7 @@ export async function describeBackupComponents(
   await connectDB();
 
   const backup = await BackupModel.findById(backupId);
-  if (!backup) throw new HttpError(404, "Backup not found");
+  if (!backup) throw new Error("Backup not found");
 
   const components: Record<BackupComponent, string[]> = {
     world: [],
@@ -293,7 +292,7 @@ export async function publishBackup(
   await connectDB();
 
   const backup = await BackupModel.findById(backupId);
-  if (!backup) throw new HttpError(404, "Backup not found");
+  if (!backup) throw new Error("Backup not found");
 
   const token = Buffer.from(`${backupId}:${Date.now()}`).toString("base64url");
   return { downloadUrl: `/api/backups/download?token=${token}` };
