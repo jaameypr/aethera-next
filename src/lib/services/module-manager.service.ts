@@ -597,7 +597,15 @@ function buildEnvConfig(
   const result: Array<{ key: string; value: string; secret: boolean }> = [];
 
   for (const def of configurable) {
-    const value = userConfig?.[def.key] ?? def.default ?? "";
+    let value = userConfig?.[def.key] ?? def.default ?? "";
+
+    // Auto-generate a secure random value for secret fields left empty
+    if (!value && def.secret) {
+      const { randomBytes } = require("crypto");
+      value = randomBytes(24).toString("base64url");
+      console.log(`[module-manager] Auto-generated secret for ${def.key}`);
+    }
+
     result.push({
       key: def.key,
       value,
