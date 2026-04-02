@@ -69,32 +69,67 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function uploadWithProgress(
-  url: string,
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
+
+function uploadChunked(
   file: File,
   onProgress: (p: UploadProgress) => void,
 ): Promise<{ status: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", url);
-    xhr.setRequestHeader("Content-Type", "application/octet-stream");
-    xhr.setRequestHeader("X-Filename", encodeURIComponent(file.name));
+  const uploadId = crypto.randomUUID();
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  let completedBytes = 0;
 
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) {
-        onProgress({
-          loaded: e.loaded,
-          total: e.total,
-          percent: Math.round((e.loaded / e.total) * 100),
-        });
-      }
+  function sendChunk(index: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const start = index * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+      const chunkSize = end - start;
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/backups/import/chunk");
+      xhr.setRequestHeader("Content-Type", "application/octet-stream");
+      xhr.setRequestHeader("X-Upload-Id", uploadId);
+      xhr.setRequestHeader("X-Chunk-Index", String(index));
+
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          onProgress({
+            loaded: completedBytes + e.loaded,
+            total: file.size,
+            percent: Math.round(((completedBytes + e.loaded) / file.size) * 100),
+          });
+        }
+      });
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          completedBytes += chunkSize;
+          resolve();
+        } else {
+          reject(new Error(`Chunk ${index} fehlgeschlagen (${xhr.status})`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
+      xhr.send(chunk);
+    });
+  }
+
+  return (async () => {
+    for (let i = 0; i < totalChunks; i++) {
+      await sendChunk(i);
+    }
+
+    // Finalize
+    const res = await fetch("/api/backups/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uploadId, filename: file.name }),
     });
 
-    xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
-    xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
-    xhr.ontimeout = () => reject(new Error("Upload Timeout"));
-    xhr.send(file);
-  });
+    return { status: res.status, body: await res.text() };
+  })();
 }
 
 export function BackupSelector({
@@ -153,8 +188,7 @@ export function BackupSelector({
       let backup: Backup;
 
       if (importTab === "upload") {
-        const { status, body } = await uploadWithProgress(
-          "/api/backups/import",
+        const { status, body } = await uploadChunked(
           file!,
           (p) => setProgress(p),
         );

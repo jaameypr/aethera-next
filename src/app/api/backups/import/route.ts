@@ -1,8 +1,5 @@
-import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import type { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth/guards";
 import { errorResponse, badRequest } from "@/lib/api/errors";
@@ -12,7 +9,7 @@ import { getBackupDir } from "@/lib/docker/storage";
 
 export const POST = withAuth(async (req: NextRequest, { session }) => {
   try {
-    const contentType = req.headers.get("content-type") ?? "";
+    const body = await req.json();
 
     const importDir = path.join(getBackupDir(), "imports");
     await mkdir(importDir, { recursive: true });
@@ -20,28 +17,31 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
     let tempPath: string;
     let filename: string;
 
-    if (contentType.includes("application/json")) {
-      // URL import (Paperview)
-      const { url } = await req.json();
-      if (!url || typeof url !== "string") throw badRequest("'url' is required");
-
-      console.log(`[backup-import] Downloading from Paperview: ${url}`);
-      const result = await downloadFromPaperviewToFile(url, importDir);
+    if (body.url) {
+      // Paperview URL download
+      console.log(`[backup-import] Downloading from Paperview: ${body.url}`);
+      const result = await downloadFromPaperviewToFile(body.url, importDir);
       tempPath = result.tempPath;
       filename = result.filename;
+    } else if (body.uploadId) {
+      // Finalize a chunked upload
+      const uploadId = body.uploadId;
+      if (!/^[a-f0-9-]{36}$/i.test(uploadId)) {
+        throw badRequest("Invalid uploadId");
+      }
+
+      tempPath = path.join(importDir, `upload-${uploadId}.tmp`);
+      filename = body.filename || "upload.tar.gz";
+
+      // Verify the temp file exists
+      try {
+        const s = await stat(tempPath);
+        console.log(`[backup-import] Finalizing chunked upload: ${filename} (${s.size} bytes)`);
+      } catch {
+        throw badRequest("Upload not found — chunks may have expired");
+      }
     } else {
-      // Raw binary file upload — streams directly to disk, no buffering
-      const headerName = req.headers.get("x-filename");
-      filename = headerName ? decodeURIComponent(headerName) : "upload.tar.gz";
-
-      if (!req.body) throw badRequest("No request body");
-
-      tempPath = path.join(importDir, `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-      console.log(`[backup-import] Streaming ${filename} to disk`);
-
-      const nodeStream = Readable.fromWeb(req.body as any);
-      await pipeline(nodeStream, createWriteStream(tempPath));
-      console.log(`[backup-import] File saved to ${tempPath}`);
+      throw badRequest("Provide 'url' or 'uploadId'");
     }
 
     console.log(`[backup-import] Processing ${filename}`);
