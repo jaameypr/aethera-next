@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth/guards";
 import {
   createProject,
+  getProject,
   renameProject,
   deleteProject,
   addMember,
@@ -58,9 +59,14 @@ export async function deleteProjectAction(data: {
   projectKey: string;
   confirmationName: string;
 }): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
 
   try {
+    const project = await getProject(data.projectKey);
+    if (!project) throw new Error("Project not found");
+    if (project.owner.toString() !== session.userId) {
+      throw new Error("Nur der Projektinhaber kann das Projekt löschen");
+    }
     await deleteProject(data.projectKey, data.confirmationName);
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : "Failed to delete project");

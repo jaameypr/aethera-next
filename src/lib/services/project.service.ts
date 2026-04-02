@@ -225,12 +225,15 @@ export async function deleteProject(
     );
   }
 
-  // Remove all related data
-  const servers = await ServerModel.find({ projectKey: key }).lean();
-  const serverIds = servers.map((s) => s._id);
+  // Require all servers to be deleted first
+  const serverCount = await ServerModel.countDocuments({ projectKey: key });
+  if (serverCount > 0) {
+    throw badRequest(
+      `Projekt enthält noch ${serverCount} Server. Lösche zuerst alle Server.`,
+    );
+  }
 
-  await BackupModel.deleteMany({ serverId: { $in: serverIds } });
-  await ServerModel.deleteMany({ projectKey: key });
+  await BackupModel.deleteMany({ serverId: { $in: [] } });
   await ProjectLogModel.deleteMany({ projectKey: key });
   await ProjectModel.deleteOne({ _id: project._id });
 }

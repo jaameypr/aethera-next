@@ -48,7 +48,7 @@ export const DELETE = withAuth(
     try {
       const project = await getProject(params.key);
       if (!project) throw notFound("Project not found");
-      if (!hasAccess(project, session.userId)) throw forbidden();
+      if (project.owner.toString() !== session.userId) throw forbidden();
 
       const { confirmationName } = await req.json();
       await deleteProject(params.key, confirmationName);

@@ -7,6 +7,7 @@ import { UserModel } from "@/lib/db/models/user";
 import { connectDB } from "@/lib/db/connection";
 import { ProjectServerSection } from "@/components/projects/ProjectServerSection";
 import { ProjectMembersPanel } from "@/components/projects/ProjectMembersPanel";
+import { DeleteProjectSection } from "@/components/projects/DeleteProjectSection";
 
 interface Props {
   params: Promise<{ key: string }>;
@@ -81,6 +82,15 @@ export default async function ProjectDetailPage({ params }: Props) {
           />
         </aside>
       </div>
+
+      {/* Danger zone — owner only */}
+      {isOwner && (
+        <DeleteProjectSection
+          projectKey={key}
+          projectName={project.name}
+          serverCount={servers.length}
+        />
+      )}
     </div>
   );
 }
