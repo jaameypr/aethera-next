@@ -275,16 +275,18 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
                             <Square className="mr-1 h-3 w-3" />
                             Stop
                           </Button>
-                          <Button size="sm" variant="outline" asChild>
-                            <a
-                              href={`/api/modules/${mod.moduleId}/launch`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="mr-1 h-3 w-3" />
-                              Öffnen
-                            </a>
-                          </Button>
+                          {mod.exposure === "public" && (
+                            <Button size="sm" variant="outline" asChild>
+                              <a
+                                href={`/api/modules/${mod.moduleId}/launch`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="mr-1 h-3 w-3" />
+                                Öffnen
+                              </a>
+                            </Button>
+                          )}
                         </>
                       )}
                       {update?.updateAvailable && (

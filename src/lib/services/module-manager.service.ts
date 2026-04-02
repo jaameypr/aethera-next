@@ -70,6 +70,7 @@ function toResponse(doc: IInstalledModule): InstalledModuleResponse {
     name: doc.name,
     version: doc.version,
     type: doc.type,
+    exposure: doc.exposure ?? "none",
     status: doc.status,
     internalUrl: doc.internalUrl,
     assignedPort: doc.assignedPort,
@@ -167,6 +168,7 @@ export async function installModule(
     name: manifest.name,
     version: manifest.version,
     type: manifest.type,
+    exposure: manifest.exposure ?? (manifest.type === "code" ? "none" : "internal"),
     status: "installing",
     manifest: JSON.parse(JSON.stringify(manifest)) as Record<string, unknown>,
     config: buildEnvConfig(manifest, userConfig),
@@ -462,6 +464,7 @@ async function deployDockerModule(
   const containerNameStr = moduleContainerName(manifest.id);
   const containerPort = manifest.docker.port;
   const docker = manifest.docker;
+  const exposure = manifest.exposure ?? "internal";
 
   // Resolve image: either pre-built or build from source
   let imageName: string;
@@ -477,9 +480,17 @@ async function deployDockerModule(
     throw new Error("Module manifest must specify docker.image or docker.build");
   }
 
-  // Allocate an external host port so the module is reachable from the browser
-  const hostPort = await allocateHostPort();
-  console.log(`[module-manager] Allocated host port ${hostPort} for ${manifest.id}`);
+  // Only allocate a host port for public modules (those with a web UI)
+  let hostPort: number | undefined;
+  const ports: Array<{ container: number; protocol: "tcp" | "udp"; host?: number }> = [];
+
+  if (exposure === "public") {
+    hostPort = await allocateHostPort();
+    ports.push({ host: hostPort, container: containerPort, protocol: "tcp" as const });
+    console.log(`[module-manager] Public module: allocated host port ${hostPort} for ${manifest.id}`);
+  } else {
+    console.log(`[module-manager] Internal module: no host port for ${manifest.id}`);
+  }
 
   // Build environment variables
   const env = buildContainerEnv(manifest, doc);
@@ -499,7 +510,7 @@ async function deployDockerModule(
     image: imageName,
     tag: imageTag,
     env,
-    ports: [{ host: hostPort, container: containerPort, protocol: "tcp" }],
+    ports,
     mounts: volumes.map((v) => ({
       type: "volume" as const,
       source: v.name,
@@ -510,6 +521,7 @@ async function deployDockerModule(
       [`${LABEL_PREFIX}.id`]: manifest.id,
       [`${LABEL_PREFIX}.version`]: manifest.version,
       [`${LABEL_PREFIX}.type`]: manifest.type,
+      [`${LABEL_PREFIX}.exposure`]: exposure,
       "aethera.type": "module",
     },
     restartPolicy: "unless-stopped",

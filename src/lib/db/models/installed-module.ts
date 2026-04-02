@@ -22,6 +22,7 @@ export interface IInstalledModule extends Document {
   name: string;
   version: string;
   type: "docker" | "code";
+  exposure: "public" | "internal" | "none";
   status:
     | "installing"
     | "running"
@@ -81,6 +82,11 @@ const InstalledModuleSchema = new Schema<IInstalledModule>(
     name: { type: String, required: true, trim: true },
     version: { type: String, required: true },
     type: { type: String, enum: ["docker", "code"], required: true },
+    exposure: {
+      type: String,
+      enum: ["public", "internal", "none"],
+      default: "none",
+    },
     status: {
       type: String,
       enum: [

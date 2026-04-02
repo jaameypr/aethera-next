@@ -8,8 +8,8 @@ type Params = { moduleId: string };
 /**
  * GET /api/modules/[moduleId]/launch — Open the module UI.
  *
- * For Docker modules: redirects to the module's external URL.
- * The module handles its own auth (admin logs in normally).
+ * For public Docker modules: redirects to the server's public address + assigned port.
+ * Internal/code modules have no browser-facing URL.
  */
 export const GET = withPermission<Params>(
   "module.access",
@@ -23,12 +23,14 @@ export const GET = withPermission<Params>(
       if (!mod) throw notFound("Module not installed");
       if (mod.status !== "running") throw notFound("Module is not running");
 
-      // Use assigned port for browser access, fall back to internal URL
-      const moduleUrl = mod.assignedPort
-        ? `${_req.nextUrl.origin.replace(/:\d+$/, "")}:${mod.assignedPort}`
-        : mod.internalUrl;
+      if (!mod.assignedPort) {
+        throw notFound("Module has no public UI");
+      }
 
-      if (!moduleUrl) throw notFound("Module URL not configured");
+      // Build external URL using the request's hostname (= public server address)
+      const host = _req.nextUrl.hostname;
+      const protocol = _req.nextUrl.protocol; // "http:" or "https:"
+      const moduleUrl = `${protocol}//${host}:${mod.assignedPort}`;
 
       return Response.redirect(moduleUrl, 302);
     } catch (err) {

@@ -179,6 +179,7 @@ export async function getModuleCatalog(): Promise<ModuleCatalogEntry[]> {
             name: inst.name,
             version: inst.version,
             type: inst.type,
+            exposure: (inst.exposure as "public" | "internal" | "none") ?? "none",
             status: inst.status,
             internalUrl: inst.internalUrl,
             assignedPort: inst.assignedPort,

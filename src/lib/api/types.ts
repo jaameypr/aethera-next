@@ -188,6 +188,14 @@ export interface ModuleManifest {
   icon: string;
   type: "docker" | "code";
   minAetheraVersion: string;
+  /**
+   * How the module is exposed:
+   * - "public"   → Has a web UI, gets a host port, reachable from browser (e.g. Paperview)
+   * - "internal" → Background service, Docker-network only, no browser access (e.g. async-backend)
+   * - "none"     → Code module, no container at all (e.g. Discord integration)
+   * Defaults to "none" for code modules, "internal" for docker modules.
+   */
+  exposure?: "public" | "internal" | "none";
   docker?: ModuleManifestDocker;
   auth?: ModuleManifestAuth;
   database?: { type: string; name: string };
@@ -210,6 +218,7 @@ export interface InstalledModuleResponse {
   version: string;
   type: "docker" | "code";
   status: string;
+  exposure: "public" | "internal" | "none";
   internalUrl?: string;
   assignedPort?: number;
   errorMessage?: string;
