@@ -29,5 +29,7 @@ declare namespace NodeJS {
 
     // Module system
     MODULE_REGISTRY_URL?: string;
+    /** Public IPv4 of the server — used for module launch URLs when behind a reverse proxy */
+    PUBLIC_SERVER_IP?: string;
   }
 }

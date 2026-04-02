@@ -27,12 +27,12 @@ export const GET = withPermission<Params>(
         throw notFound("Module has no public UI");
       }
 
-      // Use the Host header to get the actual public address the user connected to
-      const hostHeader = _req.headers.get("host") ?? _req.nextUrl.host;
-      // Strip port from host header (e.g. "myserver.com:3000" → "myserver.com")
-      const hostname = hostHeader.replace(/:\d+$/, "");
-      const protocol = _req.nextUrl.protocol; // "http:" or "https:"
-      const moduleUrl = `${protocol}//${hostname}:${mod.assignedPort}`;
+      // Use PUBLIC_SERVER_IP if set (for servers behind reverse proxy),
+      // otherwise fall back to the Host header
+      const publicHost = process.env.PUBLIC_SERVER_IP
+        ?? _req.headers.get("host")?.replace(/:\d+$/, "")
+        ?? _req.nextUrl.hostname;
+      const moduleUrl = `http://${publicHost}:${mod.assignedPort}`;
 
       return Response.redirect(moduleUrl, 302);
     } catch (err) {
