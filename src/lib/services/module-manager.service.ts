@@ -486,6 +486,7 @@ async function deployDockerModule(
   // Resolve image: either pre-built or build from source
   let imageName: string;
   let imageTag = "latest";
+  let builtLocally = false;
 
   if (docker.image) {
     imageName = docker.image;
@@ -493,6 +494,7 @@ async function deployDockerModule(
     imageName = `aethera-mod-${manifest.id}`;
     imageTag = manifest.version;
     await buildImageFromRepo(imageName, imageTag, docker.build);
+    builtLocally = true;
   } else {
     throw new Error("Module manifest must specify docker.image or docker.build");
   }
@@ -520,45 +522,99 @@ async function deployDockerModule(
     }),
   );
 
-  const orch = await getOrchestrator();
+  const fullImageRef = `${imageName}:${imageTag}`;
+  const labels: Record<string, string> = {
+    [`${LABEL_PREFIX}.id`]: manifest.id,
+    [`${LABEL_PREFIX}.version`]: manifest.version,
+    [`${LABEL_PREFIX}.type`]: manifest.type,
+    [`${LABEL_PREFIX}.exposure`]: exposure,
+    "aethera.type": "module",
+  };
 
-  const result = await orch.deploy({
-    name: containerNameStr,
-    image: imageName,
-    tag: imageTag,
-    env,
-    ports,
-    mounts: volumes.map((v) => ({
-      type: "volume" as const,
-      source: v.name,
-      target: v.target,
-      readOnly: false,
-    })),
-    labels: {
-      [`${LABEL_PREFIX}.id`]: manifest.id,
-      [`${LABEL_PREFIX}.version`]: manifest.version,
-      [`${LABEL_PREFIX}.type`]: manifest.type,
-      [`${LABEL_PREFIX}.exposure`]: exposure,
-      "aethera.type": "module",
-    },
-    restartPolicy: "unless-stopped",
-    resources: docker.resources
-      ? {
-          memory: docker.resources.memoryLimit
-            ? { limit: docker.resources.memoryLimit }
-            : undefined,
-          cpu: docker.resources.cpuLimit
-            ? { nanoCpus: docker.resources.cpuLimit }
-            : undefined,
-        }
-      : undefined,
-    stopTimeout: 30,
-  });
+  let containerId: string;
 
-  doc.containerId = result.containerId;
+  if (builtLocally) {
+    // Create container directly via Dockerode — skip image pull for local builds
+    const dockerClient = await getDockerClient();
+
+    const portBindings: Record<string, Array<{ HostPort: string }>> = {};
+    const exposedPorts: Record<string, object> = {};
+    if (hostPort) {
+      const key = `${containerPort}/tcp`;
+      exposedPorts[key] = {};
+      portBindings[key] = [{ HostPort: String(hostPort) }];
+    }
+
+    const envArray = Object.entries(env).map(([k, v]) => `${k}=${v}`);
+
+    const memoryBytes = docker.resources?.memoryLimit
+      ? parseMemoryLimit(docker.resources.memoryLimit)
+      : undefined;
+
+    const container = await (dockerClient as any).createContainer({
+      name: containerNameStr,
+      Image: fullImageRef,
+      Env: envArray,
+      ExposedPorts: exposedPorts,
+      Labels: labels,
+      HostConfig: {
+        PortBindings: portBindings,
+        RestartPolicy: { Name: "unless-stopped" },
+        Binds: volumes.map((v) => `${v.name}:${v.target}`),
+        Memory: memoryBytes,
+        NetworkMode: NETWORK,
+      },
+    });
+
+    await container.start();
+    containerId = container.id;
+    console.log(`[module-manager] Container ${containerNameStr} started (local image)`);
+  } else {
+    // Pre-built image — use orchestrator which handles pulling
+    const orch = await getOrchestrator();
+    const result = await orch.deploy({
+      name: containerNameStr,
+      image: imageName,
+      tag: imageTag,
+      env,
+      ports,
+      mounts: volumes.map((v) => ({
+        type: "volume" as const,
+        source: v.name,
+        target: v.target,
+        readOnly: false,
+      })),
+      labels,
+      restartPolicy: "unless-stopped",
+      resources: docker.resources
+        ? {
+            memory: docker.resources.memoryLimit
+              ? { limit: docker.resources.memoryLimit }
+              : undefined,
+            cpu: docker.resources.cpuLimit
+              ? { nanoCpus: docker.resources.cpuLimit }
+              : undefined,
+          }
+        : undefined,
+      stopTimeout: 30,
+    });
+    containerId = result.containerId;
+  }
+
+  doc.containerId = containerId;
   doc.containerName = containerNameStr;
   doc.assignedPort = hostPort;
   doc.internalUrl = `http://${containerNameStr}:${containerPort}`;
+}
+
+/** Parse memory limit string (e.g. "512m", "1g") to bytes. */
+function parseMemoryLimit(limit: string): number {
+  const match = limit.match(/^(\d+)\s*([kmgt]?)b?$/i);
+  if (!match) return 0;
+  const value = parseInt(match[1], 10);
+  const unit = (match[2] || "").toLowerCase();
+  const multipliers: Record<string, number> = { "": 1, k: 1024, m: 1024 ** 2, g: 1024 ** 3, t: 1024 ** 4 };
+  return value * (multipliers[unit] ?? 1);
 }
 
 /**
