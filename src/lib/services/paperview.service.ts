@@ -1,5 +1,11 @@
 import "server-only";
 
+import { createReadStream, createWriteStream } from "node:fs";
+import { openAsBlob } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { connectDB } from "@/lib/db/connection";
 import { InstalledModuleModel } from "@/lib/db/models/installed-module";
 
@@ -39,9 +45,10 @@ export interface PaperviewShareResult {
 
 /**
  * Upload a backup file to Paperview and return a share link.
+ * Streams from disk — safe for multi-GB files.
  */
 export async function uploadBackupToShare(opts: {
-  file: Buffer;
+  filePath: string;
   filename: string;
   title: string;
   description?: string;
@@ -49,12 +56,9 @@ export async function uploadBackupToShare(opts: {
 }): Promise<PaperviewShareResult> {
   const { internalUrl, apiKey } = await getPaperviewConfig();
 
+  const blob = await openAsBlob(opts.filePath);
   const formData = new FormData();
-  formData.append(
-    "file",
-    new Blob([new Uint8Array(opts.file)]),
-    opts.filename,
-  );
+  formData.append("file", blob, opts.filename);
   formData.append("title", opts.title);
 
   if (opts.description) {
@@ -76,7 +80,7 @@ export async function uploadBackupToShare(opts: {
       Authorization: `Bearer ${apiKey}`,
     },
     body: formData,
-    signal: AbortSignal.timeout(120_000), // 2 min for large files
+    signal: AbortSignal.timeout(3_600_000), // 1 hour for large files
   });
 
   if (!res.ok) {
@@ -128,11 +132,13 @@ export async function listShares(): Promise<
 }
 
 /**
- * Download a file from a Paperview share URL.
+ * Download a file from a Paperview share URL directly to disk.
+ * Streams the response — safe for multi-GB files.
  */
-export async function downloadFromPaperview(
+export async function downloadFromPaperviewToFile(
   shareUrl: string,
-): Promise<{ buffer: Buffer; filename: string }> {
+  destDir: string,
+): Promise<{ tempPath: string; filename: string }> {
   const match = shareUrl.match(/\/shares\/([a-f0-9]+)\/?$/i);
   if (!match) throw new Error("Invalid Paperview share URL");
   const shareId = match[1];
@@ -141,16 +147,13 @@ export async function downloadFromPaperview(
 
   const res = await fetch(`${internalUrl}/api/shares/${shareId}/download`, {
     headers: { Authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(3_600_000), // 1 hour for large files
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Paperview download failed (${res.status}): ${body}`);
   }
-
-  const arrayBuffer = await res.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
 
   let filename = "backup.tar.gz";
   const disposition = res.headers.get("content-disposition");
@@ -159,7 +162,14 @@ export async function downloadFromPaperview(
     if (filenameMatch) filename = filenameMatch[1].trim();
   }
 
-  return { buffer, filename };
+  if (!res.body) throw new Error("Empty response body from Paperview");
+
+  await mkdir(destDir, { recursive: true });
+  const tempPath = path.join(destDir, `download-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const nodeStream = Readable.fromWeb(res.body as any);
+  await pipeline(nodeStream, createWriteStream(tempPath));
+
+  return { tempPath, filename };
 }
 
 /**

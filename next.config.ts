@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     "bcryptjs",
     "dockerode",
     "tar-stream",
-    "adm-zip",
+    "yauzl",
     "@pruefertit/docker-orchestrator",
   ],
   experimental: {

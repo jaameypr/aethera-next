@@ -1,14 +1,13 @@
 import "server-only";
 
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, rm, stat, readdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, stat, readdir, rename, open as fsOpen } from "node:fs/promises";
 import path from "node:path";
-import { Readable } from "node:stream";
 import { createGzip, createGunzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
 import mongoose from "mongoose";
 import tar from "tar-stream";
-import AdmZip from "adm-zip";
+import yauzl from "yauzl";
 import { connectDB } from "@/lib/db/connection";
 import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models/backup";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
@@ -324,11 +323,18 @@ export async function restoreBackupSelective(
 }
 
 // ---------------------------------------------------------------------------
-// ZIP → tar.gz conversion
+// ZIP handling — fully streaming via yauzl (no memory buffering)
 // ---------------------------------------------------------------------------
 
-function isZipBuffer(buf: Buffer): boolean {
-  return buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
+async function isZipFile(filePath: string): Promise<boolean> {
+  const fh = await fsOpen(filePath, "r");
+  try {
+    const buf = Buffer.alloc(4);
+    await fh.read(buf, 0, 4, 0);
+    return buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
+  } finally {
+    await fh.close();
+  }
 }
 
 function detectComponentsFromPaths(paths: string[]): BackupComponent[] {
@@ -344,43 +350,75 @@ function detectComponentsFromPaths(paths: string[]): BackupComponent[] {
   return [...componentSet];
 }
 
-async function convertZipToTarGz(zipBuffer: Buffer): Promise<Buffer> {
-  const zip = new AdmZip(zipBuffer);
-  const entries = zip.getEntries();
-  const pack = tar.pack();
+/**
+ * Stream-convert a ZIP file on disk to a tar.gz file on disk.
+ * Uses yauzl (random-access, one entry at a time) so memory stays low
+ * even for multi-GB archives.
+ */
+async function convertZipToTarGz(
+  zipPath: string,
+  tarGzPath: string,
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (err, zipfile) => {
+      if (err || !zipfile) return reject(err ?? new Error("Failed to open ZIP"));
 
-  for (const entry of entries) {
-    // Normalise Windows backslashes from zip entries
-    const name = entry.entryName.replace(/\\/g, "/");
-    if (entry.isDirectory) continue;
+      const entryPaths: string[] = [];
+      const pack = tar.pack();
+      const gzip = createGzip();
+      const output = createWriteStream(tarGzPath);
 
-    const data = entry.getData();
-    await new Promise<void>((resolve, reject) => {
-      const entryStream = pack.entry(
-        { name, size: data.length, mtime: entry.header.time },
-        (err) => (err ? reject(err) : resolve()),
-      );
-      entryStream.end(data);
+      pack.pipe(gzip).pipe(output);
+      pack.on("error", reject);
+      gzip.on("error", reject);
+      output.on("error", reject);
+      output.on("finish", () => resolve(entryPaths));
+
+      zipfile.readEntry();
+
+      zipfile.on("entry", (entry: yauzl.Entry) => {
+        const name = entry.fileName.replace(/\\/g, "/");
+
+        // Skip directory entries — tar-stream creates them implicitly
+        if (/\/$/.test(name)) {
+          zipfile.readEntry();
+          return;
+        }
+
+        entryPaths.push(name);
+
+        zipfile.openReadStream(entry, (err, readStream) => {
+          if (err || !readStream) return reject(err ?? new Error("Failed to read ZIP entry"));
+
+          const tarEntry = pack.entry(
+            { name, size: entry.uncompressedSize, mtime: entry.getLastModDate() },
+            (err) => {
+              if (err) return reject(err);
+              zipfile.readEntry();
+            },
+          );
+
+          readStream.pipe(tarEntry);
+        });
+      });
+
+      zipfile.on("end", () => pack.finalize());
+      zipfile.on("error", reject);
     });
-  }
-
-  pack.finalize();
-
-  const chunks: Buffer[] = [];
-  const gzip = createGzip();
-  pack.pipe(gzip);
-  for await (const chunk of gzip) {
-    chunks.push(Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Import
+// Import — works entirely with files on disk (no Buffer loading)
 // ---------------------------------------------------------------------------
 
+/**
+ * Import a backup from a file already saved to disk.
+ * Handles both .tar.gz and .zip (auto-converts ZIP → tar.gz).
+ * Returns the created backup record.
+ */
 export async function importBackup(
-  file: Buffer,
+  tempFilePath: string,
   filename: string,
   actorId: string,
 ): Promise<IBackup> {
@@ -389,80 +427,49 @@ export async function importBackup(
   const importDir = path.join(getBackupDir(), "imports");
   await mkdir(importDir, { recursive: true });
 
-  let tarGzBuffer: Buffer;
+  const isZip = await isZipFile(tempFilePath);
+  let finalPath: string;
   let storedFilename: string;
+  let entryPaths: string[];
 
-  if (isZipBuffer(file)) {
-    // Convert zip → tar.gz, detect components from zip entries
-    const zip = new AdmZip(file);
-    const entryPaths = zip
-      .getEntries()
-      .filter((e) => !e.isDirectory)
-      .map((e) => e.entryName.replace(/\\/g, "/"));
-
-    tarGzBuffer = await convertZipToTarGz(file);
+  if (isZip) {
     storedFilename = filename.replace(/\.zip$/i, ".tar.gz");
+    finalPath = path.join(importDir, `${Date.now()}-${storedFilename}`);
+    entryPaths = await convertZipToTarGz(tempFilePath, finalPath);
+    await rm(tempFilePath, { force: true });
+  } else {
+    storedFilename = filename;
+    finalPath = path.join(importDir, `${Date.now()}-${storedFilename}`);
+    await rename(tempFilePath, finalPath);
 
-    const filePath = path.join(importDir, storedFilename);
-    await writeFile(filePath, tarGzBuffer);
+    // Stream through tar entries to detect components
+    entryPaths = [];
+    await new Promise<void>((resolve, reject) => {
+      const extract = tar.extract();
 
-    const detectedComponents = detectComponentsFromPaths(entryPaths);
-    const fileStat = await stat(filePath);
+      extract.on("entry", (header, stream, next) => {
+        if (header.type === "file") entryPaths.push(header.name);
+        stream.resume();
+        next();
+      });
 
-    const backup = await BackupModel.create({
-      serverId: new mongoose.Types.ObjectId("000000000000000000000000"),
-      name: filename.replace(/\.(tar\.gz|zip)$/i, ""),
-      filename: storedFilename,
-      path: filePath,
-      size: fileStat.size,
-      components: detectedComponents,
-      status: "completed",
-      strategy: "import",
-      createdBy: actorId,
+      extract.on("finish", resolve);
+      extract.on("error", reject);
+
+      createReadStream(finalPath).pipe(createGunzip()).pipe(extract);
     });
-
-    return backup.toObject() as IBackup;
   }
 
-  // tar.gz path (existing logic)
-  storedFilename = filename;
-  const filePath = path.join(importDir, storedFilename);
-  await writeFile(filePath, file);
-
-  const componentSet = new Set<BackupComponent>();
-
-  await new Promise<void>((resolve, reject) => {
-    const extract = tar.extract();
-
-    extract.on("entry", (header, stream, next) => {
-      if (header.type === "file") {
-        const entryPath = header.name;
-        for (const [comp, dirs] of Object.entries(COMPONENT_DIRS)) {
-          if (dirs.some((d) => entryPath.startsWith(d + "/") || entryPath === d)) {
-            componentSet.add(comp as BackupComponent);
-            break;
-          }
-        }
-      }
-      stream.resume();
-      next();
-    });
-
-    extract.on("finish", resolve);
-    extract.on("error", reject);
-
-    Readable.from(file).pipe(createGunzip()).pipe(extract);
-  });
-
-  const fileStat = await stat(filePath);
+  const detectedComponents = detectComponentsFromPaths(entryPaths);
+  const fileStat = await stat(finalPath);
 
   const backup = await BackupModel.create({
     serverId: new mongoose.Types.ObjectId("000000000000000000000000"),
-    name: filename.replace(/\.tar\.gz$/i, ""),
+    name: filename.replace(/\.(tar\.gz|tgz|zip)$/i, ""),
     filename: storedFilename,
-    path: filePath,
+    path: finalPath,
     size: fileStat.size,
-    components: [...componentSet],
+    components: detectedComponents,
     status: "completed",
     strategy: "import",
     createdBy: actorId,

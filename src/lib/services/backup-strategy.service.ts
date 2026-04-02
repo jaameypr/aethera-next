@@ -1,6 +1,5 @@
 import "server-only";
 
-import { readFile } from "node:fs/promises";
 import { connectDB } from "@/lib/db/connection";
 import { InstalledModuleModel } from "@/lib/db/models/installed-module";
 import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models/backup";
@@ -253,10 +252,8 @@ export async function shareBackup(backupId: string): Promise<IBackup> {
   const ready = await isPaperviewReady();
   if (!ready) throw new Error("Paperview is not available");
 
-  const fileBuffer = await readFile(backup.path);
-
   const result = await uploadBackupToShare({
-    file: fileBuffer,
+    filePath: backup.path,
     filename: backup.filename,
     title: `Backup: ${backup.name} — ${new Date(backup.createdAt).toLocaleString("de-DE")}`,
     description: `Server backup (${backup.components.join(", ")})`,

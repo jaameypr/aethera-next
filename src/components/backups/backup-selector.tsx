@@ -56,10 +56,43 @@ interface BackupSelectorProps {
   onSelectionChange: (selection: BackupSelection | null) => void;
 }
 
+interface UploadProgress {
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function uploadWithProgress(
+  url: string,
+  formData: FormData,
+  onProgress: (p: UploadProgress) => void,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        onProgress({
+          loaded: e.loaded,
+          total: e.total,
+          percent: Math.round((e.loaded / e.total) * 100),
+        });
+      }
+    });
+
+    xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
+    xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
+    xhr.ontimeout = () => reject(new Error("Upload Timeout"));
+    xhr.send(formData);
+  });
 }
 
 export function BackupSelector({
@@ -72,6 +105,7 @@ export function BackupSelector({
   const [search, setSearch] = useState("");
   const [importTab, setImportTab] = useState<"upload" | "url">("upload");
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -112,6 +146,7 @@ export function BackupSelector({
     if (importTab === "upload" && !file) return;
 
     setImporting(true);
+    setProgress(null);
     try {
       const formData = new FormData();
       if (importTab === "url") {
@@ -120,17 +155,40 @@ export function BackupSelector({
         formData.append("file", file!);
       }
 
-      const res = await fetch("/api/backups/import", {
-        method: "POST",
-        body: formData,
-      });
+      const isFileUpload = importTab === "upload";
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Import fehlgeschlagen`);
+      let backup: Backup;
+
+      if (isFileUpload) {
+        const { status, body } = await uploadWithProgress(
+          "/api/backups/import",
+          formData,
+          (p) => setProgress(p),
+        );
+
+        setProgress(null);
+
+        if (status < 200 || status >= 300) {
+          let errMsg = "Import fehlgeschlagen";
+          try { errMsg = JSON.parse(body).error || errMsg; } catch {}
+          throw new Error(errMsg);
+        }
+
+        backup = JSON.parse(body);
+      } else {
+        const res = await fetch("/api/backups/import", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Import fehlgeschlagen");
+        }
+
+        backup = await res.json();
       }
 
-      const backup = await res.json();
       const components = backup.components as ComponentId[];
       onSelectionChange({
         backupId: backup._id,
@@ -143,6 +201,7 @@ export function BackupSelector({
       toast.error(err instanceof Error ? err.message : "Import fehlgeschlagen");
     } finally {
       setImporting(false);
+      setProgress(null);
     }
   }
 
@@ -418,16 +477,35 @@ export function BackupSelector({
         </TabsContent>
       </Tabs>
 
+      {progress && (
+        <div className="space-y-1">
+          <div className="h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 ease-out"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-zinc-500 text-center">
+            {formatSize(progress.loaded)} / {formatSize(progress.total)} ({progress.percent}%)
+          </p>
+        </div>
+      )}
+
       <Button
         size="sm"
         className="w-full"
         onClick={handleImport}
         disabled={importing || (importTab === "upload" ? !file : !url.trim())}
       >
-        {importing ? (
+        {importing && progress ? (
           <>
             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            Importiere…
+            {progress.percent}% hochgeladen…
+          </>
+        ) : importing ? (
+          <>
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            Verarbeite…
           </>
         ) : (
           <>

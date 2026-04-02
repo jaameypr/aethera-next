@@ -44,6 +44,45 @@ interface ImportResult {
   components: string[];
 }
 
+interface UploadProgress {
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function uploadWithProgress(
+  url: string,
+  formData: FormData,
+  onProgress: (p: UploadProgress) => void,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        onProgress({
+          loaded: e.loaded,
+          total: e.total,
+          percent: Math.round((e.loaded / e.total) * 100),
+        });
+      }
+    });
+
+    xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
+    xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
+    xhr.ontimeout = () => reject(new Error("Upload Timeout"));
+    xhr.send(formData);
+  });
+}
+
 interface ImportBackupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -57,6 +96,7 @@ export function ImportBackupDialog({
 }: ImportBackupDialogProps) {
   const [tab, setTab] = useState<"upload" | "url">("upload");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -66,6 +106,7 @@ export function ImportBackupDialog({
   function reset() {
     setTab("upload");
     setLoading(false);
+    setProgress(null);
     setUrl("");
     setFile(null);
     setDragOver(false);
@@ -90,6 +131,7 @@ export function ImportBackupDialog({
 
   async function handleImport() {
     setLoading(true);
+    setProgress(null);
     try {
       const formData = new FormData();
 
@@ -107,17 +149,39 @@ export function ImportBackupDialog({
         formData.append("file", file);
       }
 
-      const res = await fetch("/api/backups/import", {
-        method: "POST",
-        body: formData,
-      });
+      const isFileUpload = tab === "upload" && file;
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Import fehlgeschlagen (${res.status})`);
+      let backup: ImportResult;
+
+      if (isFileUpload) {
+        const { status, body } = await uploadWithProgress(
+          "/api/backups/import",
+          formData,
+          (p) => setProgress(p),
+        );
+
+        setProgress(null);
+
+        if (status < 200 || status >= 300) {
+          const data = JSON.parse(body).catch?.(() => ({})) ?? {};
+          throw new Error(data.error || `Import fehlgeschlagen (${status})`);
+        }
+
+        backup = JSON.parse(body);
+      } else {
+        const res = await fetch("/api/backups/import", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Import fehlgeschlagen (${res.status})`);
+        }
+
+        backup = await res.json();
       }
 
-      const backup = await res.json();
       setResult(backup);
       toast.success("Backup erfolgreich importiert");
       onImported?.(backup);
@@ -127,13 +191,8 @@ export function ImportBackupDialog({
       );
     } finally {
       setLoading(false);
+      setProgress(null);
     }
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   if (result) {
@@ -306,6 +365,20 @@ export function ImportBackupDialog({
           </TabsContent>
         </Tabs>
 
+        {progress && (
+          <div className="space-y-1.5">
+            <div className="h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+              <div
+                className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 ease-out"
+                style={{ width: `${progress.percent}%` }}
+              />
+            </div>
+            <p className="text-xs text-zinc-500 text-center">
+              {formatSize(progress.loaded)} / {formatSize(progress.total)} ({progress.percent}%)
+            </p>
+          </div>
+        )}
+
         <DialogFooter>
           <Button
             variant="outline"
@@ -318,10 +391,15 @@ export function ImportBackupDialog({
             onClick={handleImport}
             disabled={loading || (tab === "upload" ? !file : !url.trim())}
           >
-            {loading ? (
+            {loading && progress ? (
               <>
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                Importiere…
+                {progress.percent}% hochgeladen…
+              </>
+            ) : loading ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                Verarbeite…
               </>
             ) : (
               <>
