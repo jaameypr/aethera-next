@@ -31,7 +31,14 @@ function getRegistryUrl(): string {
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-/** Fetch the remote registry (cached for 5 min). */
+/**
+ * Fetch the remote registry (cached for 5 min).
+ *
+ * The registry JSON is hosted as a Paperview share. The URL points to
+ * a share endpoint (e.g. /api/shares/{id}) which returns metadata
+ * including version info. We then fetch the current version's content
+ * which contains the actual registry JSON as a string.
+ */
 export async function fetchRegistry(
   forceRefresh = false,
 ): Promise<ModuleRegistry> {
@@ -39,22 +46,41 @@ export async function fetchRegistry(
     return _cache;
   }
 
-  const url = getRegistryUrl();
-  const res = await fetch(url, { next: { revalidate: 0 } });
+  const shareUrl = getRegistryUrl();
 
-  if (!res.ok) {
-    throw new Error(`Failed to fetch module registry: ${res.status}`);
+  // Step 1: Fetch share metadata to get the current version ID
+  const shareRes = await fetch(shareUrl, { next: { revalidate: 0 } });
+  if (!shareRes.ok) {
+    throw new Error(`Failed to fetch registry share: ${shareRes.status}`);
+  }
+  const { share, versions } = await shareRes.json();
+  const versionId: string = share?.currentVersionId ?? versions?.[0]?._id;
+  if (!versionId) {
+    throw new Error("Registry share has no versions");
   }
 
-  const contentType = res.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    const preview = (await res.text()).slice(0, 120);
+  // Step 2: Fetch the raw content of the current version
+  const contentRes = await fetch(`${shareUrl}/versions/${versionId}/content`, {
+    next: { revalidate: 0 },
+  });
+  if (!contentRes.ok) {
+    throw new Error(`Failed to fetch registry content: ${contentRes.status}`);
+  }
+  const { content } = await contentRes.json();
+
+  if (typeof content !== "string") {
+    throw new Error("Registry share content is not a string");
+  }
+
+  // Step 3: Parse the inner JSON string into a ModuleRegistry
+  let data: ModuleRegistry;
+  try {
+    data = JSON.parse(content);
+  } catch {
     throw new Error(
-      `Registry returned non-JSON response (${contentType || "unknown content-type"}): ${preview}`,
+      `Registry content is not valid JSON: ${content.slice(0, 120)}`,
     );
   }
-
-  const data: ModuleRegistry = await res.json();
 
   if (!data.modules || !Array.isArray(data.modules)) {
     throw new Error("Invalid module registry format");
