@@ -116,7 +116,7 @@ const INITIAL_STATE: WizardState = {
   port: 25565,
   portStatus: "idle",
   maxRam: 8192,
-  autoStart: false,
+  autoStart: true,
   backupSelection: null,
   errors: {},
 };
