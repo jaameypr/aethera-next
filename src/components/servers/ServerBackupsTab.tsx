@@ -8,6 +8,7 @@ import {
   RotateCcw,
   HardDrive,
   Share2,
+  RefreshCw,
   ExternalLink,
   Copy,
   Loader2,
@@ -257,15 +258,16 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
     });
   }
 
-  async function handleShare(backupId: string) {
+  async function handleShare(backupId: string, force = false) {
     setSharingId(backupId);
     try {
-      const res = await fetch(`/api/backups/${backupId}/share`, {
-        method: "POST",
-      });
+      const url = force
+        ? `/api/backups/${backupId}/share?force=true`
+        : `/api/backups/${backupId}/share`;
+      const res = await fetch(url, { method: "POST" });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
-      toast.success("Share-Link erstellt");
+      toast.success(force ? "Erneut geteilt" : "Share-Link erstellt");
       fetchBackups();
       if (data.shareUrl) {
         await copyToClipboard(data.shareUrl);
@@ -401,6 +403,21 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Share2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                  {capabilities?.sharing && isCompleted(backup) && backup.shareUrl && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={sharingId === backup._id}
+                      onClick={() => handleShare(backup._id, true)}
+                      title="Erneut teilen (Paperview)"
+                    >
+                      {sharingId === backup._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
                       )}
                     </Button>
                   )}

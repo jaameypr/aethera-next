@@ -3,9 +3,10 @@ import { withAuth } from "@/lib/auth/guards";
 import { errorResponse } from "@/lib/api/errors";
 import { shareBackup } from "@/lib/services/backup-strategy.service";
 
-export const POST = withAuth(async (_req: NextRequest, { params }) => {
+export const POST = withAuth(async (req: NextRequest, { params }) => {
   try {
-    const backup = await shareBackup(params.backupId);
+    const force = req.nextUrl.searchParams.get("force") === "true";
+    const backup = await shareBackup(params.backupId, force);
     return Response.json({
       shareUrl: backup.shareUrl,
       shareId: backup.shareId,

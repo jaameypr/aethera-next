@@ -241,13 +241,16 @@ export async function completeAsyncBackup(payload: {
 /*  Share — upload an existing backup to Paperview                    */
 /* ------------------------------------------------------------------ */
 
-export async function shareBackup(backupId: string): Promise<IBackup> {
+export async function shareBackup(
+  backupId: string,
+  force = false,
+): Promise<IBackup> {
   await connectDB();
 
   const backup = await BackupModel.findById(backupId);
   if (!backup) throw new Error("Backup not found");
   if (backup.status !== "completed") throw new Error("Backup is not completed");
-  if (backup.shareUrl) throw new Error("Backup already shared");
+  if (backup.shareUrl && !force) throw new Error("Backup already shared");
 
   const ready = await isPaperviewReady();
   if (!ready) throw new Error("Paperview is not available");
