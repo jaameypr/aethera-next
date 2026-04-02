@@ -43,49 +43,72 @@ export async function fetchRegistry(
   forceRefresh = false,
 ): Promise<ModuleRegistry> {
   if (!forceRefresh && _cache && Date.now() - _cacheTime < CACHE_TTL) {
+    console.log("[module-registry] Returning cached registry");
     return _cache;
   }
 
   const shareUrl = getRegistryUrl();
+  console.log("[module-registry] Fetching share metadata from:", shareUrl);
 
   // Step 1: Fetch share metadata to get the current version ID
   const shareRes = await fetch(shareUrl, { next: { revalidate: 0 } });
+  console.log("[module-registry] Share response status:", shareRes.status);
   if (!shareRes.ok) {
+    const body = await shareRes.text();
+    console.error("[module-registry] Share fetch failed:", shareRes.status, body.slice(0, 300));
     throw new Error(`Failed to fetch registry share: ${shareRes.status}`);
   }
-  const { share, versions } = await shareRes.json();
+
+  const shareJson = await shareRes.json();
+  console.log("[module-registry] Share response keys:", Object.keys(shareJson));
+  const { share, versions } = shareJson;
+  console.log("[module-registry] share.currentVersionId:", share?.currentVersionId, "| versions count:", versions?.length);
+
   const versionId: string = share?.currentVersionId ?? versions?.[0]?._id;
   if (!versionId) {
+    console.error("[module-registry] No versionId found. Full response:", JSON.stringify(shareJson).slice(0, 500));
     throw new Error("Registry share has no versions");
   }
 
   // Step 2: Fetch the raw content of the current version
-  const contentRes = await fetch(`${shareUrl}/versions/${versionId}/content`, {
-    next: { revalidate: 0 },
-  });
+  const contentUrl = `${shareUrl}/versions/${versionId}/content`;
+  console.log("[module-registry] Fetching version content from:", contentUrl);
+
+  const contentRes = await fetch(contentUrl, { next: { revalidate: 0 } });
+  console.log("[module-registry] Content response status:", contentRes.status);
   if (!contentRes.ok) {
+    const body = await contentRes.text();
+    console.error("[module-registry] Content fetch failed:", contentRes.status, body.slice(0, 300));
     throw new Error(`Failed to fetch registry content: ${contentRes.status}`);
   }
-  const { content } = await contentRes.json();
+
+  const contentJson = await contentRes.json();
+  console.log("[module-registry] Content response keys:", Object.keys(contentJson));
+  const { content } = contentJson;
 
   if (typeof content !== "string") {
+    console.error("[module-registry] Content is not a string, type:", typeof content, "value:", JSON.stringify(contentJson).slice(0, 300));
     throw new Error("Registry share content is not a string");
   }
+  console.log("[module-registry] Content length:", content.length, "| preview:", content.slice(0, 100));
 
   // Step 3: Parse the inner JSON string into a ModuleRegistry
   let data: ModuleRegistry;
   try {
     data = JSON.parse(content);
-  } catch {
+  } catch (err) {
+    console.error("[module-registry] JSON parse failed:", err, "| content:", content.slice(0, 200));
     throw new Error(
       `Registry content is not valid JSON: ${content.slice(0, 120)}`,
     );
   }
 
   if (!data.modules || !Array.isArray(data.modules)) {
+    console.error("[module-registry] Invalid format, keys:", Object.keys(data));
     throw new Error("Invalid module registry format");
   }
 
+  console.log("[module-registry] Successfully loaded", data.modules.length, "modules from registry");
   _cache = data;
   _cacheTime = Date.now();
   return data;
@@ -118,8 +141,8 @@ export async function getModuleCatalog(): Promise<ModuleCatalogEntry[]> {
   let registry: ModuleRegistry;
   try {
     registry = await fetchRegistry();
-  } catch {
-    // Registry unreachable — return only installed modules
+  } catch (err) {
+    console.error("[module-registry] Failed to fetch registry, falling back to empty catalog:", err instanceof Error ? err.message : err);
     registry = { version: 1, updatedAt: "", modules: [] };
   }
 
