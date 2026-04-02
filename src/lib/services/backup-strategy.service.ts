@@ -199,7 +199,18 @@ export async function completeAsyncBackup(payload: {
     backup.status = "completed";
     backup.filename = payload.filename ?? backup.filename;
     backup.size = payload.size ?? backup.size;
-    backup.path = payload.path ?? backup.path;
+
+    // Translate path from module's mount (/aethera/backups/...) to Aethera's backup dir
+    if (payload.path) {
+      const moduleBackupPrefix = "/aethera/backups/";
+      if (payload.path.startsWith(moduleBackupPrefix)) {
+        const relativePath = payload.path.slice(moduleBackupPrefix.length);
+        backup.path = `${getBackupDir()}/${relativePath}`;
+      } else {
+        backup.path = payload.path;
+      }
+    }
+
     if (payload.shareUrl) backup.shareUrl = payload.shareUrl;
     if (payload.shareId) backup.shareId = payload.shareId;
   } else {
