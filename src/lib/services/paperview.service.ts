@@ -87,11 +87,10 @@ export async function uploadBackupToShare(opts: {
   const data = await res.json();
   const share = data.share;
 
-  // Build the external share URL (using the module's assigned port or internal URL)
+  // Build the external share URL — prefer the admin-configured publicUrl
   const mod = await InstalledModuleModel.findOne({ moduleId: "paperview" }).lean();
-  const baseUrl = mod?.assignedPort
-    ? `http://localhost:${mod.assignedPort}`
-    : internalUrl;
+  const baseUrl = mod?.publicUrl
+    || (mod?.assignedPort ? `http://localhost:${mod.assignedPort}` : internalUrl);
 
   return {
     shareId: share._id,
