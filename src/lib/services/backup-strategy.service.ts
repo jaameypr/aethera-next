@@ -9,6 +9,7 @@ import { createBackup as createSyncBackup } from "@/lib/services/backup.service"
 import { uploadBackupToShare, isPaperviewReady } from "@/lib/services/paperview.service";
 import { getBackupDir } from "@/lib/docker/storage";
 import { logAction } from "@/lib/services/project.service";
+import { HttpError } from "@/lib/api/errors";
 
 /* ------------------------------------------------------------------ */
 /*  Capabilities — what the system can do based on installed modules   */
@@ -79,9 +80,9 @@ async function createAsyncBackup(
   await connectDB();
 
   const server = await ServerModel.findById(serverId);
-  if (!server) throw new Error("Server not found");
+  if (!server) throw new HttpError(404, "Server nicht gefunden");
   if (server.status !== "stopped") {
-    throw new Error("Server must be stopped to create a backup");
+    throw new HttpError(400, "Server muss gestoppt sein, um ein Backup zu erstellen");
   }
 
   const asyncMod = await InstalledModuleModel.findOne({
@@ -90,7 +91,7 @@ async function createAsyncBackup(
   }).lean();
 
   if (!asyncMod?.internalUrl) {
-    throw new Error("Async-backups module URL not available");
+    throw new HttpError(503, "Async-Backups Modul URL nicht verfügbar");
   }
 
   // Determine paperview URL if available
@@ -154,7 +155,7 @@ async function createAsyncBackup(
       status: "failed",
       errorMessage: `Async module responded ${res.status}: ${body}`,
     });
-    throw new Error(`Async backup request failed (${res.status}): ${body}`);
+    throw new HttpError(502, `Async Backup fehlgeschlagen (${res.status}): ${body}`);
   }
 
   const data = await res.json();
@@ -193,7 +194,7 @@ export async function completeAsyncBackup(payload: {
   await connectDB();
 
   const backup = await BackupModel.findById(payload.backupId);
-  if (!backup) throw new Error("Backup not found");
+  if (!backup) throw new HttpError(404, "Backup nicht gefunden");
 
   if (payload.status === "completed") {
     backup.status = "completed";
@@ -235,12 +236,12 @@ export async function shareBackup(backupId: string): Promise<IBackup> {
   await connectDB();
 
   const backup = await BackupModel.findById(backupId);
-  if (!backup) throw new Error("Backup not found");
-  if (backup.status !== "completed") throw new Error("Backup is not completed");
-  if (backup.shareUrl) throw new Error("Backup already shared");
+  if (!backup) throw new HttpError(404, "Backup nicht gefunden");
+  if (backup.status !== "completed") throw new HttpError(400, "Backup ist nicht abgeschlossen");
+  if (backup.shareUrl) throw new HttpError(409, "Backup wurde bereits geteilt");
 
   const ready = await isPaperviewReady();
-  if (!ready) throw new Error("Paperview is not available");
+  if (!ready) throw new HttpError(503, "Paperview ist nicht verfügbar");
 
   const fileBuffer = await readFile(backup.path);
 
