@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createReadStream, createWriteStream } from "node:fs";
-import { openAsBlob } from "node:fs";
+import { stat } from "node:fs/promises";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -44,8 +44,8 @@ export interface PaperviewShareResult {
 }
 
 /**
- * Upload a backup file to Paperview and return a share link.
- * Streams from disk — safe for multi-GB files.
+ * Upload a backup file to Paperview using chunked uploads.
+ * Streams from disk in 5 MB chunks — safe for multi-GB files.
  */
 export async function uploadBackupToShare(opts: {
   filePath: string;
@@ -56,51 +56,106 @@ export async function uploadBackupToShare(opts: {
 }): Promise<PaperviewShareResult> {
   const { internalUrl, apiKey } = await getPaperviewConfig();
 
-  const blob = await openAsBlob(opts.filePath);
-  const formData = new FormData();
-  formData.append("file", blob, opts.filename);
-  formData.append("title", opts.title);
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
+  const fileStats = await stat(opts.filePath);
+  const totalSize = fileStats.size;
+  const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+  const uploadId = crypto.randomUUID();
 
-  if (opts.description) {
-    formData.append("description", opts.description);
+  console.log(
+    `[paperview] Uploading ${opts.filename} (${totalSize} bytes) in ${totalChunks} chunks`,
+  );
+
+  // Send each chunk to Paperview's chunk endpoint
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, totalSize);
+
+    const chunkBuf = await readFileChunk(opts.filePath, start, end);
+
+    const res = await fetch(`${internalUrl}/api/upload/chunk`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/octet-stream",
+        "X-Upload-Id": uploadId,
+        "X-Chunk-Index": String(i),
+      },
+      body: chunkBuf,
+      signal: AbortSignal.timeout(300_000), // 5 min per chunk
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `Paperview chunk upload failed (${res.status}): ${body}`,
+      );
+    }
   }
 
-  formData.append("visibility", "public");
-  formData.append("downloadEnabled", "true");
-  formData.append("commentsEnabled", "false");
-  formData.append("previewMode", "download_only");
+  console.log(`[paperview] All chunks sent, finalizing share`);
 
-  if (opts.expiresAt) {
-    formData.append("expiresAt", opts.expiresAt.toISOString());
-  }
-
+  // Finalize: create the share from the assembled file
   const res = await fetch(`${internalUrl}/api/shares`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
-    body: formData,
-    signal: AbortSignal.timeout(3_600_000), // 1 hour for large files
+    body: JSON.stringify({
+      uploadId,
+      filename: opts.filename,
+      title: opts.title,
+      description: opts.description ?? "",
+      visibility: "public",
+      downloadEnabled: true,
+      commentsEnabled: false,
+      previewMode: "download_only",
+      ...(opts.expiresAt ? { expiresAt: opts.expiresAt.toISOString() } : {}),
+    }),
+    signal: AbortSignal.timeout(600_000), // 10 min for finalization
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Paperview upload failed (${res.status}): ${body}`);
+    throw new Error(`Paperview share creation failed (${res.status}): ${body}`);
   }
 
   const data = await res.json();
   const share = data.share;
 
-  // Build the external share URL — prefer the admin-configured publicUrl
-  const mod = await InstalledModuleModel.findOne({ moduleId: "paperview" }).lean();
-  const baseUrl = mod?.publicUrl
-    || (mod?.assignedPort ? `http://localhost:${mod.assignedPort}` : internalUrl);
+  const mod = await InstalledModuleModel.findOne({
+    moduleId: "paperview",
+  }).lean();
+  const baseUrl =
+    mod?.publicUrl ||
+    (mod?.assignedPort
+      ? `http://localhost:${mod.assignedPort}`
+      : internalUrl);
 
   return {
     shareId: share._id,
     title: share.title,
     shareUrl: `${baseUrl}/shares/${share._id}`,
   };
+}
+
+/** Read a specific byte range from a file into an ArrayBuffer */
+async function readFileChunk(
+  filePath: string,
+  start: number,
+  end: number,
+): Promise<ArrayBuffer> {
+  const { open } = await import("node:fs/promises");
+  const fh = await open(filePath, "r");
+  try {
+    const length = end - start;
+    const buf = Buffer.alloc(length);
+    await fh.read(buf, 0, length, start);
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  } finally {
+    await fh.close();
+  }
 }
 
 /**

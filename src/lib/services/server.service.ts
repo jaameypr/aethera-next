@@ -201,19 +201,35 @@ export async function startServer(
     // If a stopped container already exists, just start it
     if (server.containerId) {
       const docker = await getDockerClient();
-      await startContainer(docker, server.containerId);
+      try {
+        await startContainer(docker, server.containerId);
 
-      await ServerModel.findByIdAndUpdate(serverId, {
-        status: "running",
-        containerStatus: "running",
-      });
+        await ServerModel.findByIdAndUpdate(serverId, {
+          status: "running",
+          containerStatus: "running",
+        });
 
-      await logAction(server.projectKey, "SERVER_STARTED", actorId, {
-        serverId: server._id.toString(),
-        containerId: server.containerId,
-      });
+        await logAction(server.projectKey, "SERVER_STARTED", actorId, {
+          serverId: server._id.toString(),
+          containerId: server.containerId,
+        });
 
-      return { containerId: server.containerId };
+        return { containerId: server.containerId };
+      } catch (containerErr: any) {
+        const statusCode =
+          containerErr?.statusCode ?? containerErr?.cause?.statusCode ?? 0;
+        if (statusCode === 404) {
+          // Container was removed externally — clear stale ref and fall through to full deploy
+          console.log(
+            `[server] Container ${server.containerId} no longer exists, redeploying`,
+          );
+          await ServerModel.findByIdAndUpdate(serverId, {
+            containerId: null,
+          });
+        } else {
+          throw containerErr;
+        }
+      }
     }
 
     // No container exists — full deploy
