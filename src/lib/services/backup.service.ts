@@ -2,6 +2,8 @@ import "server-only";
 
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, rm, stat, readdir, rename, open as fsOpen } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
 import { createGzip, createGunzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
@@ -35,6 +37,17 @@ export interface BackupComponents {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const execFileAsync = promisify(execFile);
+
+/** itzg/minecraft-server runs as UID/GID 1000 — fix ownership after restore */
+async function fixOwnership(dirPath: string): Promise<void> {
+  try {
+    await execFileAsync("chown", ["-R", "1000:1000", dirPath]);
+  } catch {
+    // chown may not be available (e.g., on Windows dev), ignore silently
+  }
+}
 
 function backupDir(serverId: string): string {
   return path.resolve(getBackupDir(), serverId);
@@ -233,6 +246,8 @@ export async function restoreBackup(
     createReadStream(backup.path).pipe(createGunzip()).pipe(extract);
   });
 
+  await fixOwnership(serverDir);
+
   await logAction(server.projectKey, "BACKUP_RESTORED", backup.createdBy.toString(), {
     backupId,
     serverId,
@@ -313,6 +328,8 @@ export async function restoreBackupSelective(
 
     createReadStream(backup.path).pipe(createGunzip()).pipe(extract);
   });
+
+  await fixOwnership(serverDir);
 
   await logAction(server.projectKey, "BACKUP_RESTORED", backup.createdBy.toString(), {
     backupId,
