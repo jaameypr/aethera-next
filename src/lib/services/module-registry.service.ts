@@ -22,9 +22,21 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 /* ------------------------------------------------------------------ */
 
 function getRegistryUrl(): string {
-  const url = process.env.MODULE_REGISTRY_URL;
-  if (!url) throw new Error("MODULE_REGISTRY_URL not configured");
-  return url;
+  const raw = process.env.MODULE_REGISTRY_URL;
+  if (!raw) throw new Error("MODULE_REGISTRY_URL not configured");
+
+  // Normalise: accept both /shares/{id} and /api/shares/{id}
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname.match(/^\/shares\//) && !parsed.pathname.startsWith("/api/")) {
+      parsed.pathname = `/api${parsed.pathname}`;
+      console.log("[module-registry] Normalized URL: added /api prefix →", parsed.href);
+      return parsed.href;
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
 }
 
 /* ------------------------------------------------------------------ */
