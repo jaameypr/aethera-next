@@ -15,6 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { copyToClipboard } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -109,7 +110,7 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
 
       toast.success("Share-Link erstellt");
       if (data.shareUrl) {
-        await navigator.clipboard.writeText(data.shareUrl);
+        await copyToClipboard(data.shareUrl);
         toast.info("Link in Zwischenablage kopiert");
       }
     } catch (err) {
@@ -120,7 +121,7 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
   }
 
   function copyShareUrl(url: string) {
-    navigator.clipboard.writeText(url);
+    copyToClipboard(url);
     toast.info("Link kopiert");
   }
 

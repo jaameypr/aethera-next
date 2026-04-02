@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Copy, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 
 interface CopyableFieldProps {
   value: string;
@@ -14,7 +14,7 @@ export function CopyableField({ value, label, className }: CopyableFieldProps) {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(value);
+    await copyToClipboard(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
