@@ -61,7 +61,7 @@ export async function uploadBackupToShare(opts: {
     formData.append("description", opts.description);
   }
 
-  formData.append("visibility", "private");
+  formData.append("visibility", "public");
   formData.append("downloadEnabled", "true");
   formData.append("commentsEnabled", "false");
   formData.append("previewMode", "download_only");
