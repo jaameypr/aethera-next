@@ -15,6 +15,8 @@ import {
   FolderKanban,
   ChevronLeft,
   Menu,
+  Puzzle,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -55,17 +57,27 @@ const navGroups: NavGroup[] = [
       { label: "Benutzer", href: "/admin/users", icon: Users },
       { label: "Rollen", href: "/admin/roles", icon: ShieldCheck },
       { label: "Mail Templates", href: "/admin/mail-templates", icon: Mail },
+      { label: "Module", href: "/admin/modules", icon: Puzzle },
     ],
   },
 ];
+
+export interface ModuleSidebarItem {
+  moduleId: string;
+  label: string;
+  icon: string;
+  description?: string;
+  type: "docker" | "code";
+}
 
 interface AppShellProps {
   children: React.ReactNode;
   currentUser: CurrentUserResponse;
   projects?: Array<{ _id: string; key: string; name: string }>;
+  moduleItems?: ModuleSidebarItem[];
 }
 
-export function AppShell({ children, currentUser, projects }: AppShellProps) {
+export function AppShell({ children, currentUser, projects, moduleItems }: AppShellProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -155,6 +167,43 @@ export function AppShell({ children, currentUser, projects }: AppShellProps) {
               })}
             </div>
           ))}
+
+          {/* Module-Links */}
+          {moduleItems && moduleItems.length > 0 && (
+            <div className="mb-4">
+              {!collapsed && (
+                <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  Module
+                </p>
+              )}
+              {collapsed && <Separator className="mb-2" />}
+              {moduleItems.map((item) => (
+                <a
+                  key={item.moduleId}
+                  href={
+                    item.type === "docker"
+                      ? `/api/modules/${item.moduleId}/launch`
+                      : `/modules/${item.moduleId}`
+                  }
+                  target={item.type === "docker" ? "_blank" : undefined}
+                  rel={item.type === "docker" ? "noopener noreferrer" : undefined}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                    collapsed && "justify-center px-0",
+                  )}
+                  title={collapsed ? item.label : item.description}
+                >
+                  <Puzzle className="h-4 w-4 shrink-0" />
+                  {!collapsed && <span>{item.label}</span>}
+                  {!collapsed && item.type === "docker" && (
+                    <ExternalLink className="ml-auto h-3 w-3 text-zinc-400" />
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
 
           {/* Projekt-Links */}
           {!collapsed && (
