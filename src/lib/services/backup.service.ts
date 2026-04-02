@@ -133,6 +133,8 @@ export async function createBackup(
     path: filePath,
     size: archiveStat.size,
     components,
+    status: "completed",
+    strategy: "sync",
     createdBy: actorId,
   });
 

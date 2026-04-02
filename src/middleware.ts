@@ -15,6 +15,7 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/api/auth/")) return true;
   if (pathname.startsWith("/api/setup")) return true;
   if (pathname.startsWith("/api/modules/") && pathname.endsWith("/health")) return true;
+  if (pathname === "/api/backups/callback") return true;
   if (pathname.startsWith("/_next/")) return true;
   if (pathname === "/favicon.ico") return true;
   return false;
