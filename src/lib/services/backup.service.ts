@@ -42,6 +42,9 @@ const execFileAsync = promisify(execFile);
 
 /** itzg/minecraft-server runs as UID/GID 1000 — fix ownership after restore */
 async function fixOwnership(dirPath: string): Promise<void> {
+  // Remove stale session.lock that would block MC from starting
+  await rm(path.join(dirPath, "world", "session.lock"), { force: true }).catch(() => {});
+
   try {
     await execFileAsync("chown", ["-R", "1000:1000", dirPath]);
   } catch {

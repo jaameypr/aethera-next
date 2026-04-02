@@ -1,7 +1,11 @@
 import "server-only";
 
 import { mkdir, rm, stat, readdir } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
+
+const execFileAsync = promisify(execFile);
 
 export interface FileEntry {
   name: string;
@@ -45,7 +49,14 @@ export function getServerDataPath(identifier: string): string {
 }
 
 export async function ensureServerDir(identifier: string): Promise<void> {
-  await mkdir(getServerDataPath(identifier), { recursive: true });
+  const dir = getServerDataPath(identifier);
+  await mkdir(dir, { recursive: true });
+  // itzg/minecraft-server runs as UID 1000 — ensure the dir is writable
+  try {
+    await execFileAsync("chown", ["-R", "1000:1000", dir]);
+  } catch {
+    // chown not available (Windows dev), ignore
+  }
 }
 
 export async function deleteServerDir(identifier: string): Promise<void> {
