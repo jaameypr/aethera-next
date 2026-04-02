@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/guards";
 import { getUserById } from "@/lib/services/user.service";
 import { listAllRoles } from "@/lib/services/role.service";
 import { listProjects } from "@/lib/services/project.service";
+import { getModuleSidebarItems } from "@/lib/services/module-manager.service";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import type { CurrentUserResponse } from "@/lib/api/types";
@@ -17,9 +18,10 @@ export default async function AppLayout({
   const user = await getUserById(session.userId);
   if (!user) redirect("/login");
 
-  const [allRoles, projectDocs] = await Promise.all([
+  const [allRoles, projectDocs, moduleSidebar] = await Promise.all([
     listAllRoles(),
     listProjects(session.userId),
+    getModuleSidebarItems().catch(() => []),
   ]);
   const userRoles = allRoles.filter((r) => user.roles.includes(r.name));
   const projects = projectDocs.map((p) => ({
@@ -46,5 +48,13 @@ export default async function AppLayout({
     updatedAt: user.updatedAt.toISOString(),
   };
 
-  return <AppShell currentUser={currentUser} projects={projects}>{children}</AppShell>;
+  return (
+    <AppShell
+      currentUser={currentUser}
+      projects={projects}
+      moduleItems={moduleSidebar}
+    >
+      {children}
+    </AppShell>
+  );
 }

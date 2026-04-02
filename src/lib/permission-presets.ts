@@ -72,6 +72,24 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: "Manage uploaded files and backups",
     category: "Files",
   },
+  {
+    name: "module.*",
+    label: "All Module Permissions",
+    description: "Full access to all modules",
+    category: "Modules",
+  },
+  {
+    name: "module.manage",
+    label: "Manage Modules",
+    description: "Install, update, and remove modules",
+    category: "Modules",
+  },
+  {
+    name: "module.access",
+    label: "Access Modules",
+    description: "Open installed modules",
+    category: "Modules",
+  },
 ];
 
 export interface PermissionPreset {
@@ -99,6 +117,7 @@ export const PERMISSION_QUICK_PRESETS: PermissionPreset[] = [
       { name: "project.*", allow: true },
       { name: "files.upload", allow: true },
       { name: "files.manage", allow: true },
+      { name: "module.*", allow: true },
     ],
   },
   {

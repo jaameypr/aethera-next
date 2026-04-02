@@ -26,5 +26,8 @@ declare namespace NodeJS {
     ADMIN_USERNAME?: string;
     ADMIN_EMAIL?: string;
     ADMIN_PASSWORD?: string;
+
+    // Module system
+    MODULE_REGISTRY_URL?: string;
   }
 }
