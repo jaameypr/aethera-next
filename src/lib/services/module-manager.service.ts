@@ -524,33 +524,21 @@ async function buildImageFromRepo(
   build: NonNullable<ModuleManifest["docker"]>["build"] & object,
 ): Promise<void> {
   const { execSync } = await import("node:child_process");
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
-  const os = await import("node:os");
 
-  const tmpDir = path.join(os.tmpdir(), `aethera-mod-build-${Date.now()}`);
+  const branch = build.branch ?? "main";
+  const dockerfile = build.dockerfile ?? "Dockerfile";
 
-  try {
-    const branch = build.branch ?? "main";
-    const dockerfile = build.dockerfile ?? "Dockerfile";
-    const context = build.context ?? ".";
+  // docker build supports git URLs directly — no need for git in the container
+  // Format: docker build <repoUrl>#<branch>
+  const gitContext = `${build.repository}#${branch}`;
+  const fullTag = `${imageName}:${imageTag}`;
 
-    // Clone the repository
-    execSync(
-      `git clone --depth 1 --branch ${branch} ${build.repository} ${tmpDir}`,
-      { stdio: "pipe", timeout: 120_000 },
-    );
-
-    // Build the image
-    const buildContext = path.join(tmpDir, context);
-    execSync(
-      `docker build -t ${imageName}:${imageTag} -f ${path.join(buildContext, dockerfile)} ${buildContext}`,
-      { stdio: "pipe", timeout: 600_000 }, // 10 min for build
-    );
-  } finally {
-    // Clean up temp dir
-    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
-  }
+  console.log(`[module-manager] Building image ${fullTag} from ${gitContext}`);
+  execSync(
+    `docker build -t ${fullTag} -f ${dockerfile} ${gitContext}`,
+    { stdio: "pipe", timeout: 600_000 }, // 10 min for build
+  );
+  console.log(`[module-manager] Image ${fullTag} built successfully`);
 }
 
 /* ------------------------------------------------------------------ */
