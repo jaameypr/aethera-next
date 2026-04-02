@@ -155,12 +155,8 @@ export interface ModuleManifestDocker {
 
 /** Auth config inside a module manifest. */
 export interface ModuleManifestAuth {
-  strategy: "sso" | "none";
-  callbackPath?: string;
-  userMapping?: {
-    autoCreate: boolean;
-    roleMapping: Record<string, string>;
-  };
+  strategy: "api_key" | "none";
+  exchangePath?: string;
 }
 
 /** Env var definition in a module manifest. */

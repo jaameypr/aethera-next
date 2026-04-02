@@ -20,6 +20,7 @@ import {
   getRegistryModule,
   fetchManifest,
 } from "@/lib/services/module-registry.service";
+import { provisionApiKey } from "@/lib/services/module-auth.service";
 import type { ModuleManifest, InstalledModuleResponse } from "@/lib/api/types";
 
 /* ------------------------------------------------------------------ */
@@ -167,6 +168,11 @@ export async function installModule(
 
     doc.status = "running";
     await doc.save();
+
+    // Auto-provision API key if the module supports it
+    if (manifest.auth?.strategy === "api_key") {
+      scheduleApiKeyProvisioning(manifest.id);
+    }
   } catch (err) {
     doc.status = "error";
     doc.errorMessage = err instanceof Error ? err.message : "Install failed";
@@ -389,6 +395,45 @@ export async function checkModuleHealth(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Internal: Delayed API key provisioning                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The module container needs time to boot before we can call its API.
+ * We retry a few times with increasing delay.
+ */
+function scheduleApiKeyProvisioning(moduleId: string): void {
+  const maxRetries = 10;
+  const baseDelay = 5_000; // 5s
+
+  let attempt = 0;
+
+  const tryProvision = async () => {
+    attempt++;
+    try {
+      await provisionApiKey(moduleId);
+      console.log(`[modules] API key provisioned for ${moduleId}`);
+    } catch (err) {
+      if (attempt < maxRetries) {
+        const delay = baseDelay * attempt;
+        console.log(
+          `[modules] API key provisioning for ${moduleId} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay / 1000}s`,
+        );
+        setTimeout(tryProvision, delay);
+      } else {
+        console.error(
+          `[modules] API key provisioning for ${moduleId} failed after ${maxRetries} attempts:`,
+          err,
+        );
+      }
+    }
+  };
+
+  // First attempt after 10s (give container time to start)
+  setTimeout(tryProvision, 10_000);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Internal: Docker deployment                                        */
 /* ------------------------------------------------------------------ */
 
@@ -470,14 +515,6 @@ function buildContainerEnv(
 
   if (autoKeys.has("MONGODB_URI") && manifest.database?.name) {
     env.MONGODB_URI = buildMongoUri(manifest.database.name);
-  }
-
-  if (autoKeys.has("AETHERA_JWT_SECRET")) {
-    env.AETHERA_JWT_SECRET = process.env.JWT_SECRET || "";
-  }
-
-  if (autoKeys.has("AETHERA_URL")) {
-    env.AETHERA_URL = "http://aethera-app:3000";
   }
 
   if (autoKeys.has("AUTH_SECRET")) {

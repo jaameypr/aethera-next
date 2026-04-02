@@ -80,3 +80,12 @@ export async function checkModuleHealthAction(moduleId: string) {
   await requirePermission("module.access");
   return moduleManager.checkModuleHealth(moduleId);
 }
+
+export async function provisionModuleApiKeyAction(moduleId: string) {
+  await requirePermission("module.manage");
+  const { provisionApiKey } = await import(
+    "@/lib/services/module-auth.service"
+  );
+  await provisionApiKey(moduleId);
+  revalidatePath(`/admin/modules/${moduleId}`);
+}
