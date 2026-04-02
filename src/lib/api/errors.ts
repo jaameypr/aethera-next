@@ -35,6 +35,10 @@ export function errorResponse(error: unknown) {
       { status: error.statusCode },
     );
   }
+  if (error instanceof Error && error.message) {
+    console.error("Unhandled error:", error);
+    return Response.json({ error: error.message }, { status: 400 });
+  }
   console.error("Unhandled error:", error);
   return Response.json({ error: "Internal Server Error" }, { status: 500 });
 }

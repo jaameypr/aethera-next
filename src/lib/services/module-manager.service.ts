@@ -21,6 +21,7 @@ import {
   fetchManifest,
 } from "@/lib/services/module-registry.service";
 import { provisionApiKey } from "@/lib/services/module-auth.service";
+import { getDataDir, getBackupDir } from "@/lib/docker/storage";
 import type { ModuleManifest, InstalledModuleResponse } from "@/lib/api/types";
 
 /* ------------------------------------------------------------------ */
@@ -514,13 +515,23 @@ async function deployDockerModule(
   // Build environment variables
   const env = buildContainerEnv(manifest, doc);
 
-  // Build volume mounts
+  // Build volume mounts (named volumes from manifest)
   const volumes = Object.entries(docker.volumes ?? {}).map(
     ([name, target]) => ({
       name: `aethera-mod-${manifest.id}-${name}`,
       target,
     }),
   );
+
+  // Auto bind mounts for storage directories
+  const autoKeys = new Set(manifest.env?.auto ?? []);
+  const autoBinds: string[] = [];
+  if (autoKeys.has("AETHERA_DATA_DIR")) {
+    autoBinds.push(`${getDataDir()}:/aethera/data`);
+  }
+  if (autoKeys.has("AETHERA_BACKUP_DIR")) {
+    autoBinds.push(`${getBackupDir()}:/aethera/backups`);
+  }
 
   const fullImageRef = `${imageName}:${imageTag}`;
   const labels: Record<string, string> = {
@@ -560,7 +571,10 @@ async function deployDockerModule(
       HostConfig: {
         PortBindings: portBindings,
         RestartPolicy: { Name: "unless-stopped" },
-        Binds: volumes.map((v) => `${v.name}:${v.target}`),
+        Binds: [
+          ...volumes.map((v) => `${v.name}:${v.target}`),
+          ...autoBinds,
+        ],
         Memory: memoryBytes,
         NetworkMode: NETWORK,
       },
@@ -578,12 +592,18 @@ async function deployDockerModule(
       tag: imageTag,
       env,
       ports,
-      mounts: volumes.map((v) => ({
-        type: "volume" as const,
-        source: v.name,
-        target: v.target,
-        readOnly: false,
-      })),
+      mounts: [
+        ...volumes.map((v) => ({
+          type: "volume" as const,
+          source: v.name,
+          target: v.target,
+          readOnly: false,
+        })),
+        ...(autoBinds.map((b) => {
+          const [source, target] = b.split(":");
+          return { type: "bind" as const, source, target, readOnly: false };
+        })),
+      ],
       labels,
       restartPolicy: "unless-stopped",
       resources: docker.resources
@@ -716,6 +736,14 @@ function buildContainerEnv(
       .createHmac("sha256", base)
       .update(`module:${manifest.id}`)
       .digest("hex");
+  }
+
+  // Storage dirs — use fixed container-internal paths
+  if (autoKeys.has("AETHERA_DATA_DIR")) {
+    env.AETHERA_DATA_DIR = "/aethera/data";
+  }
+  if (autoKeys.has("AETHERA_BACKUP_DIR")) {
+    env.AETHERA_BACKUP_DIR = "/aethera/backups";
   }
 
   // User-configured env vars
