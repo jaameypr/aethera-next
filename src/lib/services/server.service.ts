@@ -222,7 +222,27 @@ export async function startServer(
     await ensureServerDir(server.identifier);
 
     const config = deployConfigFromDoc(server, dataDir);
-    const result = await orch.deploy(config);
+
+    let result;
+    try {
+      result = await orch.deploy(config);
+    } catch (deployErr: any) {
+      // Handle stale container conflict — remove old container and retry
+      const msg = deployErr?.cause?.json?.message ?? deployErr?.message ?? "";
+      if (msg.includes("is already in use")) {
+        console.log(`[server] Removing stale container ${config.name} and retrying deploy`);
+        const docker = await getDockerClient();
+        try {
+          const old = docker.getContainer(config.name);
+          await old.remove({ force: true });
+        } catch {
+          // container might already be gone
+        }
+        result = await orch.deploy(config);
+      } else {
+        throw deployErr;
+      }
+    }
 
     await ServerModel.findByIdAndUpdate(serverId, {
       containerId: result.containerId,
