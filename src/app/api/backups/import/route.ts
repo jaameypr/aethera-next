@@ -12,9 +12,7 @@ import { getBackupDir } from "@/lib/docker/storage";
 
 export const POST = withAuth(async (req: NextRequest, { session }) => {
   try {
-    const formData = await req.formData();
-    const url = formData.get("url") as string | null;
-    const file = formData.get("file") as File | null;
+    const contentType = req.headers.get("content-type") ?? "";
 
     const importDir = path.join(getBackupDir(), "imports");
     await mkdir(importDir, { recursive: true });
@@ -22,20 +20,28 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
     let tempPath: string;
     let filename: string;
 
-    if (url) {
+    if (contentType.includes("application/json")) {
+      // URL import (Paperview)
+      const { url } = await req.json();
+      if (!url || typeof url !== "string") throw badRequest("'url' is required");
+
       console.log(`[backup-import] Downloading from Paperview: ${url}`);
       const result = await downloadFromPaperviewToFile(url, importDir);
       tempPath = result.tempPath;
       filename = result.filename;
-    } else if (file) {
-      filename = file.name || "upload.tar.gz";
+    } else {
+      // Raw binary file upload — streams directly to disk, no buffering
+      const headerName = req.headers.get("x-filename");
+      filename = headerName ? decodeURIComponent(headerName) : "upload.tar.gz";
+
+      if (!req.body) throw badRequest("No request body");
+
       tempPath = path.join(importDir, `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-      console.log(`[backup-import] Streaming ${filename} (${file.size} bytes) to disk`);
-      const nodeStream = Readable.fromWeb(file.stream() as any);
+      console.log(`[backup-import] Streaming ${filename} to disk`);
+
+      const nodeStream = Readable.fromWeb(req.body as any);
       await pipeline(nodeStream, createWriteStream(tempPath));
       console.log(`[backup-import] File saved to ${tempPath}`);
-    } else {
-      throw badRequest("Either 'file' or 'url' is required");
     }
 
     console.log(`[backup-import] Processing ${filename}`);

@@ -71,12 +71,14 @@ function formatSize(bytes: number): string {
 
 function uploadWithProgress(
   url: string,
-  formData: FormData,
+  file: File,
   onProgress: (p: UploadProgress) => void,
 ): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.setRequestHeader("X-Filename", encodeURIComponent(file.name));
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
@@ -91,7 +93,7 @@ function uploadWithProgress(
     xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
     xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
     xhr.ontimeout = () => reject(new Error("Upload Timeout"));
-    xhr.send(formData);
+    xhr.send(file);
   });
 }
 
@@ -148,21 +150,12 @@ export function BackupSelector({
     setImporting(true);
     setProgress(null);
     try {
-      const formData = new FormData();
-      if (importTab === "url") {
-        formData.append("url", url.trim());
-      } else {
-        formData.append("file", file!);
-      }
-
-      const isFileUpload = importTab === "upload";
-
       let backup: Backup;
 
-      if (isFileUpload) {
+      if (importTab === "upload") {
         const { status, body } = await uploadWithProgress(
           "/api/backups/import",
-          formData,
+          file!,
           (p) => setProgress(p),
         );
 
@@ -178,7 +171,8 @@ export function BackupSelector({
       } else {
         const res = await fetch("/api/backups/import", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url.trim() }),
         });
 
         if (!res.ok) {

@@ -59,12 +59,14 @@ function formatSize(bytes: number): string {
 
 function uploadWithProgress(
   url: string,
-  formData: FormData,
+  file: File,
   onProgress: (p: UploadProgress) => void,
 ): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.setRequestHeader("X-Filename", encodeURIComponent(file.name));
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
@@ -79,7 +81,7 @@ function uploadWithProgress(
     xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
     xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
     xhr.ontimeout = () => reject(new Error("Upload Timeout"));
-    xhr.send(formData);
+    xhr.send(file);
   });
 }
 
@@ -133,45 +135,18 @@ export function ImportBackupDialog({
     setLoading(true);
     setProgress(null);
     try {
-      const formData = new FormData();
+      let backup: ImportResult;
 
       if (tab === "url") {
         if (!url.trim()) {
           toast.error("Bitte eine URL eingeben");
           return;
         }
-        formData.append("url", url.trim());
-      } else {
-        if (!file) {
-          toast.error("Bitte eine Datei auswählen");
-          return;
-        }
-        formData.append("file", file);
-      }
 
-      const isFileUpload = tab === "upload" && file;
-
-      let backup: ImportResult;
-
-      if (isFileUpload) {
-        const { status, body } = await uploadWithProgress(
-          "/api/backups/import",
-          formData,
-          (p) => setProgress(p),
-        );
-
-        setProgress(null);
-
-        if (status < 200 || status >= 300) {
-          const data = JSON.parse(body).catch?.(() => ({})) ?? {};
-          throw new Error(data.error || `Import fehlgeschlagen (${status})`);
-        }
-
-        backup = JSON.parse(body);
-      } else {
         const res = await fetch("/api/backups/import", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url.trim() }),
         });
 
         if (!res.ok) {
@@ -180,6 +155,27 @@ export function ImportBackupDialog({
         }
 
         backup = await res.json();
+      } else {
+        if (!file) {
+          toast.error("Bitte eine Datei auswählen");
+          return;
+        }
+
+        const { status, body } = await uploadWithProgress(
+          "/api/backups/import",
+          file,
+          (p) => setProgress(p),
+        );
+
+        setProgress(null);
+
+        if (status < 200 || status >= 300) {
+          let errMsg = "Import fehlgeschlagen";
+          try { errMsg = JSON.parse(body).error || errMsg; } catch {}
+          throw new Error(errMsg);
+        }
+
+        backup = JSON.parse(body);
       }
 
       setResult(backup);

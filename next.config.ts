@@ -9,11 +9,6 @@ const nextConfig: NextConfig = {
     "yauzl",
     "@pruefertit/docker-orchestrator",
   ],
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "500mb",
-    },
-  },
 };
 
 export default nextConfig;
