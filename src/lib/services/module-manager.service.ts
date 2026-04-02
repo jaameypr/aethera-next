@@ -447,12 +447,29 @@ async function deployDockerModule(
 
   const containerNameStr = moduleContainerName(manifest.id);
   const port = manifest.docker.port;
+  const docker = manifest.docker;
+
+  // Resolve image: either pre-built or build from source
+  let imageName: string;
+  let imageTag = "latest";
+
+  if (docker.image) {
+    // Pre-built image — just use it
+    imageName = docker.image;
+  } else if (docker.build) {
+    // Build from git repository
+    imageName = `aethera-mod-${manifest.id}`;
+    imageTag = manifest.version;
+    await buildImageFromRepo(imageName, imageTag, docker.build);
+  } else {
+    throw new Error("Module manifest must specify docker.image or docker.build");
+  }
 
   // Build environment variables
   const env = buildContainerEnv(manifest, doc);
 
   // Build volume mounts
-  const volumes = Object.entries(manifest.docker.volumes ?? {}).map(
+  const volumes = Object.entries(docker.volumes ?? {}).map(
     ([name, target]) => ({
       name: `aethera-mod-${manifest.id}-${name}`,
       target,
@@ -463,8 +480,8 @@ async function deployDockerModule(
 
   const result = await orch.deploy({
     name: containerNameStr,
-    image: manifest.docker.image,
-    tag: "latest",
+    image: imageName,
+    tag: imageTag,
     env,
     ports: [], // No host port binding — accessed internally via Docker network
     mounts: volumes.map((v) => ({
@@ -480,13 +497,13 @@ async function deployDockerModule(
       "aethera.type": "module",
     },
     restartPolicy: "unless-stopped",
-    resources: manifest.docker.resources
+    resources: docker.resources
       ? {
-          memory: manifest.docker.resources.memoryLimit
-            ? { limit: manifest.docker.resources.memoryLimit }
+          memory: docker.resources.memoryLimit
+            ? { limit: docker.resources.memoryLimit }
             : undefined,
-          cpu: manifest.docker.resources.cpuLimit
-            ? { nanoCpus: manifest.docker.resources.cpuLimit }
+          cpu: docker.resources.cpuLimit
+            ? { nanoCpus: docker.resources.cpuLimit }
             : undefined,
         }
       : undefined,
@@ -496,6 +513,44 @@ async function deployDockerModule(
   doc.containerId = result.containerId;
   doc.containerName = containerNameStr;
   doc.internalUrl = `http://${containerNameStr}:${port}`;
+}
+
+/**
+ * Clone a git repo and build a Docker image from it.
+ */
+async function buildImageFromRepo(
+  imageName: string,
+  imageTag: string,
+  build: NonNullable<ModuleManifest["docker"]>["build"] & object,
+): Promise<void> {
+  const { execSync } = await import("node:child_process");
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const os = await import("node:os");
+
+  const tmpDir = path.join(os.tmpdir(), `aethera-mod-build-${Date.now()}`);
+
+  try {
+    const branch = build.branch ?? "main";
+    const dockerfile = build.dockerfile ?? "Dockerfile";
+    const context = build.context ?? ".";
+
+    // Clone the repository
+    execSync(
+      `git clone --depth 1 --branch ${branch} ${build.repository} ${tmpDir}`,
+      { stdio: "pipe", timeout: 120_000 },
+    );
+
+    // Build the image
+    const buildContext = path.join(tmpDir, context);
+    execSync(
+      `docker build -t ${imageName}:${imageTag} -f ${path.join(buildContext, dockerfile)} ${buildContext}`,
+      { stdio: "pipe", timeout: 600_000 }, // 10 min for build
+    );
+  } finally {
+    // Clean up temp dir
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 /* ------------------------------------------------------------------ */

@@ -106,8 +106,10 @@ export interface RegistryModuleVersion {
   releaseDate: string;
   minAetheraVersion: string;
   changelog: string;
-  /** Docker image reference (docker modules). */
+  /** Pre-built Docker image reference (docker modules). */
   image?: string;
+  /** Git repository URL to build from (docker modules without pre-built image). */
+  repository?: string;
   /** npm package name (code modules). */
   package?: string;
   /** URL to the aethera-module.json manifest for this version. */
@@ -146,7 +148,15 @@ export interface ModuleManifestSidebarItem {
 
 /** Docker-specific config inside a module manifest. */
 export interface ModuleManifestDocker {
-  image: string;
+  /** Pre-built image reference (e.g. from GHCR/DockerHub). */
+  image?: string;
+  /** Build from source when no pre-built image is available. */
+  build?: {
+    repository: string;
+    context?: string;
+    dockerfile?: string;
+    branch?: string;
+  };
   port: number;
   healthCheck?: string;
   volumes?: Record<string, string>;
