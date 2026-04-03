@@ -346,6 +346,35 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
                 <Input id="d-mr-id" placeholder="fabulously-optimized" value={state.packReference.projectId ?? ""}
                   onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "projectId", value: e.target.value })} />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="d-mr-ver">Version-ID <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                <Input id="d-mr-ver" placeholder="IIJJKKLL" value={state.packReference.versionId ?? ""}
+                  onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "versionId", value: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Oder .mrpack-Datei hochladen</Label>
+                <input
+                  type="file"
+                  accept=".mrpack"
+                  className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm dark:file:bg-zinc-800 dark:text-zinc-400"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    dispatch({ type: "SET_PACK_RESOLVING", value: true });
+                    dispatch({ type: "SET_ERRORS", errors: {} });
+                    const buf = await file.arrayBuffer();
+                    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+                    const result = await resolvePackAction({ source: "modrinth", reference: {}, mrpackBase64: b64 });
+                    dispatch({ type: "SET_PACK_RESOLVING", value: false });
+                    if (!result.ok) {
+                      dispatch({ type: "SET_ERRORS", errors: { pack: result.error } });
+                      return;
+                    }
+                    dispatch({ type: "SET_PACK_META", meta: result.data });
+                    if (result.data.packName && !state.identifierEdited) dispatch({ type: "SET_NAME", value: result.data.packName });
+                  }}
+                />
+              </div>
             </div>
           )}
 
