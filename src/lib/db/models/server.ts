@@ -21,6 +21,54 @@ export interface IPackReference {
   packName?: string;
 }
 
+/** A panel-managed mod added on top of the pack's preinstalled mods */
+export interface IAdditionalMod {
+  _id?: mongoose.Types.ObjectId;
+  /** Where to download this mod from */
+  source: "modrinth" | "curseforge";
+  /** Project ID (Modrinth project ID or CurseForge project ID) */
+  projectId: string;
+  /** Human-readable slug (for display / CF_EXCLUDE lookup) */
+  slug?: string;
+  /** Display name shown in UI */
+  displayName: string;
+  /** Modrinth: pin to this version ID */
+  versionId?: string;
+  /** CurseForge: pin to this file ID */
+  fileId?: string;
+  addedAt: Date;
+}
+
+/**
+ * A preinstalled pack mod that should be suppressed on every container start.
+ * Never a one-off filesystem mutation — stored declaratively and re-applied on start.
+ */
+export interface IExcludedPackMod {
+  _id?: mongoose.Types.ObjectId;
+  /** Display name shown in UI */
+  displayName: string;
+  /** Project slug (for display) */
+  slug?: string;
+  /** Project ID (for display / CF_EXCLUDE_MODS) */
+  projectId?: string;
+  /**
+   * CurseForge: value passed to CF_EXCLUDE_MODS (slug or project ID).
+   * Example: "jei" or "238222"
+   */
+  cfExcludeToken?: string;
+  /**
+   * Modrinth: partial filename token passed to MODRINTH_EXCLUDE_FILES.
+   * Example: "jei-" or "jei-1.20.1"
+   */
+  filenameToken?: string;
+  /**
+   * If true, this exclusion targets override files rather than pack files.
+   * Rendered into CF_OVERRIDES_EXCLUSIONS / MODRINTH_OVERRIDES_EXCLUSIONS.
+   */
+  isOverride?: boolean;
+  excludedAt: Date;
+}
+
 export interface IServer extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
@@ -54,6 +102,10 @@ export interface IServer extends Document {
   resolvedLoader?: string;
   /** Loader version resolved from pack */
   resolvedLoaderVersion?: string;
+  /** Panel-added mods rendered as MODRINTH_PROJECTS / CURSEFORGE_FILES on start */
+  additionalMods?: IAdditionalMod[];
+  /** Pack mods suppressed via CF_EXCLUDE_MODS / MODRINTH_EXCLUDE_FILES on start */
+  excludedPackMods?: IExcludedPackMod[];
   containerId?: string;
   containerStatus?: string;
   autoStart: boolean;
@@ -80,6 +132,32 @@ const PackReferenceSchema = new Schema<IPackReference>(
     packName: { type: String },
   },
   { _id: false },
+);
+
+const AdditionalModSchema = new Schema<IAdditionalMod>(
+  {
+    source: { type: String, enum: ["modrinth", "curseforge"], required: true },
+    projectId: { type: String, required: true },
+    slug: { type: String },
+    displayName: { type: String, required: true },
+    versionId: { type: String },
+    fileId: { type: String },
+    addedAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
+);
+
+const ExcludedPackModSchema = new Schema<IExcludedPackMod>(
+  {
+    displayName: { type: String, required: true },
+    slug: { type: String },
+    projectId: { type: String },
+    cfExcludeToken: { type: String },
+    filenameToken: { type: String },
+    isOverride: { type: Boolean, default: false },
+    excludedAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
 );
 
 const SERVER_TYPES = [
@@ -117,6 +195,8 @@ const ServerSchema = new Schema<IServer>(
     resolvedMinecraftVersion: { type: String },
     resolvedLoader: { type: String },
     resolvedLoaderVersion: { type: String },
+    additionalMods: { type: [AdditionalModSchema], default: [] },
+    excludedPackMods: { type: [ExcludedPackModSchema], default: [] },
     containerId: { type: String },
     containerStatus: { type: String },
     autoStart: { type: Boolean, default: false },

@@ -7,6 +7,7 @@ import { ServerLogsTab } from "./ServerLogsTab";
 
 import { ServerFilesTab } from "./ServerFilesTab";
 import { ServerAddonsTab } from "./ServerAddonsTab";
+import { PackModsTab } from "./PackModsTab";
 import { ServerBackupsTab } from "./ServerBackupsTab";
 import { ServerAccessTab } from "./ServerAccessTab";
 import { SettingsTab } from "./tabs/SettingsTab";
@@ -19,6 +20,7 @@ interface ServerPlain {
   runtime: string;
   version?: string;
   modLoader?: string;
+  serverType?: string;
   port: number;
   rconPort?: number;
   memory: number;
@@ -79,7 +81,14 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
           <ServerFilesTab serverId={server._id} />
         </TabsContent>
         <TabsContent value="addons">
-          <ServerAddonsTab serverId={server._id} modLoader={server.modLoader} />
+          {(server.serverType === "curseforge" || server.serverType === "modrinth") ? (
+            <PackModsTab
+              serverId={server._id}
+              packType={server.serverType as "curseforge" | "modrinth"}
+            />
+          ) : (
+            <ServerAddonsTab serverId={server._id} modLoader={server.modLoader} />
+          )}
         </TabsContent>
         <TabsContent value="backups">
           <ServerBackupsTab serverId={server._id} serverName={server.name} />

@@ -54,6 +54,43 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
     env.MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
   }
 
+  // --- Additional mods (panel-managed overlays, re-applied on every start) ---
+  if (server.additionalMods?.length) {
+    const modrinthExtra = server.additionalMods.filter((m) => m.source === "modrinth");
+    const cfExtra = server.additionalMods.filter((m) => m.source === "curseforge");
+
+    if (modrinthExtra.length) {
+      // MODRINTH_PROJECTS: comma-separated "projectId[:versionId]"
+      env.MODRINTH_PROJECTS = modrinthExtra
+        .map((m) => (m.versionId ? `${m.projectId}:${m.versionId}` : m.projectId))
+        .join(",");
+    }
+    if (cfExtra.length) {
+      // CURSEFORGE_FILES: pipe-separated "projectId[:fileId]"
+      env.CURSEFORGE_FILES = cfExtra
+        .map((m) => (m.fileId ? `${m.projectId}:${m.fileId}` : m.projectId))
+        .join("|");
+    }
+  }
+
+  // --- Exclusions (declarative, re-applied on every start — database is source of truth) ---
+  if (server.excludedPackMods?.length) {
+    const normal = server.excludedPackMods.filter((m) => !m.isOverride);
+    const overrides = server.excludedPackMods.filter((m) => m.isOverride);
+
+    if (server.serverType === "curseforge") {
+      const normalTokens = normal.map((m) => m.cfExcludeToken).filter(Boolean);
+      const overrideTokens = overrides.map((m) => m.cfExcludeToken).filter(Boolean);
+      if (normalTokens.length) env.CF_EXCLUDE_MODS = normalTokens.join(",");
+      if (overrideTokens.length) env.CF_OVERRIDES_EXCLUSIONS = overrideTokens.join(",");
+    } else if (server.serverType === "modrinth") {
+      const normalTokens = normal.map((m) => m.filenameToken).filter(Boolean);
+      const overrideTokens = overrides.map((m) => m.filenameToken).filter(Boolean);
+      if (normalTokens.length) env.MODRINTH_EXCLUDE_FILES = normalTokens.join(",");
+      if (overrideTokens.length) env.MODRINTH_OVERRIDES_EXCLUSIONS = overrideTokens.join(",");
+    }
+  }
+
   // --- Loader version (Forge/Fabric) ---
   if (server.resolvedLoaderVersion) {
     if (server.serverType === "forge" || server.modLoader === "forge") {

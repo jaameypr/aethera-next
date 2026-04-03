@@ -361,6 +361,101 @@ export async function resolvePackAction(data: {
 }
 
 // ---------------------------------------------------------------------------
+// Pack Mod Lookup
+// ---------------------------------------------------------------------------
+
+export interface PackModInfo {
+  projectId: string;
+  slug: string;
+  displayName: string;
+  description?: string;
+  iconUrl?: string;
+}
+
+/**
+ * Look up a mod by project ID or slug from Modrinth or CurseForge.
+ * Returns structured metadata safe to store in additionalMods.
+ */
+export async function lookupPackModAction(data: {
+  source: "modrinth" | "curseforge";
+  query: string; // projectId or slug
+}): Promise<{ ok: true; data: PackModInfo } | { ok: false; error: string }> {
+  await requireSession();
+
+  try {
+    if (data.source === "modrinth") {
+      const res = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(data.query)}`, {
+        headers: { "User-Agent": "aethera-panel/1.0" },
+        next: { revalidate: 60 },
+      });
+      if (res.status === 404) return { ok: false, error: `Modrinth-Projekt nicht gefunden: ${data.query}` };
+      if (!res.ok) return { ok: false, error: `Modrinth API Fehler: ${res.status}` };
+      const project = await res.json();
+      if (project.project_type !== "mod") {
+        return { ok: false, error: `"${project.title}" ist kein Mod (Typ: ${project.project_type})` };
+      }
+      return {
+        ok: true,
+        data: {
+          projectId: project.id,
+          slug: project.slug,
+          displayName: project.title,
+          description: project.description,
+          iconUrl: project.icon_url,
+        },
+      };
+    }
+
+    if (data.source === "curseforge") {
+      const key = process.env.CURSEFORGE_API_KEY;
+      if (!key) return { ok: false, error: "CURSEFORGE_API_KEY ist nicht konfiguriert" };
+
+      // Try numeric project ID first, then slug search
+      const isNumeric = /^\d+$/.test(data.query);
+      let mod: { id: number; slug: string; name: string; summary: string; logo?: { thumbnailUrl: string } } | null = null;
+
+      if (isNumeric) {
+        const res = await fetch(`https://api.curseforge.com/v1/mods/${data.query}`, {
+          headers: { "x-api-key": key },
+        });
+        if (res.ok) {
+          const body = await res.json();
+          mod = body.data;
+        }
+      }
+
+      if (!mod) {
+        const res = await fetch(
+          `https://api.curseforge.com/v1/search?gameId=432&classId=6&searchFilter=${encodeURIComponent(data.query)}&pageSize=1`,
+          { headers: { "x-api-key": key } },
+        );
+        if (!res.ok) return { ok: false, error: `CurseForge API Fehler: ${res.status}` };
+        const body = await res.json();
+        if (!body.data?.length) return { ok: false, error: `CurseForge-Mod nicht gefunden: ${data.query}` };
+        mod = body.data[0];
+      }
+
+      if (!mod) return { ok: false, error: `CurseForge-Mod nicht gefunden: ${data.query}` };
+
+      return {
+        ok: true,
+        data: {
+          projectId: String(mod.id),
+          slug: mod.slug,
+          displayName: mod.name,
+          description: mod.summary,
+          iconUrl: mod.logo?.thumbnailUrl,
+        },
+      };
+    }
+
+    return { ok: false, error: "Unbekannte Quelle" };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unbekannter Fehler" };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // System Info
 // ---------------------------------------------------------------------------
 
