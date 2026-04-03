@@ -106,6 +106,11 @@ export interface IServer extends Document {
   additionalMods?: IAdditionalMod[];
   /** Pack mods suppressed via CF_EXCLUDE_MODS / MODRINTH_EXCLUDE_FILES on start */
   excludedPackMods?: IExcludedPackMod[];
+  /**
+   * Java version override for the itzg image (e.g. "8", "11", "17", "21").
+   * Auto-detected from the resolved MC version; can be overridden manually.
+   */
+  javaVersion?: string;
   containerId?: string;
   containerStatus?: string;
   autoStart: boolean;
@@ -197,6 +202,7 @@ const ServerSchema = new Schema<IServer>(
     resolvedLoaderVersion: { type: String },
     additionalMods: { type: [AdditionalModSchema], default: [] },
     excludedPackMods: { type: [ExcludedPackModSchema], default: [] },
+    javaVersion: { type: String },
     containerId: { type: String },
     containerStatus: { type: String },
     autoStart: { type: Boolean, default: false },

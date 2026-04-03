@@ -70,6 +70,7 @@ export interface ServerPlain {
   version?: string;
   modLoader?: string;
   javaArgs?: string;
+  javaVersion?: string;
   autoStart: boolean;
 }
 
@@ -84,6 +85,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [javaVersion, setJavaVersion] = useState(server.javaVersion ?? "21");
 
   const editable = server.status === "stopped";
 
@@ -120,6 +122,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
           version: data.version || undefined,
           modLoader: data.modLoader,
           javaArgs: data.javaArgs || undefined,
+          javaVersion,
           autoStart: data.autoStart,
         }),
       });
@@ -218,6 +221,23 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                 disabled={!editable}
                 {...register("version")}
               />
+            </div>
+
+            {/* Java-Version */}
+            <div className="space-y-1">
+              <Label>Java-Version</Label>
+              <Select value={javaVersion} onValueChange={setJavaVersion} disabled={!editable}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["8", "11", "17", "21"] as const).map((v) => (
+                    <SelectItem key={v} value={v}>
+                      Java {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* ModLoader */}

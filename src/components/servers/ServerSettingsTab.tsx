@@ -51,6 +51,7 @@ interface ServerSettingsTabProps {
     version?: string;
     modLoader?: string;
     javaArgs?: string;
+    javaVersion?: string;
   };
 }
 
@@ -64,6 +65,7 @@ export function ServerSettingsTab({
   const [isPending, startTransition] = useTransition();
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [modLoader, setModLoader] = useState(defaults.modLoader ?? "vanilla");
+  const [javaVersion, setJavaVersion] = useState(defaults.javaVersion ?? "21");
 
   const {
     register,
@@ -85,7 +87,7 @@ export function ServerSettingsTab({
       try {
         await updateServerAction({
           serverId,
-          patch: { ...data, modLoader },
+          patch: { ...data, modLoader, javaVersion },
         });
         toast.success("Einstellungen gespeichert");
       } catch (err) {
@@ -142,6 +144,21 @@ export function ServerSettingsTab({
             <div className="space-y-1">
               <Label htmlFor="version">Version</Label>
               <Input id="version" placeholder="latest" {...register("version")} />
+            </div>
+            <div className="space-y-1">
+              <Label>Java-Version</Label>
+              <Select value={javaVersion} onValueChange={setJavaVersion}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["8", "11", "17", "21"] as const).map((v) => (
+                    <SelectItem key={v} value={v}>
+                      Java {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label>Mod-Loader</Label>

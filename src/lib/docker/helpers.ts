@@ -95,6 +95,12 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
     }
   }
 
+  // --- Java version ---
+  // Explicit javaVersion stored on the server wins; otherwise infer from MC version.
+  if (server.javaVersion) {
+    env.JAVA_VERSION = server.javaVersion;
+  }
+
   // --- Loader version (Forge/Fabric) ---
   if (server.resolvedLoaderVersion) {
     if (server.serverType === "forge" || server.modLoader === "forge") {

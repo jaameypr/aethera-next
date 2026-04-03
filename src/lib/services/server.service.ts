@@ -61,6 +61,7 @@ export interface ServerCreateInput {
   /** Loader version resolved from pack */
   resolvedLoaderVersion?: string;
   javaArgs?: string;
+  javaVersion?: string;
   env?: Record<string, string>;
   properties?: Record<string, string>;
   autoStart?: boolean;
@@ -140,6 +141,7 @@ const CONFIG_FIELDS = new Set([
   "resolvedLoader",
   "resolvedLoaderVersion",
   "javaArgs",
+  "javaVersion",
   "env",
   "properties",
 ]);

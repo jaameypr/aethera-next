@@ -59,6 +59,8 @@ import {
   type BackupSelection,
 } from "@/components/backups/backup-selector";
 import { uploadChunked, type UploadProgress } from "@/lib/utils/upload-chunked";
+import { inferJavaVersion, JAVA_VERSIONS } from "@/lib/utils/java-version";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,6 +86,7 @@ interface WizardState {
   version: string;
   jvmPresetId: string;
   javaArgs: string;
+  javaVersion: string;
   // Step 3 — Resources
   memory: number;
   port: number;
@@ -142,6 +145,7 @@ const INITIAL_STATE: WizardState = {
   version: "",
   jvmPresetId: DEFAULT_JVM_PRESET?.id ?? "minimal",
   javaArgs: DEFAULT_JVM_PRESET?.flags ?? "",
+  javaVersion: "21",
   memory: 2048,
   port: 25565,
   portStatus: "idle",
@@ -192,12 +196,13 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
         identifierEdited: true,
         errors: {},
       };
-    case "SET_FIELD":
-      return {
-        ...state,
-        [action.field]: action.value,
-        errors: {},
-      } as WizardState;
+    case "SET_FIELD": {
+      const next = { ...state, [action.field]: action.value, errors: {} } as WizardState;
+      if (action.field === "version") {
+        next.javaVersion = inferJavaVersion(action.value as string);
+      }
+      return next;
+    }
     case "NEXT":
       return { ...state, step: state.step + 1, direction: 1, errors: {} };
     case "PREV":
@@ -232,7 +237,12 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
     case "SET_PACK_REF":
       return { ...state, packReference: { ...state.packReference, [action.field]: action.value }, errors: {} };
     case "SET_PACK_META":
-      return { ...state, packMeta: action.meta, errors: {} };
+      return {
+        ...state,
+        packMeta: action.meta,
+        errors: {},
+        javaVersion: action.meta ? inferJavaVersion(action.meta.mcVersion) : state.javaVersion,
+      };
     case "SET_PACK_RESOLVING":
       return { ...state, packResolving: action.value };
     case "SET_UPLOAD_PROGRESS":
@@ -476,6 +486,33 @@ function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.
           <Label htmlFor="w-version">{isMinecraft ? "Minecraft-Version" : "Version"}</Label>
           <Input id="w-version" value={state.version} onChange={(e) => dispatch({ type: "SET_FIELD", field: "version", value: e.target.value })} placeholder="latest" />
           <p className="text-xs text-zinc-500">Leer lassen für die neueste Version</p>
+        </div>
+      )}
+      {isMinecraft && (
+        <div className="space-y-1.5">
+          <Label>Java-Version</Label>
+          <div className="flex flex-wrap gap-2">
+            {JAVA_VERSIONS.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => dispatch({ type: "SET_FIELD", field: "javaVersion", value: v })}
+                className={cn(
+                  "rounded-md border px-3 py-1 text-sm transition-colors",
+                  state.javaVersion === v
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500",
+                )}
+              >
+                Java {v}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-zinc-500">
+            {isPack && state.packMeta
+              ? `Automatisch erkannt aus MC ${state.packMeta.mcVersion}. Kann manuell überschrieben werden.`
+              : "Automatisch angepasst wenn eine Version eingetragen wird."}
+          </p>
         </div>
       )}
       {isMinecraft && (
@@ -965,6 +1002,7 @@ export function CreateServerWizard({
           resolvedLoader: state.packMeta?.loader,
           resolvedLoaderVersion: state.packMeta?.loaderVersion,
           javaArgs: state.javaArgs || undefined,
+          javaVersion: state.javaVersion || undefined,
           autoStart: needsPostCreation ? false : state.autoStart,
           properties,
         };

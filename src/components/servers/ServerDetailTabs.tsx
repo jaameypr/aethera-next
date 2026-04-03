@@ -29,6 +29,7 @@ interface ServerPlain {
   containerId?: string;
   containerStatus?: string;
   javaArgs?: string;
+  javaVersion?: string;
   autoStart: boolean;
   access: { userId: string; username: string; permissions: string[] }[];
   createdAt: string;
