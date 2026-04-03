@@ -17,6 +17,8 @@ export interface IPackReference {
   versionId?: string;
   /** Modrinth: direct .mrpack download URL (from uploaded file or version) */
   mrpackUrl?: string;
+  /** Panel-local upload ID — used during server creation to copy the file into /data */
+  mrpackUploadId?: string;
   /** Display name of the pack as resolved */
   packName?: string;
 }
@@ -134,6 +136,7 @@ const PackReferenceSchema = new Schema<IPackReference>(
     fileId: { type: String },
     versionId: { type: String },
     mrpackUrl: { type: String },
+    mrpackUploadId: { type: String },
     packName: { type: String },
   },
   { _id: false },

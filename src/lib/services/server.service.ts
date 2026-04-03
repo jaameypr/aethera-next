@@ -1,6 +1,8 @@
 import "server-only";
 
 import os from "node:os";
+import { copyFile, unlink } from "node:fs/promises";
+import path from "node:path";
 import { connectDB } from "@/lib/db/connection";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
 import { BlueprintModel } from "@/lib/db/models/blueprint";
@@ -112,6 +114,20 @@ export async function createServer(
   });
 
   await ensureServerDir(server.identifier);
+
+  // If an .mrpack was uploaded via the wizard, move it into /data so the
+  // itzg image can find it at MODRINTH_MODPACK=/data/pack.mrpack
+  if (data.packReference?.mrpackUploadId) {
+    try {
+      const { getMrpackPackPath } = await import("@/app/api/servers/mrpack/process/route");
+      const src = getMrpackPackPath(data.packReference.mrpackUploadId);
+      const dest = path.join(getServerDataPath(server.identifier), "pack.mrpack");
+      await copyFile(src, dest);
+      unlink(src).catch(() => {});
+    } catch (err) {
+      console.warn("[createServer] Could not copy .mrpack file:", err);
+    }
+  }
 
   await logAction(projectKey, "SERVER_CREATED", actorId, {
     serverId: server._id.toString(),

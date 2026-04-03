@@ -461,12 +461,17 @@ function Step0({
                         dispatch({ type: "SET_ERRORS", errors: { pack: msg } });
                         return;
                       }
-                      const result = JSON.parse(body) as { ok: boolean; data?: ResolvedPackInfo; error?: string };
+                      const result = JSON.parse(body) as { ok: boolean; uploadId?: string; data?: ResolvedPackInfo; error?: string };
                       if (!result.ok || !result.data) {
                         dispatch({ type: "SET_ERRORS", errors: { pack: result.error ?? "Unbekannter Fehler" } });
                         return;
                       }
                       dispatch({ type: "SET_PACK_META", meta: result.data });
+                      // Store the upload ID and the local container path so MODRINTH_MODPACK gets set
+                      if (result.uploadId) {
+                        dispatch({ type: "SET_PACK_REF", field: "mrpackUploadId", value: result.uploadId });
+                        dispatch({ type: "SET_PACK_REF", field: "mrpackUrl", value: "/data/pack.mrpack" });
+                      }
                       if (result.data.packName && !state.identifierEdited) {
                         dispatch({ type: "SET_NAME", value: result.data.packName });
                       }

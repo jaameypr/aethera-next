@@ -1,4 +1,4 @@
-import { readFile, unlink } from "node:fs/promises";
+import { readFile, rename, mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth/guards";
@@ -6,13 +6,19 @@ import { badRequest, errorResponse } from "@/lib/api/errors";
 import { getDataDir } from "@/lib/docker/storage";
 import { parseMrpack } from "@/lib/services/pack-resolution.service";
 
-function getMrpackTempDir(): string {
+export function getMrpackTempDir(): string {
   return path.join(getDataDir(), ".mrpack-uploads");
+}
+
+/** Permanent pack file: pack-<uploadId>.mrpack (kept until server creation) */
+export function getMrpackPackPath(uploadId: string): string {
+  return path.join(getMrpackTempDir(), `pack-${uploadId}.mrpack`);
 }
 
 /**
  * Finalizes an .mrpack chunked upload: reads the reassembled temp file,
- * parses modrinth.index.json, and returns pack metadata.
+ * parses modrinth.index.json, and returns pack metadata + uploadId.
+ * The .mrpack file is kept on disk so createServer can copy it to /data.
  * Body: { uploadId: string, filename?: string }
  */
 export const POST = withAuth(async (req: NextRequest) => {
@@ -24,17 +30,21 @@ export const POST = withAuth(async (req: NextRequest) => {
       throw badRequest("Valid uploadId required");
     }
 
-    const tempPath = path.join(getMrpackTempDir(), `upload-${uploadId}.tmp`);
+    const dir = getMrpackTempDir();
+    await mkdir(dir, { recursive: true });
+
+    const tempPath = path.join(dir, `upload-${uploadId}.tmp`);
     const buf = await readFile(tempPath).catch(() => {
       throw badRequest("Upload-Datei nicht gefunden. Bitte erneut hochladen.");
     });
 
     const info = await parseMrpack(buf);
 
-    // Clean up temp file (best-effort)
-    unlink(tempPath).catch(() => {});
+    // Rename to a stable name so createServer can find it later
+    const packPath = getMrpackPackPath(uploadId);
+    await rename(tempPath, packPath).catch(() => {});
 
-    return Response.json({ ok: true, data: info });
+    return Response.json({ ok: true, uploadId, data: info });
   } catch (error) {
     console.error("[mrpack-process] Error:", error);
     if (error instanceof Error && "statusCode" in error) {
