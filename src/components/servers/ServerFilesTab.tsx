@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ChevronDown,
   Download,
+  MoveRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,14 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface FileTreeNode {
   name: string;
@@ -31,6 +40,12 @@ interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
+type PendingAction =
+  | { type: "delete"; path: string }
+  | { type: "move"; from: string; to: string };
+
+const DRAG_TYPE = "application/x-aethera-path";
+
 export function ServerFilesTab({ serverId }: { serverId: string }) {
   const [tree, setTree] = useState<FileTreeNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -38,6 +53,8 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     fetchTree();
@@ -102,6 +119,51 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
     }
   }
 
+  function requestDelete(filepath: string) {
+    setPendingAction({ type: "delete", path: filepath });
+  }
+
+  async function handleMove(from: string, to: string) {
+    try {
+      const res = await fetch(`/api/servers/${serverId}/files/${from}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast.success("Verschoben");
+      if (selectedFile === from) {
+        setSelectedFile(null);
+        setFileContent("");
+      }
+      fetchTree();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fehler beim Verschieben");
+    }
+  }
+
+  function requestMove(from: string, toFolder: string) {
+    const filename = from.split("/").pop() ?? from;
+    const to = toFolder ? `${toFolder}/${filename}` : filename;
+    if (from === to) return;
+    setPendingAction({ type: "move", from, to });
+  }
+
+  async function handleConfirm() {
+    if (!pendingAction) return;
+    setConfirming(true);
+    try {
+      if (pendingAction.type === "delete") {
+        await handleDelete(pendingAction.path);
+      } else {
+        await handleMove(pendingAction.from, pendingAction.to);
+      }
+    } finally {
+      setConfirming(false);
+      setPendingAction(null);
+    }
+  }
+
   function handleDownload(filepath: string) {
     const filename = filepath.split("/").pop() ?? "download";
     const a = document.createElement("a");
@@ -143,18 +205,60 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
     e.target.value = "";
   }
 
-  function handleDrop(targetPath: string, files: FileList) {
-    if (files.length === 0) return;
-    handleUploadFiles(files, targetPath);
+  function handleDrop(targetPath: string, e: React.DragEvent) {
     setDragOverPath(null);
+    const internalPath = e.dataTransfer.getData(DRAG_TYPE);
+    if (internalPath) {
+      requestMove(internalPath, targetPath);
+    } else if (e.dataTransfer.files.length > 0) {
+      handleUploadFiles(e.dataTransfer.files, targetPath);
+    }
   }
 
   if (loading) {
     return <p className="text-sm text-zinc-500">Lade Dateien…</p>;
   }
 
+  const dialogTitle =
+    pendingAction?.type === "delete"
+      ? "Löschen bestätigen"
+      : "Verschieben bestätigen";
+
+  const dialogDescription =
+    pendingAction?.type === "delete"
+      ? `Möchtest du "${pendingAction.path}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.`
+      : pendingAction?.type === "move"
+        ? `Möchtest du "${pendingAction.from}" nach "${pendingAction.to}" verschieben?`
+        : "";
+
   return (
-    <div className="flex h-[600px] gap-4">
+    <>
+      {/* Confirmation dialog */}
+      <Dialog
+        open={pendingAction !== null}
+        onOpenChange={(open) => { if (!open) setPendingAction(null); }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+            <DialogDescription>{dialogDescription}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingAction(null)} disabled={confirming}>
+              Abbrechen
+            </Button>
+            <Button
+              variant={pendingAction?.type === "delete" ? "destructive" : "default"}
+              onClick={handleConfirm}
+              disabled={confirming}
+            >
+              {confirming ? "…" : pendingAction?.type === "delete" ? "Löschen" : "Verschieben"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex h-[600px] gap-4">
       {/* Tree panel */}
       <div
         className={cn(
@@ -173,7 +277,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
         onDrop={(e) => {
           e.preventDefault();
           if (dragOverPath === "" || dragOverPath === null) {
-            handleDrop("", e.dataTransfer.files);
+            handleDrop("", e);
           }
         }}
       >
@@ -211,7 +315,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
               selectedFile={selectedFile}
               dragOverPath={dragOverPath}
               onSelect={handleSelect}
-              onDelete={handleDelete}
+              onDelete={requestDelete}
               onDownload={handleDownload}
               onDragOver={setDragOverPath}
               onDrop={handleDrop}
@@ -247,6 +351,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -270,7 +375,7 @@ function TreeNode({
   onDelete: (path: string) => void;
   onDownload: (path: string) => void;
   onDragOver: (path: string) => void;
-  onDrop: (path: string, files: FileList) => void;
+  onDrop: (path: string, e: React.DragEvent) => void;
   onUploadInput: (e: React.ChangeEvent<HTMLInputElement>, targetPath?: string) => void;
 }) {
   const [open, setOpen] = useState(depth < 1);
@@ -289,10 +394,16 @@ function TreeNode({
             onDrop={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onDrop(node.path, e.dataTransfer.files);
+              onDrop(node.path, e);
             }}
           >
             <button
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                e.dataTransfer.setData(DRAG_TYPE, node.path);
+                e.dataTransfer.effectAllowed = "move";
+              }}
               className={cn(
                 "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
                 isDragTarget && "bg-blue-50 ring-1 ring-blue-400 dark:bg-blue-900/30",
@@ -368,6 +479,11 @@ function TreeNode({
       <ContextMenuTrigger asChild>
         <div className="group flex items-center">
           <button
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(DRAG_TYPE, node.path);
+              e.dataTransfer.effectAllowed = "move";
+            }}
             className={cn(
               "flex flex-1 items-center gap-1 rounded px-1 py-0.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
               selectedFile === node.path && "bg-zinc-200 dark:bg-zinc-800",
@@ -403,6 +519,3 @@ function TreeNode({
     </ContextMenu>
   );
 }
-
-
-

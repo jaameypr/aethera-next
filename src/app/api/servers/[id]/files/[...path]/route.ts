@@ -9,6 +9,7 @@ import {
   uploadFile,
   downloadFile,
   downloadFolderAsZip,
+  moveFile,
 } from "@/lib/services/file.service";
 import { canAccessServer } from "@/lib/services/server-access";
 
@@ -84,6 +85,25 @@ export const DELETE = withAuth<{ id: string; path: string[] }>(
     }
   },
 );
+
+export const PATCH = withAuth<{ id: string; path: string[] }>(async (req: NextRequest, { session, params }) => {
+  try {
+    const server = await getServer(params.id);
+    if (!server) throw notFound("Server not found");
+    if (!(await canAccessServer(server, session.userId))) throw forbidden();
+
+    const fromPath = extractFilepath(params);
+    const { to } = await req.json();
+    if (!to || typeof to !== "string") {
+      return Response.json({ error: '"to" is required' }, { status: 400 });
+    }
+
+    await moveFile(params.id, fromPath, to);
+    return Response.json({ success: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
 
 export const POST = withAuth<{ id: string; path: string[] }>(async (req: NextRequest, { session, params }) => {
   try {

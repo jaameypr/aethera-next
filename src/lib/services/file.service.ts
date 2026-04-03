@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readdir, readFile as fsReadFile, writeFile as fsWriteFile, rm, stat, mkdir } from "node:fs/promises";
+import { readdir, readFile as fsReadFile, writeFile as fsWriteFile, rm, stat, mkdir, rename as fsRename } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 import path from "node:path";
@@ -154,6 +154,24 @@ export async function uploadFile(
   await mkdir(path.dirname(resolved), { recursive: true });
   const buffer = Buffer.from(await file.arrayBuffer());
   await fsWriteFile(resolved, buffer);
+}
+
+export async function moveFile(
+  serverId: string,
+  fromPath: string,
+  toPath: string,
+): Promise<void> {
+  const { resolved: from } = await resolveServerPath(serverId, fromPath);
+  const { resolved: to } = await resolveServerPath(serverId, toPath);
+
+  // Guard against moving into itself or a child of itself
+  const fromNorm = path.normalize(from) + path.sep;
+  if (path.normalize(to) === path.normalize(from) || path.normalize(to).startsWith(fromNorm)) {
+    throw new Error("Cannot move a path into itself or one of its subdirectories");
+  }
+
+  await mkdir(path.dirname(to), { recursive: true });
+  await fsRename(from, to);
 }
 
 // ---------------------------------------------------------------------------
