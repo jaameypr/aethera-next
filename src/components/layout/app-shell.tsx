@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Users,
   ShieldCheck,
-  Mail,
   Upload,
   HardDrive,
   Files,
@@ -56,7 +55,6 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Benutzer", href: "/admin/users", icon: Users },
       { label: "Rollen", href: "/admin/roles", icon: ShieldCheck },
-      { label: "Mail Templates", href: "/admin/mail-templates", icon: Mail },
       { label: "Module", href: "/admin/modules", icon: Puzzle },
     ],
   },

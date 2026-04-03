@@ -7,7 +7,7 @@ import {
   comparePassword,
   generateTempPassword,
 } from "@/lib/auth/password";
-import { sendMail, isMailConfigured } from "./mail.service";
+import { sendPasswordResetMail } from "./smtp-module.service";
 import type { PermissionEntry } from "@/lib/api/types";
 
 export async function listAllUsers(): Promise<IUser[]> {
@@ -52,13 +52,15 @@ export async function createUser(data: {
     tempPassword = generateTempPassword();
     passwordHash = await hashPassword(tempPassword);
 
-    // Try to send email
-    if (data.email && isMailConfigured()) {
-      const result = await sendMail(
-        data.email,
-        `Welcome to ${process.env.NEXT_PUBLIC_APP_NAME || "Aethera"}`,
-        `<p>Hello ${data.username},</p><p>Your temporary password is: <strong>${tempPassword}</strong></p><p>Please log in and change your password.</p>`,
-      );
+    // Try to send invitation email via SMTP module
+    if (data.email) {
+      const { sendPasswordResetMail: sendWelcome } = await import("./smtp-module.service");
+      // Reuse password-reset endpoint — same data shape (to, username, tempPassword)
+      const result = await sendWelcome({
+        to: data.email,
+        username: data.username,
+        tempPassword,
+      });
       emailSent = result.sent;
     }
   }
@@ -123,12 +125,12 @@ export async function resetPassword(
   await user.save();
 
   let emailSent = false;
-  if (user.email && isMailConfigured()) {
-    const result = await sendMail(
-      user.email,
-      `Password Reset - ${process.env.NEXT_PUBLIC_APP_NAME || "Aethera"}`,
-      `<p>Hello ${user.username},</p><p>Your password has been reset. Your new temporary password is: <strong>${tempPassword}</strong></p><p>Please log in and change your password.</p>`,
-    );
+  if (user.email) {
+    const result = await sendPasswordResetMail({
+      to: user.email,
+      username: user.username,
+      tempPassword,
+    });
     emailSent = result.sent;
   }
 
