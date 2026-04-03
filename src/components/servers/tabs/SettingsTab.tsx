@@ -141,7 +141,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
   }
 
   async function handleDelete() {
-    if (deleteConfirm !== server.name) return;
+    if (deleteConfirm.trim() !== server.name.trim()) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/servers/${server._id}`, {
@@ -341,17 +341,34 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Server löschen</DialogTitle>
-                <DialogDescription>
-                  Gib <strong>{server.name}</strong> ein um den Server
-                  unwiderruflich zu löschen.
+                <DialogDescription asChild>
+                  <div className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    <p>Gib den Servernamen ein um den Server unwiderruflich zu löschen.</p>
+                    <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
+                      <span className="flex-1 font-mono text-xs text-zinc-700 dark:text-zinc-300">{server.name}</span>
+                      <button
+                        type="button"
+                        className="shrink-0 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                        onClick={() => { navigator.clipboard.writeText(server.name); setDeleteConfirm(server.name); }}
+                      >
+                        Kopieren & einfügen
+                      </button>
+                    </div>
+                  </div>
                 </DialogDescription>
               </DialogHeader>
-              <Input
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value)}
-                placeholder={server.name}
-                autoFocus
-              />
+              <div className="relative">
+                <Input
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder={server.name}
+                  autoFocus
+                  className={deleteConfirm.trim() === server.name.trim() && deleteConfirm.length > 0 ? "border-red-500 pr-8" : ""}
+                />
+                {deleteConfirm.trim() === server.name.trim() && deleteConfirm.length > 0 && (
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-500 text-xs font-medium">✓</span>
+                )}
+              </div>
               <DialogFooter>
                 <Button
                   variant="outline"
@@ -362,7 +379,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                 </Button>
                 <Button
                   variant="destructive"
-                  disabled={deleting || deleteConfirm !== server.name}
+                  disabled={deleting || deleteConfirm.trim() !== server.name.trim() || deleteConfirm.length === 0}
                   onClick={handleDelete}
                 >
                   {deleting ? "Lösche…" : "Endgültig löschen"}
