@@ -46,10 +46,14 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
   }
 
   if (server.serverType === "modrinth" && server.packReference) {
-    const projectRef = server.packReference.projectId || server.packReference.slug;
-    if (projectRef) env.MODRINTH_PROJECT = projectRef;
-    if (server.packReference.versionId) env.MODRINTH_VERSION_ID = server.packReference.versionId;
-    if (server.packReference.mrpackUrl) env.MODRINTH_DOWNLOAD_URL = server.packReference.mrpackUrl;
+    // itzg requires MODRINTH_MODPACK = slug | projectId | .mrpack URL
+    const modpack =
+      server.packReference.mrpackUrl ||
+      server.packReference.projectId ||
+      server.packReference.slug;
+    if (modpack) env.MODRINTH_MODPACK = modpack;
+    // Optional: pin a specific version
+    if (server.packReference.versionId) env.MODRINTH_VERSION = server.packReference.versionId;
     // Download optional dependencies (mods required by the pack)
     env.MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
   }
