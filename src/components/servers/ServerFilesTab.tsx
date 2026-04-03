@@ -422,8 +422,7 @@ function TreeNode({
                   e.dataTransfer.effectAllowed = "move";
                 }}
                 className={cn(
-                  "flex flex-1 items-center gap-1 rounded px-1 py-0.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                  isDragTarget && "bg-blue-50 ring-1 ring-blue-400 dark:bg-blue-900/30",
+                  "flex flex-1 items-center gap-1 rounded px-1 py-1 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
                 )}
                 style={{ paddingLeft: `${depth * 12 + 4}px` }}
                 onClick={() => setOpen(!open)}
@@ -509,7 +508,7 @@ function TreeNode({
               e.dataTransfer.effectAllowed = "move";
             }}
             className={cn(
-              "flex flex-1 items-center gap-1 rounded px-1 py-0.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
+              "flex flex-1 items-center gap-1 rounded px-1 py-1 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
               selectedFile === node.path && "bg-zinc-200 dark:bg-zinc-800",
             )}
             style={{ paddingLeft: `${depth * 12 + 16}px` }}

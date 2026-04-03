@@ -135,36 +135,38 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
                 </p>
               )}
               {collapsed && <Separator className="mb-2" />}
-              {group.items.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.disabled ? "#" : item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
-                      item.disabled &&
-                        "cursor-not-allowed opacity-40 hover:bg-transparent dark:hover:bg-transparent",
-                      collapsed && "justify-center px-0",
-                    )}
-                    aria-disabled={item.disabled}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {!collapsed && <span>{item.label}</span>}
-                    {!collapsed && item.disabled && (
-                      <span className="ml-auto text-[10px] uppercase text-zinc-400">
-                        Soon
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
+              <div className="flex flex-col gap-0.5">
+                {group.items.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.disabled ? "#" : item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                        item.disabled &&
+                          "cursor-not-allowed opacity-40 hover:bg-transparent dark:hover:bg-transparent",
+                        collapsed && "justify-center px-0",
+                      )}
+                      aria-disabled={item.disabled}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.label}</span>}
+                      {!collapsed && item.disabled && (
+                        <span className="ml-auto text-[10px] uppercase text-zinc-400">
+                          Soon
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           ))}
 
@@ -177,31 +179,33 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
                 </p>
               )}
               {collapsed && <Separator className="mb-2" />}
-              {moduleItems.map((item) => (
-                <a
-                  key={item.moduleId}
-                  href={
-                    item.type === "docker"
-                      ? `/api/modules/${item.moduleId}/launch`
-                      : `/modules/${item.moduleId}`
-                  }
-                  target={item.type === "docker" ? "_blank" : undefined}
-                  rel={item.type === "docker" ? "noopener noreferrer" : undefined}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
-                    collapsed && "justify-center px-0",
-                  )}
-                  title={collapsed ? item.label : item.description}
-                >
-                  <Puzzle className="h-4 w-4 shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
-                  {!collapsed && item.type === "docker" && (
-                    <ExternalLink className="ml-auto h-3 w-3 text-zinc-400" />
-                  )}
-                </a>
-              ))}
+              <div className="flex flex-col gap-0.5">
+                {moduleItems.map((item) => (
+                  <a
+                    key={item.moduleId}
+                    href={
+                      item.type === "docker"
+                        ? `/api/modules/${item.moduleId}/launch`
+                        : `/modules/${item.moduleId}`
+                    }
+                    target={item.type === "docker" ? "_blank" : undefined}
+                    rel={item.type === "docker" ? "noopener noreferrer" : undefined}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                      collapsed && "justify-center px-0",
+                    )}
+                    title={collapsed ? item.label : item.description}
+                  >
+                    <Puzzle className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
+                    {!collapsed && item.type === "docker" && (
+                      <ExternalLink className="ml-auto h-3 w-3 text-zinc-400" />
+                    )}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 
@@ -212,26 +216,28 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
                 Projekte
               </p>
               {projects && projects.length > 0 ? (
-                projects.map((project) => {
-                  const href = `/projects/${project.key}`;
-                  const isActive = pathname === href || pathname.startsWith(href + "/");
-                  return (
-                    <Link
-                      key={project._id}
-                      href={href}
-                      onClick={() => setMobileOpen(false)}
-                      className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
-                      )}
-                    >
-                      <FolderKanban className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{project.name}</span>
-                    </Link>
-                  );
-                })
+                <div className="flex flex-col gap-0.5">
+                  {projects.map((project) => {
+                    const href = `/projects/${project.key}`;
+                    const isActive = pathname === href || pathname.startsWith(href + "/");
+                    return (
+                      <Link
+                        key={project._id}
+                        href={href}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                        )}
+                      >
+                        <FolderKanban className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{project.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
               ) : (
                 <p className="px-3 py-2 text-xs text-zinc-400 dark:text-zinc-500">
                   Noch keine Projekte
