@@ -136,7 +136,7 @@ export async function updateTemplate(
   const doc = await MailTemplateModel.findOneAndUpdate(
     { key },
     { $set: data },
-    { new: true },
+    { returnDocument: "after" },
   ).lean<IMailTemplate>();
   if (!doc) throw new Error(`Template "${key}" not found`);
   return doc;

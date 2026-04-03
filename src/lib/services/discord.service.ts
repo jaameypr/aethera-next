@@ -91,7 +91,7 @@ export async function consumeVerificationCode(
       discordGuildName: guildName,
       discordGuildIcon: guildIcon ?? null,
     },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!project) throw notFound("Project not found");

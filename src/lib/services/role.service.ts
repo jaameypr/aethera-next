@@ -43,7 +43,7 @@ export async function updateRole(
   if (patch.description !== undefined) update.description = patch.description;
   if (patch.permissions !== undefined) update.permissions = patch.permissions;
 
-  return RoleModel.findByIdAndUpdate(id, update, { new: true }).lean<IRole>();
+  return RoleModel.findByIdAndUpdate(id, update, { returnDocument: "after" }).lean<IRole>();
 }
 
 export async function deleteRole(id: string): Promise<void> {

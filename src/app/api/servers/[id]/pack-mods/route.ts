@@ -74,7 +74,7 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
           additionalMods: { source, projectId, slug, displayName, versionId, fileId, addedAt: new Date() },
         },
       },
-      { new: true },
+      { returnDocument: "after" },
     ).lean();
 
     const added = updated?.additionalMods?.at(-1);

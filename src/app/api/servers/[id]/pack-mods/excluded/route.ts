@@ -55,7 +55,7 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
           },
         },
       },
-      { new: true },
+      { returnDocument: "after" },
     ).lean();
 
     const added = updated?.excludedPackMods?.at(-1);

@@ -172,14 +172,14 @@ export async function updateServer(
   if (!server) throw new Error("Server not found");
 
   const changesConfig = Object.keys(patch).some((k) => CONFIG_FIELDS.has(k));
-  if (changesConfig && server.status !== "stopped") {
+  if (changesConfig && server.status !== "stopped" && server.status !== "error") {
     throw new Error(
       "Server must be stopped before changing configuration fields",
     );
   }
 
   const updated = await ServerModel.findByIdAndUpdate(serverId, patch, {
-    new: true,
+    returnDocument: "after",
   }).lean<IServer>();
   if (!updated) throw new Error("Server not found");
 

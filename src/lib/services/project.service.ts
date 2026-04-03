@@ -203,7 +203,7 @@ export async function renameProject(
   const project = await ProjectModel.findOneAndUpdate(
     { key },
     { name: name.trim() },
-    { new: true },
+    { returnDocument: "after" },
   ).lean<IProject>();
 
   if (!project) throw notFound(`Project "${key}" not found`);

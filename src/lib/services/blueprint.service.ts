@@ -117,7 +117,7 @@ export async function updateBlueprint(
   if (data.maxRam !== undefined) update.maxRam = data.maxRam;
 
   const updated = await BlueprintModel.findByIdAndUpdate(blueprintId, update, {
-    new: true,
+    returnDocument: "after",
   }).lean<IBlueprint>();
 
   return updated!;

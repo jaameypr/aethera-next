@@ -87,7 +87,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [javaVersion, setJavaVersion] = useState(server.javaVersion ?? "21");
 
-  const editable = server.status === "stopped";
+  const editable = server.status === "stopped" || server.status === "error";
 
   const {
     register,
@@ -165,6 +165,11 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
       {!editable && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
           Server muss gestoppt sein um Einstellungen zu bearbeiten.
+        </div>
+      )}
+      {server.status === "error" && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+          Server befindet sich im Fehlerzustand. Einstellungen können bearbeitet und gespeichert werden — danach neu starten.
         </div>
       )}
 

@@ -94,7 +94,7 @@ export async function updateUser(
   if (patch.roles !== undefined) update.roles = patch.roles;
   if (patch.permissions !== undefined) update.permissions = patch.permissions;
 
-  return UserModel.findByIdAndUpdate(id, update, { new: true }).lean<IUser>();
+  return UserModel.findByIdAndUpdate(id, update, { returnDocument: "after" }).lean<IUser>();
 }
 
 export async function setEnabled(
