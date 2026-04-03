@@ -319,22 +319,19 @@ function Step0({
   async function handleResolve() {
     if (!typeConfig.packSource) return;
     dispatch({ type: "SET_PACK_RESOLVING", value: true });
-    try {
-      const meta = await resolvePackAction({
-        source: typeConfig.packSource,
-        reference: state.packReference,
-      });
-      dispatch({ type: "SET_PACK_META", meta });
-      if (meta.packName && !state.identifierEdited) {
-        dispatch({ type: "SET_NAME", value: meta.packName });
-      }
-    } catch (e) {
-      dispatch({
-        type: "SET_ERRORS",
-        errors: { pack: e instanceof Error ? e.message : "Pack konnte nicht aufgelöst werden" },
-      });
-    } finally {
-      dispatch({ type: "SET_PACK_RESOLVING", value: false });
+    dispatch({ type: "SET_ERRORS", errors: {} });
+    const result = await resolvePackAction({
+      source: typeConfig.packSource,
+      reference: state.packReference,
+    });
+    dispatch({ type: "SET_PACK_RESOLVING", value: false });
+    if (!result.ok) {
+      dispatch({ type: "SET_ERRORS", errors: { pack: result.error } });
+      return;
+    }
+    dispatch({ type: "SET_PACK_META", meta: result.data });
+    if (result.data.packName && !state.identifierEdited) {
+      dispatch({ type: "SET_NAME", value: result.data.packName });
     }
   }
 
@@ -427,18 +424,18 @@ function Step0({
                     const file = e.target.files?.[0];
                     if (!file) return;
                     dispatch({ type: "SET_PACK_RESOLVING", value: true });
-                    try {
-                      const buf = await file.arrayBuffer();
-                      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-                      const meta = await resolvePackAction({ source: "modrinth", reference: {}, mrpackBase64: b64 });
-                      dispatch({ type: "SET_PACK_META", meta });
-                      if (meta.packName && !state.identifierEdited) {
-                        dispatch({ type: "SET_NAME", value: meta.packName });
-                      }
-                    } catch (err) {
-                      dispatch({ type: "SET_ERRORS", errors: { pack: err instanceof Error ? err.message : "Fehler" } });
-                    } finally {
-                      dispatch({ type: "SET_PACK_RESOLVING", value: false });
+                    dispatch({ type: "SET_ERRORS", errors: {} });
+                    const buf = await file.arrayBuffer();
+                    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+                    const result = await resolvePackAction({ source: "modrinth", reference: {}, mrpackBase64: b64 });
+                    dispatch({ type: "SET_PACK_RESOLVING", value: false });
+                    if (!result.ok) {
+                      dispatch({ type: "SET_ERRORS", errors: { pack: result.error } });
+                      return;
+                    }
+                    dispatch({ type: "SET_PACK_META", meta: result.data });
+                    if (result.data.packName && !state.identifierEdited) {
+                      dispatch({ type: "SET_NAME", value: result.data.packName });
                     }
                   }}
                 />

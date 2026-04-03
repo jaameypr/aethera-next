@@ -335,25 +335,29 @@ export async function resolvePackAction(data: {
   reference: IPackReference;
   /** Base64-encoded .mrpack file contents (for Modrinth local upload) */
   mrpackBase64?: string;
-}): Promise<ResolvedPackInfo> {
+}): Promise<{ ok: true; data: ResolvedPackInfo } | { ok: false; error: string }> {
   await requireSession();
 
-  const { resolveModrinthPack, resolveCurseForgePack, parseMrpack } =
-    await import("@/lib/services/pack-resolution.service");
+  try {
+    const { resolveModrinthPack, resolveCurseForgePack, parseMrpack } =
+      await import("@/lib/services/pack-resolution.service");
 
-  if (data.source === "modrinth") {
-    if (data.mrpackBase64) {
-      const buf = Buffer.from(data.mrpackBase64, "base64");
-      return parseMrpack(buf);
+    if (data.source === "modrinth") {
+      if (data.mrpackBase64) {
+        const buf = Buffer.from(data.mrpackBase64, "base64");
+        return { ok: true, data: await parseMrpack(buf) };
+      }
+      return { ok: true, data: await resolveModrinthPack(data.reference) };
     }
-    return resolveModrinthPack(data.reference);
-  }
 
-  if (data.source === "curseforge") {
-    return resolveCurseForgePack(data.reference);
-  }
+    if (data.source === "curseforge") {
+      return { ok: true, data: await resolveCurseForgePack(data.reference) };
+    }
 
-  throw new Error(`Unbekannte Pack-Quelle: ${data.source}`);
+    return { ok: false, error: `Unbekannte Pack-Quelle: ${data.source}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unbekannter Fehler beim Auflösen des Packs" };
+  }
 }
 
 // ---------------------------------------------------------------------------

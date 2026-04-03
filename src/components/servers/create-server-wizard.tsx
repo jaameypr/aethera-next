@@ -279,15 +279,15 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
   async function handleResolve() {
     if (!typeConfig.packSource) return;
     dispatch({ type: "SET_PACK_RESOLVING", value: true });
-    try {
-      const meta = await resolvePackAction({ source: typeConfig.packSource, reference: state.packReference });
-      dispatch({ type: "SET_PACK_META", meta });
-      if (meta.packName && !state.identifierEdited) dispatch({ type: "SET_NAME", value: meta.packName });
-    } catch (e) {
-      dispatch({ type: "SET_ERRORS", errors: { pack: e instanceof Error ? e.message : "Pack konnte nicht aufgelöst werden" } });
-    } finally {
-      dispatch({ type: "SET_PACK_RESOLVING", value: false });
+    dispatch({ type: "SET_ERRORS", errors: {} });
+    const result = await resolvePackAction({ source: typeConfig.packSource, reference: state.packReference });
+    dispatch({ type: "SET_PACK_RESOLVING", value: false });
+    if (!result.ok) {
+      dispatch({ type: "SET_ERRORS", errors: { pack: result.error } });
+      return;
     }
+    dispatch({ type: "SET_PACK_META", meta: result.data });
+    if (result.data.packName && !state.identifierEdited) dispatch({ type: "SET_NAME", value: result.data.packName });
   }
 
   return (
