@@ -86,25 +86,6 @@ export const DELETE = withAuth<{ id: string; path: string[] }>(
   },
 );
 
-export const PATCH = withAuth<{ id: string; path: string[] }>(async (req: NextRequest, { session, params }) => {
-  try {
-    const server = await getServer(params.id);
-    if (!server) throw notFound("Server not found");
-    if (!(await canAccessServer(server, session.userId))) throw forbidden();
-
-    const fromPath = extractFilepath(params);
-    const { to } = await req.json();
-    if (!to || typeof to !== "string") {
-      return Response.json({ error: '"to" is required' }, { status: 400 });
-    }
-
-    await moveFile(params.id, fromPath, to);
-    return Response.json({ success: true });
-  } catch (error) {
-    return errorResponse(error);
-  }
-});
-
 export const POST = withAuth<{ id: string; path: string[] }>(async (req: NextRequest, { session, params }) => {
   try {
     const server = await getServer(params.id);
@@ -112,6 +93,17 @@ export const POST = withAuth<{ id: string; path: string[] }>(async (req: NextReq
     if (!(await canAccessServer(server, session.userId))) throw forbidden();
 
     const filepath = extractFilepath(params);
+    const url = new URL(req.url);
+
+    if (url.searchParams.get("action") === "move") {
+      const { to } = await req.json();
+      if (!to || typeof to !== "string") {
+        return Response.json({ error: '"to" is required' }, { status: 400 });
+      }
+      await moveFile(params.id, filepath, to);
+      return Response.json({ success: true });
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) {

@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     "dockerode",
     "tar-stream",
     "yauzl",
+    "archiver",
     "@pruefertit/docker-orchestrator",
   ],
 };

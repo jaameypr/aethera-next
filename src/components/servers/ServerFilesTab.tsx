@@ -46,6 +46,11 @@ type PendingAction =
 
 const DRAG_TYPE = "application/x-aethera-path";
 
+/** Encode each path segment but keep slashes as separators */
+function encodePath(p: string): string {
+  return p.split("/").map(encodeURIComponent).join("/");
+}
+
 export function ServerFilesTab({ serverId }: { serverId: string }) {
   const [tree, setTree] = useState<FileTreeNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -75,7 +80,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
   async function handleSelect(filepath: string) {
     setSelectedFile(filepath);
     try {
-      const res = await fetch(`/api/servers/${serverId}/files/${filepath}`);
+      const res = await fetch(`/api/servers/${serverId}/files/${encodePath(filepath)}`);
       if (!res.ok) throw new Error((await res.json()).error);
       const { content } = await res.json();
       setFileContent(content);
@@ -89,7 +94,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
     if (!selectedFile) return;
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/servers/${serverId}/files/${selectedFile}`, {
+        const res = await fetch(`/api/servers/${serverId}/files/${encodePath(selectedFile)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: fileContent }),
@@ -104,18 +109,21 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
 
   async function handleDelete(filepath: string) {
     try {
-      const res = await fetch(`/api/servers/${serverId}/files/${filepath}`, {
+      const res = await fetch(`/api/servers/${serverId}/files/${encodePath(filepath)}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
       toast.success("Gelöscht");
       if (selectedFile === filepath) {
         setSelectedFile(null);
         setFileContent("");
       }
       fetchTree();
-    } catch {
-      toast.error("Fehler beim Löschen");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fehler beim Löschen");
     }
   }
 
@@ -125,12 +133,18 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
 
   async function handleMove(from: string, to: string) {
     try {
-      const res = await fetch(`/api/servers/${serverId}/files/${from}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error);
+      const res = await fetch(
+        `/api/servers/${serverId}/files/${encodePath(from)}?action=move`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to }),
+        },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
       toast.success("Verschoben");
       if (selectedFile === from) {
         setSelectedFile(null);
@@ -167,7 +181,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
   function handleDownload(filepath: string) {
     const filename = filepath.split("/").pop() ?? "download";
     const a = document.createElement("a");
-    a.href = `/api/servers/${serverId}/files/${filepath}?download=true`;
+    a.href = `/api/servers/${serverId}/files/${encodePath(filepath)}?download=true`;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
@@ -181,7 +195,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
       const uploadPath = targetPath ? `${targetPath}/${file.name}` : file.name;
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`/api/servers/${serverId}/files/${uploadPath}`, {
+      const res = await fetch(`/api/servers/${serverId}/files/${encodePath(uploadPath)}`, {
         method: "POST",
         body: formData,
       });
