@@ -995,7 +995,7 @@ export function CreateServerWizard({
           identifier: state.identifier,
           runtime,
           image,
-          tag: "stable",
+          tag: `java${state.javaVersion}`,
           port: state.port,
           memory: state.memory,
           version: state.packMeta?.mcVersion || state.version || undefined,

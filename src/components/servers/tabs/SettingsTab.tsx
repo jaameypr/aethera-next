@@ -123,6 +123,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
           modLoader: data.modLoader,
           javaArgs: data.javaArgs || undefined,
           javaVersion,
+          tag: `java${javaVersion}`,
           autoStart: data.autoStart,
         }),
       });

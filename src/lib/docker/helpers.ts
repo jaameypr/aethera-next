@@ -95,12 +95,6 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
     }
   }
 
-  // --- Java version ---
-  // Explicit javaVersion stored on the server wins; otherwise infer from MC version.
-  if (server.javaVersion) {
-    env.JAVA_VERSION = server.javaVersion;
-  }
-
   // --- Loader version (Forge/Fabric) ---
   if (server.resolvedLoaderVersion) {
     if (server.serverType === "forge" || server.modLoader === "forge") {
@@ -158,7 +152,10 @@ export function deployConfigFromDoc(
     preset: server.runtime === "hytale" ? "hytale" : "minecraft",
     name: containerName(server),
     image: server.image,
-    tag: server.tag,
+    // For itzg, use java{n} tag to select the correct JDK bundled in that image variant
+    tag: (server.image === "itzg/minecraft-server" && server.javaVersion)
+      ? `java${server.javaVersion}`
+      : server.tag,
     env: serverEnvFromDoc(server),
     ports,
     mounts: [
