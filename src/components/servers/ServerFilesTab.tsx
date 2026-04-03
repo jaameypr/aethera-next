@@ -113,7 +113,9 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
   }
 
   async function handleUploadFiles(files: FileList, targetPath = "") {
-    const uploads = Array.from(files).map(async (file) => {
+    const fileArray = Array.from(files);
+    const count = fileArray.length;
+    const uploads = fileArray.map(async (file) => {
       const uploadPath = targetPath ? `${targetPath}/${file.name}` : file.name;
       const formData = new FormData();
       formData.append("file", file);
@@ -125,9 +127,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
     });
     try {
       await Promise.all(uploads);
-      toast.success(
-        files.length === 1 ? "Hochgeladen" : `${files.length} Dateien hochgeladen`,
-      );
+      toast.success(count === 1 ? "Hochgeladen" : `${count} Dateien hochgeladen`);
       fetchTree();
     } catch (err) {
       toast.error(`Upload fehlgeschlagen: ${err instanceof Error ? err.message : ""}`);
