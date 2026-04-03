@@ -356,7 +356,8 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
                 <input
                   type="file"
                   accept=".mrpack"
-                  className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm dark:file:bg-zinc-800 dark:text-zinc-400"
+                  disabled={state.packResolving}
+                  className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm disabled:opacity-50 dark:file:bg-zinc-800 dark:text-zinc-400"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -374,6 +375,12 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
                     if (result.data.packName && !state.identifierEdited) dispatch({ type: "SET_NAME", value: result.data.packName });
                   }}
                 />
+                {state.packResolving && !state.packMeta && (
+                  <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Datei wird verarbeitet…
+                  </p>
+                )}
               </div>
             </div>
           )}
