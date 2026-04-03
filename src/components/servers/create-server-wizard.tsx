@@ -14,10 +14,18 @@ import {
   Cpu,
   Settings,
   Check,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -408,15 +416,6 @@ function StepResources({
       ? `${(state.memory / 1024).toFixed(1)} GB`
       : `${state.memory} MB`;
 
-  const portIcon =
-    state.portStatus === "checking"
-      ? "⏳"
-      : state.portStatus === "available"
-        ? "✅"
-        : state.portStatus === "taken"
-          ? "❌"
-          : "";
-
   return (
     <div className="space-y-6">
       <div className="space-y-3">
@@ -447,23 +446,42 @@ function StepResources({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="w-port">
-          Port {portIcon}
-        </Label>
-        <Input
-          id="w-port"
-          type="number"
-          value={state.port}
-          onChange={(e) =>
-            dispatch({
-              type: "SET_FIELD",
-              field: "port",
-              value: Number(e.target.value),
-            })
-          }
-          min={1024}
-          max={65535}
-        />
+        <Label htmlFor="w-port">Port</Label>
+        <div className="relative">
+          <Input
+            id="w-port"
+            type="number"
+            value={state.port}
+            onChange={(e) =>
+              dispatch({
+                type: "SET_FIELD",
+                field: "port",
+                value: Number(e.target.value),
+              })
+            }
+            min={1024}
+            max={65535}
+            className="pr-8"
+          />
+          {state.portStatus === "checking" && (
+            <Loader2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-400" />
+          )}
+          {state.portStatus === "available" && (
+            <CheckCircle2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500" />
+          )}
+          {state.portStatus === "taken" && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 cursor-default text-red-500" />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Dieser Port ist bereits belegt. Wähle einen anderen Port.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
         {state.portStatus === "taken" && (
           <p className="text-xs text-red-500">
             Port ist bereits belegt

@@ -1,11 +1,22 @@
 "use client";
 
-import { useReducer, useState, useEffect, useRef, useCallback } from "react";
+import { useReducer, useState, useEffect, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Check, ChevronLeft, ChevronRight, ChevronDown, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Rocket,
+  Server,
+  Cpu,
+  Settings,
+} from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -16,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -31,61 +43,58 @@ import {
 } from "@/app/(app)/actions/servers";
 import { JVM_FLAG_PRESETS, type JvmPreset } from "@/lib/constants/jvm-presets";
 import JvmPresetSelector from "@/components/servers/JvmPresetSelector";
+import {
+  BackupSelector,
+  type BackupSelection,
+} from "@/components/backups/backup-selector";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Types & Constants
 // ---------------------------------------------------------------------------
 
-const MOD_LOADERS = [
+type Runtime = "minecraft" | "hytale";
+type ModLoader = "vanilla" | "forge" | "fabric" | "paper" | "spigot" | "purpur";
+
+const MOD_LOADERS: { value: ModLoader; label: string }[] = [
   { value: "vanilla", label: "Vanilla" },
   { value: "forge", label: "Forge" },
   { value: "fabric", label: "Fabric" },
   { value: "paper", label: "Paper" },
   { value: "spigot", label: "Spigot" },
   { value: "purpur", label: "Purpur" },
-] as const;
+];
 
-type ModLoader = (typeof MOD_LOADERS)[number]["value"];
-
-const RUNTIMES = [
-  { value: "minecraft", label: "Minecraft" },
-  { value: "hytale", label: "Hytale" },
-] as const;
-
-type Runtime = (typeof RUNTIMES)[number]["value"];
+const STEPS = [
+  { title: "Basis", icon: Server, description: "Name und Runtime wählen" },
+  { title: "Version", icon: Settings, description: "Version und Mod-Loader konfigurieren" },
+  { title: "Ressourcen", icon: Cpu, description: "RAM und Port festlegen" },
+  { title: "Bestätigung", icon: Rocket, description: "Zusammenfassung prüfen" },
+];
 
 // ---------------------------------------------------------------------------
 // Zod schemas per step
 // ---------------------------------------------------------------------------
 
-const step1Schema = z.object({
-  name: z.string().min(3, "Mindestens 3 Zeichen erforderlich"),
-  identifier: z
-    .string()
-    .min(2, "Mindestens 2 Zeichen")
-    .max(40, "Maximal 40 Zeichen")
-    .regex(/^[a-z0-9-]+$/, "Nur Kleinbuchstaben, Zahlen und Bindestriche"),
-  runtime: z.enum(["minecraft", "hytale"]),
-});
-
-const step2Schema = z.object({
-  version: z.string().min(1, "Version erforderlich"),
-  modLoader: z.enum([
-    "vanilla",
-    "forge",
-    "fabric",
-    "paper",
-    "spigot",
-    "purpur",
-  ]),
-  memory: z.number().min(512).max(8192),
-  port: z.number().min(1024, "Mindestens 1024").max(65535, "Maximal 65535"),
-  rconPort: z
-    .number()
-    .min(1024)
-    .max(65535)
-    .optional(),
-});
+const stepSchemas = [
+  z.object({
+    name: z.string().min(3, "Mindestens 3 Zeichen erforderlich"),
+    identifier: z
+      .string()
+      .min(2, "Mindestens 2 Zeichen")
+      .max(40, "Maximal 40 Zeichen")
+      .regex(/^[a-z0-9-]+$/, "Nur Kleinbuchstaben, Zahlen und Bindestriche"),
+    runtime: z.enum(["minecraft", "hytale"]),
+  }),
+  z.object({
+    version: z.string().optional(),
+    modLoader: z.enum(["vanilla", "forge", "fabric", "paper", "spigot", "purpur"]),
+  }),
+  z.object({
+    memory: z.number().min(512, "Mindestens 512 MB"),
+    port: z.number().min(1024, "Mindestens 1024").max(65535, "Maximal 65535"),
+  }),
+  z.object({}),
+];
 
 // ---------------------------------------------------------------------------
 // State / Reducer
@@ -94,72 +103,77 @@ const step2Schema = z.object({
 const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "aikars")!;
 
 interface WizardState {
-  step: 1 | 2 | 3;
+  step: number;
   direction: 1 | -1;
   name: string;
   identifier: string;
+  identifierEdited: boolean;
   runtime: Runtime;
   version: string;
   modLoader: ModLoader;
   memory: number;
   port: number;
-  rconPort: number | undefined;
+  portStatus: "idle" | "checking" | "available" | "taken";
   jvmPresetId: string;
   javaArgs: string;
   autoStart: boolean;
-  errors: Partial<Record<string, string>>;
+  backupSelection: BackupSelection | null;
+  errors: Record<string, string>;
   submitting: boolean;
 }
 
 type WizardAction =
-  | { type: "SET"; field: keyof WizardState; value: unknown }
+  | { type: "SET_FIELD"; field: keyof WizardState; value: unknown }
+  | { type: "SET_NAME"; value: string }
+  | { type: "SET_IDENTIFIER"; value: string }
   | { type: "NEXT" }
   | { type: "PREV" }
-  | { type: "SET_ERRORS"; errors: Partial<Record<string, string>> }
-  | { type: "SET_SUBMITTING"; value: boolean }
+  | { type: "SET_ERRORS"; errors: Record<string, string> }
+  | { type: "SET_PORT_STATUS"; status: WizardState["portStatus"] }
   | { type: "SET_JVM_PRESET"; preset: JvmPreset }
-  | { type: "SET_JAVA_ARGS"; value: string };
+  | { type: "SET_JAVA_ARGS"; value: string }
+  | { type: "SET_BACKUP"; selection: BackupSelection | null }
+  | { type: "SET_SUBMITTING"; value: boolean };
 
 const initialState: WizardState = {
-  step: 1,
+  step: 0,
   direction: 1,
   name: "",
   identifier: "",
+  identifierEdited: false,
   runtime: "minecraft",
-  version: "latest",
+  version: "",
   modLoader: "vanilla",
   memory: 2048,
   port: 25565,
-  rconPort: undefined,
+  portStatus: "idle",
   jvmPresetId: DEFAULT_JVM_PRESET.id,
   javaArgs: DEFAULT_JVM_PRESET.flags,
-  autoStart: false,
+  autoStart: true,
+  backupSelection: null,
   errors: {},
   submitting: false,
 };
 
 function reducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
-    case "SET":
-      return { ...state, [action.field]: action.value, errors: {} };
+    case "SET_NAME": {
+      const name = action.value;
+      const identifier = state.identifierEdited ? state.identifier : slugify(name);
+      return { ...state, name, identifier, errors: {} };
+    }
+    case "SET_IDENTIFIER":
+      return { ...state, identifier: action.value, identifierEdited: true, errors: {} };
+    case "SET_FIELD":
+      return { ...state, [action.field]: action.value, errors: {} } as WizardState;
     case "NEXT":
-      return {
-        ...state,
-        step: Math.min(state.step + 1, 3) as 1 | 2 | 3,
-        direction: 1,
-        errors: {},
-      };
+      return { ...state, step: state.step + 1, direction: 1, errors: {} };
     case "PREV":
-      return {
-        ...state,
-        step: Math.max(state.step - 1, 1) as 1 | 2 | 3,
-        direction: -1,
-        errors: {},
-      };
+      return { ...state, step: state.step - 1, direction: -1, errors: {} };
     case "SET_ERRORS":
       return { ...state, errors: action.errors };
-    case "SET_SUBMITTING":
-      return { ...state, submitting: action.value };
+    case "SET_PORT_STATUS":
+      return { ...state, portStatus: action.status };
     case "SET_JVM_PRESET": {
       const { preset } = action;
       return {
@@ -170,6 +184,10 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
     }
     case "SET_JAVA_ARGS":
       return { ...state, javaArgs: action.value };
+    case "SET_BACKUP":
+      return { ...state, backupSelection: action.selection };
+    case "SET_SUBMITTING":
+      return { ...state, submitting: action.value };
     default:
       return state;
   }
@@ -182,19 +200,10 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
 function slugify(str: string): string {
   return str
     .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
+    .replace(/[äöüß]/g, (c) => ({ ä: "ae", ö: "oe", ü: "ue", ß: "ss" } as Record<string, string>)[c] ?? c)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-}
-
-function parseErrors(issues: { path: PropertyKey[]; message: string }[]) {
-  const out: Record<string, string> = {};
-  for (const issue of issues) {
-    const key = String(issue.path[0] ?? "");
-    if (key && !out[key]) out[key] = issue.message;
-  }
-  return out;
 }
 
 function formatMemory(mb: number): string {
@@ -205,63 +214,56 @@ function formatMemory(mb: number): string {
 // Step indicator
 // ---------------------------------------------------------------------------
 
-const STEP_LABELS = ["Basis", "Ressourcen", "Bestätigung"];
-
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="flex items-center gap-2">
-      {STEP_LABELS.map((label, i) => {
-        const n = i + 1;
-        const done = current > n;
-        const active = current === n;
-        return (
-          <div key={n} className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
+      {STEPS.map((s, i) => (
+        <div key={s.title} className="flex flex-1 items-center gap-1">
+          <div
+            className={cn(
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+              i < current
+                ? "bg-emerald-500 text-white"
+                : i === current
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800",
+            )}
+          >
+            {i < current ? <Check className="h-3.5 w-3.5" /> : i + 1}
+          </div>
+          <span
+            className={cn(
+              "hidden text-sm sm:block",
+              i === current ? "font-medium text-zinc-900 dark:text-zinc-50" : "text-zinc-400",
+            )}
+          >
+            {s.title}
+          </span>
+          {i < STEPS.length - 1 && (
             <div
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors",
-                done
-                  ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                  : active
-                    ? "border-2 border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50"
-                    : "border-2 border-zinc-300 text-zinc-400 dark:border-zinc-700",
+                "h-0.5 flex-1 rounded transition-colors",
+                i < current ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-800",
               )}
-            >
-              {done ? <Check className="h-3.5 w-3.5" /> : n}
-            </div>
-            <span
-              className={cn(
-                "hidden text-sm sm:block",
-                active
-                  ? "font-medium text-zinc-900 dark:text-zinc-50"
-                  : "text-zinc-400",
-              )}
-            >
-              {label}
-            </span>
-            {i < STEP_LABELS.length - 1 && (
-              <div className="mx-1 h-px w-6 bg-zinc-200 dark:bg-zinc-700" />
-            )}
-          </div>
-        );
-      })}
+            />
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Step 1 — Basis
+// Step 0 — Basis
 // ---------------------------------------------------------------------------
 
-function Step1({
+function Step0({
   state,
   dispatch,
 }: {
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
 }) {
-  const set = (field: keyof WizardState) => (value: unknown) =>
-    dispatch({ type: "SET", field, value });
-
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -270,18 +272,8 @@ function Step1({
           id="w-name"
           placeholder="Mein Minecraft Server"
           value={state.name}
-          onChange={(e) => {
-            const name = e.target.value;
-            dispatch({ type: "SET", field: "name", value: name });
-            // Auto-generate identifier only if not manually edited
-            if (!state.identifier || state.identifier === slugify(state.name)) {
-              dispatch({
-                type: "SET",
-                field: "identifier",
-                value: slugify(name),
-              });
-            }
-          }}
+          onChange={(e) => dispatch({ type: "SET_NAME", value: e.target.value })}
+          autoFocus
         />
         {state.errors.name && (
           <p className="text-xs text-red-500">{state.errors.name}</p>
@@ -296,7 +288,7 @@ function Step1({
           className="font-mono"
           value={state.identifier}
           onChange={(e) =>
-            set("identifier")(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
+            dispatch({ type: "SET_IDENTIFIER", value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })
           }
         />
         {state.errors.identifier ? (
@@ -312,129 +304,78 @@ function Step1({
         <Label>Runtime</Label>
         <Select
           value={state.runtime}
-          onValueChange={(v) => set("runtime")(v as Runtime)}
+          onValueChange={(v) => dispatch({ type: "SET_FIELD", field: "runtime", value: v as Runtime })}
         >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {RUNTIMES.map((r) => (
-              <SelectItem key={r.value} value={r.value}>
-                {r.label}
-              </SelectItem>
-            ))}
+            <SelectItem value="minecraft">🟫 Minecraft</SelectItem>
+            <SelectItem value="hytale">🟦 Hytale</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+        <BackupSelector
+          selection={state.backupSelection}
+          onSelectionChange={(sel) => dispatch({ type: "SET_BACKUP", selection: sel })}
+        />
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — Version & Ressourcen
+// Step 1 — Version
 // ---------------------------------------------------------------------------
 
-function Step2({
+function Step1({
   state,
   dispatch,
-  maxRam = 32768,
 }: {
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
-  maxRam?: number;
 }) {
-  const set = (field: keyof WizardState) => (value: unknown) =>
-    dispatch({ type: "SET", field, value });
-
   const [jvmOpen, setJvmOpen] = useState(false);
-
-  const portTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const portCheckRef = useRef<boolean | null>(null);
-  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
-
-  const checkPort = useCallback(
-    (port: number) => {
-      if (portTimerRef.current) clearTimeout(portTimerRef.current);
-      portTimerRef.current = setTimeout(async () => {
-        try {
-          const available = await checkPortAction({ port });
-          portCheckRef.current = available;
-          forceUpdate();
-        } catch {
-          portCheckRef.current = null;
-          forceUpdate();
-        }
-      }, 600);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    checkPort(state.port);
-    return () => {
-      if (portTimerRef.current) clearTimeout(portTimerRef.current);
-    };
-  }, [state.port, checkPort]);
-
   const isMinecraft = state.runtime === "minecraft";
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="w-version">Version</Label>
-          <Input
-            id="w-version"
-            placeholder="latest"
-            value={state.version}
-            onChange={(e) => set("version")(e.target.value)}
-          />
-        </div>
-
-        {isMinecraft && (
-          <div className="space-y-1.5">
-            <Label>Mod-Loader</Label>
-            <Select
-              value={state.modLoader}
-              onValueChange={(v) => set("modLoader")(v as ModLoader)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MOD_LOADERS.map((l) => (
-                  <SelectItem key={l.value} value={l.value}>
-                    {l.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
-
-      {/* RAM */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>RAM</Label>
-          <span className="font-mono text-sm font-medium">
-            {formatMemory(state.memory)}
-          </span>
-        </div>
-        <Slider
-          min={512}
-          max={Math.max(512, maxRam)}
-          step={512}
-          value={[state.memory]}
-          onValueChange={([v]) => set("memory")(v)}
+      <div className="space-y-1.5">
+        <Label htmlFor="w-version">{isMinecraft ? "Minecraft-Version" : "Version"}</Label>
+        <Input
+          id="w-version"
+          placeholder="latest"
+          value={state.version}
+          onChange={(e) => dispatch({ type: "SET_FIELD", field: "version", value: e.target.value })}
         />
-        <div className="flex justify-between text-xs text-zinc-400">
-          <span>512 MB</span>
-          <span>{formatMemory(Math.max(512, maxRam))}</span>
-        </div>
+        <p className="text-xs text-zinc-500">Leer lassen für die neueste Version</p>
       </div>
 
-      {/* JVM Flags (Minecraft only, collapsed by default) */}
+      {isMinecraft && (
+        <div className="space-y-1.5">
+          <Label>Mod-Loader</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {MOD_LOADERS.map((loader) => (
+              <button
+                key={loader.value}
+                type="button"
+                onClick={() => dispatch({ type: "SET_FIELD", field: "modLoader", value: loader.value })}
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                  state.modLoader === loader.value
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600",
+                )}
+              >
+                {loader.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isMinecraft && (
         <div className="rounded-md border border-zinc-200 dark:border-zinc-700">
           <button
@@ -443,9 +384,15 @@ function Step2({
             className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           >
             <span>JVM Flags</span>
-            <ChevronDown
+            <svg
               className={cn("h-4 w-4 transition-transform", jvmOpen && "rotate-180")}
-            />
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
           {jvmOpen && (
             <div className="border-t border-zinc-200 p-3 dark:border-zinc-700">
@@ -462,6 +409,46 @@ function Step2({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 2 — Ressourcen
+// ---------------------------------------------------------------------------
+
+function Step2({
+  state,
+  dispatch,
+  maxRam = 32768,
+}: {
+  state: WizardState;
+  dispatch: React.Dispatch<WizardAction>;
+  maxRam?: number;
+}) {
+  return (
+    <div className="space-y-6">
+      {/* RAM */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>RAM</Label>
+          <span className="font-mono text-sm font-medium">{formatMemory(state.memory)}</span>
+        </div>
+        <Slider
+          min={512}
+          max={Math.max(512, maxRam)}
+          step={512}
+          value={[state.memory]}
+          onValueChange={([v]) => dispatch({ type: "SET_FIELD", field: "memory", value: v })}
+        />
+        <div className="flex justify-between text-xs text-zinc-400">
+          <span>512 MB</span>
+          <span>{formatMemory(Math.max(512, maxRam))}</span>
+        </div>
+        {state.errors.memory && (
+          <p className="text-xs text-red-500">{state.errors.memory}</p>
+        )}
+      </div>
 
       {/* Port */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -472,12 +459,16 @@ function Step2({
               id="w-port"
               type="number"
               value={state.port}
-              onChange={(e) => set("port")(Number(e.target.value))}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "port", value: Number(e.target.value) })}
+              className="pr-8"
             />
-            {portCheckRef.current === true && (
+            {state.portStatus === "checking" && (
+              <Loader2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-400" />
+            )}
+            {state.portStatus === "available" && (
               <CheckCircle2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500" />
             )}
-            {portCheckRef.current === false && (
+            {state.portStatus === "taken" && (
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -490,21 +481,12 @@ function Step2({
               </TooltipProvider>
             )}
           </div>
+          {state.portStatus === "taken" && (
+            <p className="text-xs text-red-500">Port ist bereits belegt</p>
+          )}
           {state.errors.port && (
             <p className="text-xs text-red-500">{state.errors.port}</p>
           )}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="w-rcon">RCON Port (optional)</Label>
-          <Input
-            id="w-rcon"
-            type="number"
-            value={state.rconPort ?? ""}
-            onChange={(e) =>
-              set("rconPort")(e.target.value ? Number(e.target.value) : undefined)
-            }
-          />
         </div>
       </div>
     </div>
@@ -515,56 +497,39 @@ function Step2({
 // Step 3 — Bestätigung
 // ---------------------------------------------------------------------------
 
-function Step3({
-  state,
-  dispatch,
-}: {
-  state: WizardState;
-  dispatch: React.Dispatch<WizardAction>;
-}) {
+function Step3({ state }: { state: WizardState }) {
   const rows = [
-    ["Name", state.name],
-    ["Identifier", state.identifier],
-    ["Runtime", state.runtime],
-    ["Version", state.version],
-    ...(state.runtime === "minecraft" ? [["Mod-Loader", state.modLoader]] : []),
-    ["RAM", formatMemory(state.memory)],
-    ["Port", String(state.port)],
-    ...(state.rconPort ? [["RCON Port", String(state.rconPort)]] : []),
+    { label: "Name", value: state.name },
+    { label: "Identifier", value: state.identifier },
+    { label: "Runtime", value: state.runtime },
+    { label: "Version", value: state.version || "latest" },
+    ...(state.runtime === "minecraft" ? [{ label: "Mod-Loader", value: state.modLoader }] : []),
+    { label: "RAM", value: formatMemory(state.memory) },
+    { label: "Port", value: String(state.port) },
     ...(state.runtime === "minecraft" && state.jvmPresetId !== "minimal"
-      ? [["JVM Preset", JVM_FLAG_PRESETS.find((p) => p.id === state.jvmPresetId)?.label ?? state.jvmPresetId]]
+      ? [{ label: "JVM Preset", value: JVM_FLAG_PRESETS.find((p) => p.id === state.jvmPresetId)?.label ?? state.jvmPresetId }]
+      : []),
+    ...(state.backupSelection
+      ? [{ label: "Backup", value: `${state.backupSelection.backupName} (${state.backupSelection.components.join(", ")})` }]
       : []),
   ];
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-sm">
-          <tbody>
-            {rows.map(([label, value]) => (
-              <tr
-                key={label}
-                className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
-              >
-                <td className="w-36 px-3 py-2 text-zinc-500">{label}</td>
-                <td className="px-3 py-2 font-medium">{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+        {rows.map((row, i) => (
+          <div
+            key={row.label}
+            className={cn(
+              "flex items-center justify-between px-4 py-2.5 text-sm",
+              i < rows.length - 1 ? "border-b border-zinc-100 dark:border-zinc-800" : "",
+            )}
+          >
+            <span className="text-zinc-500">{row.label}</span>
+            <span className="max-w-[60%] truncate text-right font-medium">{row.value}</span>
+          </div>
+        ))}
       </div>
-
-      <label className="flex cursor-pointer items-center gap-3">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-zinc-300"
-          checked={state.autoStart}
-          onChange={(e) =>
-            dispatch({ type: "SET", field: "autoStart", value: e.target.checked })
-          }
-        />
-        <span className="text-sm font-medium">Sofort starten nach Erstellung</span>
-      </label>
     </div>
   );
 }
@@ -574,9 +539,9 @@ function Step3({
 // ---------------------------------------------------------------------------
 
 const variants = {
-  enter: (dir: number) => ({ x: dir > 0 ? 32 : -32, opacity: 0 }),
+  enter: (dir: number) => ({ x: dir > 0 ? 80 : -80, opacity: 0 }),
   center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir > 0 ? -32 : 32, opacity: 0 }),
+  exit: (dir: number) => ({ x: dir > 0 ? -80 : 80, opacity: 0 }),
 };
 
 interface Props {
@@ -591,85 +556,122 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
     ...initialState,
     memory: Math.min(initialState.memory, maxRam ?? 32768),
   });
+  const [isPending, startTransition] = useTransition();
 
-  // Load RAM quota on mount - removed; quotas now come from blueprints
+  const checkPort = useCallback(async (port: number) => {
+    if (port < 1024 || port > 65535) return;
+    dispatch({ type: "SET_PORT_STATUS", status: "checking" });
+    try {
+      const available = await checkPortAction({ port });
+      dispatch({ type: "SET_PORT_STATUS", status: available ? "available" : "taken" });
+    } catch {
+      dispatch({ type: "SET_PORT_STATUS", status: "idle" });
+    }
+  }, []);
 
-  const ramExhaustedOnStep2 = false; // no longer applicable
+  useEffect(() => {
+    if (state.step !== 2) return;
+    const timer = setTimeout(() => checkPort(state.port), 500);
+    return () => clearTimeout(timer);
+  }, [state.port, state.step, checkPort]);
 
   function validateStep(): boolean {
-    const schema = state.step === 1 ? step1Schema : step2Schema;
+    const schema = stepSchemas[state.step];
+    if (!schema) return true;
+
     const data =
-      state.step === 1
+      state.step === 0
         ? { name: state.name, identifier: state.identifier, runtime: state.runtime }
-        : {
-            version: state.version,
-            modLoader: state.modLoader,
-            memory: state.memory,
-            port: state.port,
-            rconPort: state.rconPort,
-          };
+        : state.step === 1
+          ? { version: state.version, modLoader: state.modLoader }
+          : state.step === 2
+            ? { memory: state.memory, port: state.port }
+            : {};
 
     const result = schema.safeParse(data);
-    if (!result.success) {
-      dispatch({
-        type: "SET_ERRORS",
-        errors: parseErrors(result.error.issues),
-      });
-      return false;
+    if (result.success) return true;
+
+    const errs: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !errs[key]) errs[key] = issue.message;
     }
-    return true;
+    dispatch({ type: "SET_ERRORS", errors: errs });
+    return false;
   }
 
   function handleNext() {
     if (validateStep()) dispatch({ type: "NEXT" });
   }
 
-  async function handleSubmit() {
-    dispatch({ type: "SET_SUBMITTING", value: true });
-    try {
-      const image =
-        state.runtime === "minecraft"
-          ? "itzg/minecraft-server"
-          : "zacheri/hytale-server";
-      const tag = state.runtime === "minecraft" ? "stable" : "latest";
+  function handleSubmit() {
+    startTransition(async () => {
+      dispatch({ type: "SET_SUBMITTING", value: true });
+      try {
+        const image =
+          state.runtime === "minecraft"
+            ? "itzg/minecraft-server"
+            : "zacheri/hytale-server";
 
-      const input = {
-        name: state.name,
-        identifier: state.identifier,
-        runtime: state.runtime,
-        image,
-        tag,
-        port: state.port,
-        rconPort: state.rconPort,
-        memory: state.memory,
-        version: state.version !== "latest" ? state.version : undefined,
-        modLoader: state.modLoader,
-        javaArgs: state.javaArgs || undefined,
-        autoStart: state.autoStart,
-      };
+        const input = {
+          name: state.name,
+          identifier: state.identifier,
+          runtime: state.runtime,
+          image,
+          tag: "stable",
+          port: state.port,
+          memory: state.memory,
+          version: state.version || undefined,
+          modLoader: state.modLoader,
+          javaArgs: state.javaArgs || undefined,
+          autoStart: state.backupSelection ? false : state.autoStart,
+        };
 
-      const result = blueprintId
-        ? await initializeBlueprintAction({
-            blueprintId,
-            projectKey,
-            input,
-            autoStartNow: state.autoStart,
-          })
-        : await createServerAction({
-            projectKey,
-            input,
-            autoStartNow: state.autoStart,
-          });
+        const result = blueprintId
+          ? await initializeBlueprintAction({
+              blueprintId,
+              projectKey,
+              input,
+              autoStartNow: state.backupSelection ? false : state.autoStart,
+            })
+          : await createServerAction({
+              projectKey,
+              input,
+              autoStartNow: state.backupSelection ? false : state.autoStart,
+            });
 
-      toast.success("Server erstellt");
-      router.push(`/projects/${projectKey}/servers/${result.serverId}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler beim Erstellen");
-      dispatch({ type: "SET_SUBMITTING", value: false });
-    }
+        // Restore backup to the newly created server
+        if (state.backupSelection && state.backupSelection.components.length > 0) {
+          try {
+            const restoreRes = await fetch(
+              `/api/backups/${state.backupSelection.backupId}/restore-to/${result.serverId}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ components: state.backupSelection.components }),
+              },
+            );
+            if (!restoreRes.ok) {
+              const data = await restoreRes.json().catch(() => ({}));
+              toast.error(`Backup-Wiederherstellung fehlgeschlagen: ${data.error || "Unbekannter Fehler"}`);
+            } else {
+              toast.success("Backup wiederhergestellt!");
+            }
+          } catch {
+            toast.error("Backup-Wiederherstellung fehlgeschlagen");
+          }
+        }
+
+        toast.success("Server erstellt!");
+        router.push(`/projects/${projectKey}/servers/${result.serverId}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Fehler beim Erstellen");
+        dispatch({ type: "SET_SUBMITTING", value: false });
+      }
+    });
   }
 
-  const isLastStep = state.step === 3;
+  const isLastStep = state.step === STEPS.length - 1;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -684,40 +686,50 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.18, ease: "easeInOut" }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
             className="p-6"
           >
-            {state.step === 1 && (
-              <Step1 state={state} dispatch={dispatch} />
-            )}
-            {state.step === 2 && (
-              <Step2 state={state} dispatch={dispatch} maxRam={maxRam ?? 32768} />
-            )}
-            {state.step === 3 && (
-              <Step3 state={state} dispatch={dispatch} />
-            )}
+            {state.step === 0 && <Step0 state={state} dispatch={dispatch} />}
+            {state.step === 1 && <Step1 state={state} dispatch={dispatch} />}
+            {state.step === 2 && <Step2 state={state} dispatch={dispatch} maxRam={maxRam ?? 32768} />}
+            {state.step === 3 && <Step3 state={state} />}
           </motion.div>
         </AnimatePresence>
+
+        {/* Auto-start on last step */}
+        {isLastStep && (
+          <div className="border-t border-zinc-200 px-6 pb-4 pt-3 dark:border-zinc-800">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={state.autoStart}
+                onCheckedChange={(v) =>
+                  dispatch({ type: "SET_FIELD", field: "autoStart", value: !!v })
+                }
+              />
+              Server sofort starten
+            </label>
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="flex items-center justify-between border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <Button
             variant="outline"
             onClick={() => dispatch({ type: "PREV" })}
-            disabled={state.step === 1 || state.submitting}
+            disabled={state.step === 0 || state.submitting || isPending}
           >
             <ChevronLeft className="mr-1.5 h-4 w-4" />
             Zurück
           </Button>
 
           {isLastStep ? (
-            <Button onClick={handleSubmit} disabled={state.submitting}>
-              {state.submitting ? (
+            <Button onClick={handleSubmit} disabled={state.submitting || isPending}>
+              {state.submitting || isPending ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
               ) : (
-                <Check className="mr-1.5 h-4 w-4" />
+                <Rocket className="mr-1.5 h-4 w-4" />
               )}
-              {state.submitting ? "Erstelle…" : "Server erstellen"}
+              {state.submitting || isPending ? "Erstelle…" : "Server erstellen"}
             </Button>
           ) : (
             <Button onClick={handleNext}>
