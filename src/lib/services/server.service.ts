@@ -27,6 +27,9 @@ import {
   type LogEntry,
 } from "@pruefertit/docker-orchestrator";
 
+import type { ServerType, PackSource } from "@/lib/config/server-types";
+import type { IPackReference } from "@/lib/db/models/server";
+
 export type { LogEntry };
 
 // ---------------------------------------------------------------------------
@@ -43,7 +46,20 @@ export interface ServerCreateInput {
   rconPort?: number;
   memory: number;
   version?: string;
+  /** New canonical type field — replaces modLoader for new servers */
+  serverType?: ServerType;
+  /** Legacy — still accepted for backward compat */
   modLoader?: IServer["modLoader"];
+  /** Pack installation source */
+  packSource?: PackSource;
+  /** Structured pack reference (slug, projectId, fileId, etc.) */
+  packReference?: IPackReference;
+  /** MC version resolved from pack metadata */
+  resolvedMinecraftVersion?: string;
+  /** Loader type resolved from pack */
+  resolvedLoader?: string;
+  /** Loader version resolved from pack */
+  resolvedLoaderVersion?: string;
   javaArgs?: string;
   env?: Record<string, string>;
   properties?: Record<string, string>;
@@ -116,7 +132,13 @@ const CONFIG_FIELDS = new Set([
   "rconPort",
   "memory",
   "version",
+  "serverType",
   "modLoader",
+  "packSource",
+  "packReference",
+  "resolvedMinecraftVersion",
+  "resolvedLoader",
+  "resolvedLoaderVersion",
   "javaArgs",
   "env",
   "properties",

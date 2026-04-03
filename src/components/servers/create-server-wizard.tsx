@@ -47,7 +47,11 @@ import {
   createServerAction,
   checkPortAction,
   initializeBlueprintAction,
+  resolvePackAction,
 } from "@/app/(app)/actions/servers";
+import { SERVER_TYPE_MAP, getRuntimeFromType, type ServerType } from "@/lib/config/server-types";
+import type { IPackReference } from "@/lib/db/models/server";
+import type { ResolvedPackInfo } from "@/lib/services/pack-resolution.service";
 import { JVM_FLAG_PRESETS, type JvmPreset } from "@/lib/constants/jvm-presets";
 import JvmPresetSelector from "@/components/servers/JvmPresetSelector";
 import {
@@ -59,30 +63,31 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type Runtime = "minecraft" | "hytale";
-type ModLoader = "vanilla" | "forge" | "fabric" | "paper" | "spigot" | "purpur";
 type Difficulty = "peaceful" | "easy" | "normal" | "hard";
 type WorldSource = "generate" | "import" | "backup";
 
 interface WizardState {
   step: number;
   direction: 1 | -1;
-  // Step 0 — Basis
+  // Step 0 — Server-Typ
+  serverType: ServerType;
+  packReference: IPackReference;
+  packMeta: ResolvedPackInfo | null;
+  packResolving: boolean;
+  // Step 1 — Basis
   name: string;
   identifier: string;
   identifierEdited: boolean;
-  runtime: Runtime;
-  // Step 1 — Version
+  // Step 2 — Version
   version: string;
-  modLoader: ModLoader;
   jvmPresetId: string;
   javaArgs: string;
-  // Step 2 — Resources
+  // Step 3 — Resources
   memory: number;
   port: number;
   portStatus: "idle" | "checking" | "available" | "taken";
   maxRam: number;
-  // Step 3 — Einstellungen
+  // Step 4 — Einstellungen
   whitelist: boolean;
   maxPlayers: number;
   difficulty: Difficulty;
@@ -91,7 +96,7 @@ interface WizardState {
   worldSeed: string;
   worldImportFile: File | null;
   worldBackupSelection: BackupSelection | null;
-  // Step 4 — Confirmation
+  // Step 5 — Confirmation
   autoStart: boolean;
   // Backup
   backupSelection: BackupSelection | null;
@@ -113,6 +118,9 @@ type WizardAction =
   | { type: "SET_BACKUP"; selection: BackupSelection | null }
   | { type: "SET_WORLD_FILE"; file: File | null }
   | { type: "SET_WORLD_BACKUP"; selection: BackupSelection | null }
+  | { type: "SET_PACK_REF"; field: keyof IPackReference; value: string }
+  | { type: "SET_PACK_META"; meta: ResolvedPackInfo | null }
+  | { type: "SET_PACK_RESOLVING"; value: boolean }
   | { type: "RESET"; maxRam?: number };
 
 const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "minimal")!;
@@ -120,12 +128,14 @@ const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "minimal")!;
 const INITIAL_STATE: WizardState = {
   step: 0,
   direction: 1,
+  serverType: "vanilla" as ServerType,
+  packReference: {} as IPackReference,
+  packMeta: null,
+  packResolving: false,
   name: "",
   identifier: "",
   identifierEdited: false,
-  runtime: "minecraft",
   version: "",
-  modLoader: "vanilla",
   jvmPresetId: DEFAULT_JVM_PRESET?.id ?? "minimal",
   javaArgs: DEFAULT_JVM_PRESET?.flags ?? "",
   memory: 2048,
@@ -215,6 +225,12 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, worldImportFile: action.file };
     case "SET_WORLD_BACKUP":
       return { ...state, worldBackupSelection: action.selection };
+    case "SET_PACK_REF":
+      return { ...state, packReference: { ...state.packReference, [action.field]: action.value }, errors: {} };
+    case "SET_PACK_META":
+      return { ...state, packMeta: action.meta, errors: {} };
+    case "SET_PACK_RESOLVING":
+      return { ...state, packResolving: action.value };
     case "RESET":
       return { ...INITIAL_STATE, maxRam: action.maxRam ?? INITIAL_STATE.maxRam };
     default:
@@ -227,29 +243,23 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
 // ---------------------------------------------------------------------------
 
 const stepSchemas = [
-  // Step 0 — Basis
+  // Step 0 — Server-Typ
+  z.object({ serverType: z.string().min(1, "Servertyp erforderlich") }),
+  // Step 1 — Basis
   z.object({
     name: z.string().min(1, "Name ist erforderlich").max(48),
-    identifier: z
-      .string()
-      .min(1, "Identifier ist erforderlich")
-      .max(32)
-      .regex(/^[a-z0-9-]+$/, "Nur Kleinbuchstaben, Zahlen und Bindestriche"),
-    runtime: z.enum(["minecraft", "hytale"]),
+    identifier: z.string().min(1, "Identifier ist erforderlich").max(32).regex(/^[a-z0-9-]+$/, "Nur Kleinbuchstaben, Zahlen und Bindestriche"),
   }),
-  // Step 1 — Version
-  z.object({
-    version: z.string().optional(),
-    modLoader: z.enum(["vanilla", "forge", "fabric", "paper", "spigot", "purpur"]),
-  }),
-  // Step 2 — Resources
+  // Step 2 — Version
+  z.object({}),
+  // Step 3 — Resources
   z.object({
     memory: z.number().min(512, "Mindestens 512 MB"),
     port: z.number().min(1024).max(65535, "Port muss zwischen 1024-65535 sein"),
   }),
-  // Step 3 — Einstellungen (no hard validation)
+  // Step 4 — Einstellungen
   z.object({}),
-  // Step 4 — Confirmation
+  // Step 5 — Confirmation
   z.object({}),
 ];
 
@@ -257,161 +267,167 @@ const stepSchemas = [
 // Step Components
 // ---------------------------------------------------------------------------
 
-function StepBasis({
-  state,
-  dispatch,
-}: {
-  state: WizardState;
-  dispatch: React.Dispatch<WizardAction>;
-}) {
+const TYPE_ICONS: Partial<Record<ServerType, string>> = {
+  vanilla: "🌿", paper: "📄", spigot: "🔧", purpur: "🟣",
+  forge: "⚙️", fabric: "🧵", curseforge: "🔥", modrinth: "🌀", hytale: "🟦",
+};
+
+function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
+  const typeConfig = SERVER_TYPE_MAP[state.serverType];
+  const groups = [
+    { label: "Vanilla & Plugins", types: ["vanilla", "paper", "spigot", "purpur"] as ServerType[] },
+    { label: "Mods", types: ["forge", "fabric"] as ServerType[] },
+    { label: "Modpacks", types: ["curseforge", "modrinth"] as ServerType[] },
+    { label: "Andere", types: ["hytale"] as ServerType[] },
+  ];
+
+  async function handleResolve() {
+    if (!typeConfig.packSource) return;
+    dispatch({ type: "SET_PACK_RESOLVING", value: true });
+    try {
+      const meta = await resolvePackAction({ source: typeConfig.packSource, reference: state.packReference });
+      dispatch({ type: "SET_PACK_META", meta });
+      if (meta.packName && !state.identifierEdited) dispatch({ type: "SET_NAME", value: meta.packName });
+    } catch (e) {
+      dispatch({ type: "SET_ERRORS", errors: { pack: e instanceof Error ? e.message : "Pack konnte nicht aufgelöst werden" } });
+    } finally {
+      dispatch({ type: "SET_PACK_RESOLVING", value: false });
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map((g) => (
+        <div key={g.label} className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{g.label}</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {g.types.map((t) => {
+              const cfg = SERVER_TYPE_MAP[t];
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: "SET_FIELD", field: "serverType", value: t });
+                    dispatch({ type: "SET_PACK_META", meta: null });
+                    dispatch({ type: "SET_FIELD", field: "packReference", value: {} });
+                  }}
+                  className={`flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                    state.serverType === t
+                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                      : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
+                  }`}
+                >
+                  <span className="text-base">{TYPE_ICONS[t]}</span>
+                  <span className="text-sm font-medium">{cfg.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {typeConfig.isPack && (
+        <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+          <p className="text-sm font-medium">
+            {state.serverType === "curseforge" ? "CurseForge-Modpack" : "Modrinth-Modpack"}
+          </p>
+
+          {state.serverType === "curseforge" && (
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="d-cf-slug">Slug oder Projekt-ID</Label>
+                <Input id="d-cf-slug" placeholder="all-the-mods-9" value={state.packReference.slug ?? ""}
+                  onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "slug", value: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="d-cf-file">Datei-ID <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                <Input id="d-cf-file" placeholder="12345678" value={state.packReference.fileId ?? ""}
+                  onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "fileId", value: e.target.value })} />
+              </div>
+            </div>
+          )}
+
+          {state.serverType === "modrinth" && (
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="d-mr-id">Projekt-ID oder Slug</Label>
+                <Input id="d-mr-id" placeholder="fabulously-optimized" value={state.packReference.projectId ?? ""}
+                  onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "projectId", value: e.target.value })} />
+              </div>
+            </div>
+          )}
+
+          {state.errors.pack && <p className="text-xs text-red-500">{state.errors.pack}</p>}
+
+          {state.packMeta ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+              <p className="font-medium text-emerald-700 dark:text-emerald-400">✓ {state.packMeta.packName}</p>
+              <p className="text-emerald-600 dark:text-emerald-500">MC {state.packMeta.mcVersion} · {state.packMeta.loader}{state.packMeta.loaderVersion ? ` ${state.packMeta.loaderVersion}` : ""}</p>
+            </div>
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={handleResolve}
+              disabled={state.packResolving || (state.serverType === "curseforge" && !state.packReference.slug && !state.packReference.projectId) || (state.serverType === "modrinth" && !state.packReference.projectId && !state.packReference.slug)}>
+              {state.packResolving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
+              Pack auflösen
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StepBasis({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="w-name">Servername</Label>
-        <Input
-          id="w-name"
-          value={state.name}
-          onChange={(e) => dispatch({ type: "SET_NAME", value: e.target.value })}
-          placeholder="Mein Minecraft Server"
-          autoFocus
-        />
-        {state.errors.name && (
-          <p className="text-xs text-red-500">{state.errors.name}</p>
-        )}
+        <Input id="w-name" value={state.name} onChange={(e) => dispatch({ type: "SET_NAME", value: e.target.value })} placeholder="Mein Minecraft Server" autoFocus />
+        {state.errors.name && <p className="text-xs text-red-500">{state.errors.name}</p>}
       </div>
-
       <div className="space-y-1.5">
         <Label htmlFor="w-id">Identifier</Label>
-        <Input
-          id="w-id"
-          value={state.identifier}
-          onChange={(e) =>
-            dispatch({ type: "SET_IDENTIFIER", value: e.target.value })
-          }
-          placeholder="mein-minecraft-server"
-          className="font-mono"
-        />
-        <p className="text-xs text-zinc-500">
-          Wird als Container-Name und Verzeichnis verwendet
-        </p>
-        {state.errors.identifier && (
-          <p className="text-xs text-red-500">{state.errors.identifier}</p>
-        )}
+        <Input id="w-id" value={state.identifier} onChange={(e) => dispatch({ type: "SET_IDENTIFIER", value: e.target.value })} placeholder="mein-minecraft-server" className="font-mono" />
+        <p className="text-xs text-zinc-500">Wird als Container-Name und Verzeichnis verwendet</p>
+        {state.errors.identifier && <p className="text-xs text-red-500">{state.errors.identifier}</p>}
       </div>
-
-      <div className="space-y-1.5">
-        <Label>Runtime</Label>
-        <Select
-          value={state.runtime}
-          onValueChange={(v) =>
-            dispatch({ type: "SET_FIELD", field: "runtime", value: v })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="minecraft">🟫 Minecraft</SelectItem>
-            <SelectItem value="hytale">🟦 Hytale</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
-        <BackupSelector
-          selection={state.backupSelection}
-          onSelectionChange={(sel) =>
-            dispatch({ type: "SET_BACKUP", selection: sel })
-          }
-        />
+        <BackupSelector selection={state.backupSelection} onSelectionChange={(sel) => dispatch({ type: "SET_BACKUP", selection: sel })} />
       </div>
     </div>
   );
 }
 
-function StepVersion({
-  state,
-  dispatch,
-}: {
-  state: WizardState;
-  dispatch: React.Dispatch<WizardAction>;
-}) {
-  const loaders: { value: ModLoader; label: string }[] = [
-    { value: "vanilla", label: "Vanilla" },
-    { value: "forge", label: "Forge" },
-    { value: "fabric", label: "Fabric" },
-    { value: "paper", label: "Paper" },
-    { value: "spigot", label: "Spigot" },
-    { value: "purpur", label: "Purpur" },
-  ];
-
-  const isMinecraft = state.runtime === "minecraft";
+function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
+  const typeConfig = SERVER_TYPE_MAP[state.serverType];
+  const isPack = typeConfig.isPack;
+  const isMinecraft = getRuntimeFromType(state.serverType) === "minecraft";
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label htmlFor="w-version">
-          {isMinecraft ? "Minecraft-Version" : "Version"}
-        </Label>
-        <Input
-          id="w-version"
-          value={state.version}
-          onChange={(e) =>
-            dispatch({
-              type: "SET_FIELD",
-              field: "version",
-              value: e.target.value,
-            })
-          }
-          placeholder="latest"
-        />
-        <p className="text-xs text-zinc-500">
-          Leer lassen für die neueste Version
-        </p>
-      </div>
-
-      {isMinecraft && (
+      {isPack && state.packMeta ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 space-y-1 dark:border-emerald-800 dark:bg-emerald-950/40">
+          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Aufgelöstes Modpack</p>
+          <p className="text-sm text-emerald-600 dark:text-emerald-500">Minecraft {state.packMeta.mcVersion} · {state.packMeta.loader}{state.packMeta.loaderVersion ? ` ${state.packMeta.loaderVersion}` : ""}</p>
+          <p className="text-xs text-zinc-500">Version wird automatisch aus dem Pack übernommen.</p>
+        </div>
+      ) : (
         <div className="space-y-1.5">
-          <Label>Mod-Loader</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {loaders.map((loader) => (
-              <button
-                key={loader.value}
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: "SET_FIELD",
-                    field: "modLoader",
-                    value: loader.value,
-                  })
-                }
-                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  state.modLoader === loader.value
-                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600"
-                }`}
-              >
-                {loader.label}
-              </button>
-            ))}
-          </div>
+          <Label htmlFor="w-version">{isMinecraft ? "Minecraft-Version" : "Version"}</Label>
+          <Input id="w-version" value={state.version} onChange={(e) => dispatch({ type: "SET_FIELD", field: "version", value: e.target.value })} placeholder="latest" />
+          <p className="text-xs text-zinc-500">Leer lassen für die neueste Version</p>
         </div>
       )}
-
       {isMinecraft && (
         <div className="space-y-1.5">
           <Label>JVM Flags</Label>
           <JvmPresetSelector
             memory={state.memory}
             selectedPresetId={state.jvmPresetId}
-            onPresetChange={(presetId, flags) => {
-              const preset = { id: presetId, flags } as JvmPreset;
-              dispatch({ type: "SET_JVM_PRESET", preset });
-            }}
+            onPresetChange={(presetId, flags) => dispatch({ type: "SET_JVM_PRESET", preset: { id: presetId, flags } as JvmPreset })}
             javaArgs={state.javaArgs}
-            onJavaArgsChange={(value) =>
-              dispatch({ type: "SET_JAVA_ARGS", value })
-            }
+            onJavaArgsChange={(value) => dispatch({ type: "SET_JAVA_ARGS", value })}
           />
         </div>
       )}
@@ -517,7 +533,7 @@ function StepEinstellungen({
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
 }) {
-  const isMinecraft = state.runtime === "minecraft";
+  const isMinecraft = getRuntimeFromType(state.serverType) === "minecraft";
   const showWorld =
     isMinecraft &&
     (!state.backupSelection || !state.backupSelection.components.includes("world"));
@@ -663,8 +679,10 @@ function StepConfirmation({ state }: { state: WizardState }) {
       ? `${(state.memory / 1024).toFixed(1)} GB`
       : `${state.memory} MB`;
 
+  const typeConfig = SERVER_TYPE_MAP[state.serverType];
+  const isMinecraft = getRuntimeFromType(state.serverType) === "minecraft";
   const showWorldInfo =
-    state.runtime === "minecraft" &&
+    isMinecraft &&
     (!state.backupSelection || !state.backupSelection.components.includes("world"));
 
   const worldDesc =
@@ -679,12 +697,16 @@ function StepConfirmation({ state }: { state: WizardState }) {
   const rows = [
     { label: "Name", value: state.name },
     { label: "Identifier", value: state.identifier },
-    { label: "Runtime", value: state.runtime },
-    { label: "Version", value: state.version || "latest" },
-    { label: "Mod-Loader", value: state.modLoader },
+    { label: "Servertyp", value: typeConfig.label },
+    ...(state.packMeta
+      ? [
+          { label: "MC-Version", value: state.packMeta.mcVersion },
+          { label: "Loader", value: `${state.packMeta.loader}${state.packMeta.loaderVersion ? ` ${state.packMeta.loaderVersion}` : ""}` },
+        ]
+      : [{ label: "Version", value: state.version || "latest" }]),
     { label: "RAM", value: memoryLabel },
     { label: "Port", value: String(state.port) },
-    ...(state.runtime === "minecraft" ? [
+    ...(isMinecraft ? [
       { label: "MOTD", value: state.motd },
       { label: "Max. Spieler", value: String(state.maxPlayers) },
       { label: "Schwierigkeit", value: state.difficulty },
@@ -727,8 +749,9 @@ function StepConfirmation({ state }: { state: WizardState }) {
 // ---------------------------------------------------------------------------
 
 const STEPS = [
-  { title: "Basis", icon: Server, description: "Name und Runtime wählen" },
-  { title: "Version", icon: Settings, description: "Version und Mod-Loader konfigurieren" },
+  { title: "Server-Typ", icon: Server, description: "Servertyp wählen" },
+  { title: "Basis", icon: Settings, description: "Name und Identifier" },
+  { title: "Version", icon: Settings, description: "Version konfigurieren" },
   { title: "Ressourcen", icon: Cpu, description: "RAM und Port festlegen" },
   { title: "Einstellungen", icon: Globe, description: "Welt und Server konfigurieren" },
   { title: "Bestätigung", icon: Rocket, description: "Zusammenfassung prüfen" },
@@ -788,7 +811,7 @@ export function CreateServerWizard({
   );
 
   useEffect(() => {
-    if (state.step !== 2) return;
+    if (state.step !== 3) return;
     const timer = setTimeout(() => checkPort(state.port), 500);
     return () => clearTimeout(timer);
   }, [state.port, state.step, checkPort]);
@@ -804,10 +827,10 @@ export function CreateServerWizard({
 
     const data =
       state.step === 0
-        ? { name: state.name, identifier: state.identifier, runtime: state.runtime }
+        ? { serverType: state.serverType }
         : state.step === 1
-          ? { version: state.version, modLoader: state.modLoader }
-          : state.step === 2
+          ? { name: state.name, identifier: state.identifier }
+          : state.step === 3
             ? { memory: state.memory, port: state.port }
             : {};
 
@@ -837,18 +860,19 @@ export function CreateServerWizard({
   function handleSubmit() {
     startTransition(async () => {
       try {
+        const runtime = getRuntimeFromType(state.serverType);
         const image =
-          state.runtime === "minecraft"
+          runtime === "minecraft"
             ? process.env.NEXT_PUBLIC_MINECRAFT_IMAGE || "itzg/minecraft-server"
             : process.env.NEXT_PUBLIC_HYTALE_IMAGE || "zacheri/hytale-server:latest";
 
         const hasWorldBackup =
           state.backupSelection?.components.includes("world") ?? false;
         const needsPostWorldSetup =
-          state.runtime === "minecraft" && !hasWorldBackup;
+          runtime === "minecraft" && !hasWorldBackup;
 
         const properties: Record<string, string> =
-          state.runtime === "minecraft"
+          runtime === "minecraft"
             ? {
                 "white-list": String(state.whitelist),
                 "max-players": String(state.maxPlayers),
@@ -869,13 +893,18 @@ export function CreateServerWizard({
         const input = {
           name: state.name,
           identifier: state.identifier,
-          runtime: state.runtime,
+          runtime,
           image,
           tag: "stable",
           port: state.port,
           memory: state.memory,
-          version: state.version || undefined,
-          modLoader: state.modLoader,
+          version: state.packMeta?.mcVersion || state.version || undefined,
+          serverType: state.serverType,
+          packSource: SERVER_TYPE_MAP[state.serverType].packSource,
+          packReference: state.packMeta ? state.packReference : undefined,
+          resolvedMinecraftVersion: state.packMeta?.mcVersion,
+          resolvedLoader: state.packMeta?.loader,
+          resolvedLoaderVersion: state.packMeta?.loaderVersion,
           javaArgs: state.javaArgs || undefined,
           autoStart: needsPostCreation ? false : state.autoStart,
           properties,
@@ -1017,19 +1046,12 @@ export function CreateServerWizard({
               exit="exit"
               transition={{ duration: 0.2, ease: "easeInOut" }}
             >
-              {state.step === 0 && (
-                <StepBasis state={state} dispatch={dispatch} />
-              )}
-              {state.step === 1 && (
-                <StepVersion state={state} dispatch={dispatch} />
-              )}
-              {state.step === 2 && (
-                <StepResources state={state} dispatch={dispatch} />
-              )}
-              {state.step === 3 && (
-                <StepEinstellungen state={state} dispatch={dispatch} />
-              )}
-              {state.step === 4 && <StepConfirmation state={state} />}
+              {state.step === 0 && <StepTyp state={state} dispatch={dispatch} />}
+              {state.step === 1 && <StepBasis state={state} dispatch={dispatch} />}
+              {state.step === 2 && <StepVersion state={state} dispatch={dispatch} />}
+              {state.step === 3 && <StepResources state={state} dispatch={dispatch} />}
+              {state.step === 4 && <StepEinstellungen state={state} dispatch={dispatch} />}
+              {state.step === 5 && <StepConfirmation state={state} />}
             </motion.div>
           </AnimatePresence>
         </div>

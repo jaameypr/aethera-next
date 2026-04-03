@@ -323,6 +323,40 @@ export async function updateServerAccessAction(data: {
 }
 
 // ---------------------------------------------------------------------------
+// Pack Resolution
+// ---------------------------------------------------------------------------
+
+import type { IPackReference } from "@/lib/db/models/server";
+import type { PackSource } from "@/lib/config/server-types";
+import type { ResolvedPackInfo } from "@/lib/services/pack-resolution.service";
+
+export async function resolvePackAction(data: {
+  source: PackSource;
+  reference: IPackReference;
+  /** Base64-encoded .mrpack file contents (for Modrinth local upload) */
+  mrpackBase64?: string;
+}): Promise<ResolvedPackInfo> {
+  await requireSession();
+
+  const { resolveModrinthPack, resolveCurseForgePack, parseMrpack } =
+    await import("@/lib/services/pack-resolution.service");
+
+  if (data.source === "modrinth") {
+    if (data.mrpackBase64) {
+      const buf = Buffer.from(data.mrpackBase64, "base64");
+      return parseMrpack(buf);
+    }
+    return resolveModrinthPack(data.reference);
+  }
+
+  if (data.source === "curseforge") {
+    return resolveCurseForgePack(data.reference);
+  }
+
+  throw new Error(`Unbekannte Pack-Quelle: ${data.source}`);
+}
+
+// ---------------------------------------------------------------------------
 // System Info
 // ---------------------------------------------------------------------------
 
