@@ -16,6 +16,7 @@ import {
   Server,
   Cpu,
   Settings,
+  Globe,
 } from "lucide-react";
 import {
   Tooltip,
@@ -68,6 +69,7 @@ const STEPS = [
   { title: "Basis", icon: Server, description: "Name und Runtime wählen" },
   { title: "Version", icon: Settings, description: "Version und Mod-Loader konfigurieren" },
   { title: "Ressourcen", icon: Cpu, description: "RAM und Port festlegen" },
+  { title: "Einstellungen", icon: Globe, description: "Welt und Server konfigurieren" },
   { title: "Bestätigung", icon: Rocket, description: "Zusammenfassung prüfen" },
 ];
 
@@ -77,10 +79,10 @@ const STEPS = [
 
 const stepSchemas = [
   z.object({
-    name: z.string().min(3, "Mindestens 3 Zeichen erforderlich"),
+    name: z.string().min(1, "Name erforderlich"),
     identifier: z
       .string()
-      .min(2, "Mindestens 2 Zeichen")
+      .min(1, "Identifier erforderlich")
       .max(40, "Maximal 40 Zeichen")
       .regex(/^[a-z0-9-]+$/, "Nur Kleinbuchstaben, Zahlen und Bindestriche"),
     runtime: z.enum(["minecraft", "hytale"]),
@@ -94,13 +96,17 @@ const stepSchemas = [
     port: z.number().min(1024, "Mindestens 1024").max(65535, "Maximal 65535"),
   }),
   z.object({}),
+  z.object({}),
 ];
 
 // ---------------------------------------------------------------------------
 // State / Reducer
 // ---------------------------------------------------------------------------
 
-const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "aikars")!;
+const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "minimal")!;
+
+type Difficulty = "peaceful" | "easy" | "normal" | "hard";
+type WorldSource = "generate" | "import" | "backup";
 
 interface WizardState {
   step: number;
@@ -116,6 +122,15 @@ interface WizardState {
   portStatus: "idle" | "checking" | "available" | "taken";
   jvmPresetId: string;
   javaArgs: string;
+  // Step 3 — Einstellungen
+  whitelist: boolean;
+  maxPlayers: number;
+  difficulty: Difficulty;
+  motd: string;
+  worldSource: WorldSource;
+  worldSeed: string;
+  worldImportFile: File | null;
+  worldBackupSelection: BackupSelection | null;
   autoStart: boolean;
   backupSelection: BackupSelection | null;
   errors: Record<string, string>;
@@ -133,6 +148,8 @@ type WizardAction =
   | { type: "SET_JVM_PRESET"; preset: JvmPreset }
   | { type: "SET_JAVA_ARGS"; value: string }
   | { type: "SET_BACKUP"; selection: BackupSelection | null }
+  | { type: "SET_WORLD_FILE"; file: File | null }
+  | { type: "SET_WORLD_BACKUP"; selection: BackupSelection | null }
   | { type: "SET_SUBMITTING"; value: boolean };
 
 const initialState: WizardState = {
@@ -147,8 +164,16 @@ const initialState: WizardState = {
   memory: 2048,
   port: 25565,
   portStatus: "idle",
-  jvmPresetId: DEFAULT_JVM_PRESET.id,
-  javaArgs: DEFAULT_JVM_PRESET.flags,
+  jvmPresetId: DEFAULT_JVM_PRESET?.id ?? "minimal",
+  javaArgs: DEFAULT_JVM_PRESET?.flags ?? "",
+  whitelist: true,
+  maxPlayers: 20,
+  difficulty: "normal",
+  motd: "A Aethera Server",
+  worldSource: "generate",
+  worldSeed: "",
+  worldImportFile: null,
+  worldBackupSelection: null,
   autoStart: true,
   backupSelection: null,
   errors: {},
@@ -186,6 +211,10 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, javaArgs: action.value };
     case "SET_BACKUP":
       return { ...state, backupSelection: action.selection };
+    case "SET_WORLD_FILE":
+      return { ...state, worldImportFile: action.file };
+    case "SET_WORLD_BACKUP":
+      return { ...state, worldBackupSelection: action.selection };
     case "SET_SUBMITTING":
       return { ...state, submitting: action.value };
     default:
@@ -494,10 +523,179 @@ function Step2({
 }
 
 // ---------------------------------------------------------------------------
-// Step 3 — Bestätigung
+// Step 3 — Einstellungen (Welt & Server)
 // ---------------------------------------------------------------------------
 
-function Step3({ state }: { state: WizardState }) {
+function Step3({
+  state,
+  dispatch,
+}: {
+  state: WizardState;
+  dispatch: React.Dispatch<WizardAction>;
+}) {
+  const isMinecraft = state.runtime === "minecraft";
+  const showWorld =
+    isMinecraft &&
+    (!state.backupSelection || !state.backupSelection.components.includes("world"));
+
+  return (
+    <div className="space-y-5">
+      {isMinecraft && (
+        <>
+          {/* MOTD */}
+          <div className="space-y-1.5">
+            <Label htmlFor="w-motd">Server-Beschreibung (MOTD)</Label>
+            <Input
+              id="w-motd"
+              value={state.motd}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "motd", value: e.target.value })}
+              placeholder="A Aethera Server"
+            />
+          </div>
+
+          {/* maxPlayers + difficulty */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="w-maxplayers">Max. Spieler</Label>
+              <Input
+                id="w-maxplayers"
+                type="number"
+                min={1}
+                max={1000}
+                value={state.maxPlayers}
+                onChange={(e) =>
+                  dispatch({ type: "SET_FIELD", field: "maxPlayers", value: Math.max(1, Number(e.target.value)) })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Schwierigkeitsgrad</Label>
+              <Select
+                value={state.difficulty}
+                onValueChange={(v) =>
+                  dispatch({ type: "SET_FIELD", field: "difficulty", value: v as Difficulty })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="peaceful">Friedlich</SelectItem>
+                  <SelectItem value="easy">Einfach</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="hard">Schwer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Whitelist */}
+          <label className="flex items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-700 cursor-pointer">
+            <Checkbox
+              checked={state.whitelist}
+              onCheckedChange={(v) =>
+                dispatch({ type: "SET_FIELD", field: "whitelist", value: !!v })
+              }
+            />
+            <div>
+              <span className="text-sm font-medium">Whitelist aktivieren</span>
+              <p className="text-xs text-zinc-500">Nur eingeladene Spieler können beitreten</p>
+            </div>
+          </label>
+        </>
+      )}
+
+      {/* World Section */}
+      {showWorld && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-zinc-500" />
+            <Label className="text-sm font-semibold">Welt</Label>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {(["generate", "import", "backup"] as WorldSource[]).map((src) => (
+              <button
+                key={src}
+                type="button"
+                onClick={() => dispatch({ type: "SET_FIELD", field: "worldSource", value: src })}
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                  state.worldSource === src
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600",
+                )}
+              >
+                {src === "generate" ? "Generieren" : src === "import" ? "Importieren" : "Backup"}
+              </button>
+            ))}
+          </div>
+
+          {state.worldSource === "generate" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="w-seed">Seed <span className="text-zinc-400 font-normal">(optional)</span></Label>
+              <Input
+                id="w-seed"
+                placeholder="Zufällig"
+                value={state.worldSeed}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "worldSeed", value: e.target.value })}
+              />
+            </div>
+          )}
+
+          {state.worldSource === "import" && (
+            <div className="space-y-1.5">
+              <Label>Welt-ZIP hochladen</Label>
+              <input
+                type="file"
+                accept=".zip"
+                className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium dark:file:bg-zinc-800 dark:file:text-zinc-300 dark:text-zinc-400"
+                onChange={(e) =>
+                  dispatch({ type: "SET_WORLD_FILE", file: e.target.files?.[0] ?? null })
+                }
+              />
+              {state.worldImportFile && (
+                <p className="text-xs text-emerald-600">{state.worldImportFile.name} ausgewählt</p>
+              )}
+            </div>
+          )}
+
+          {state.worldSource === "backup" && (
+            <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+              <BackupSelector
+                selection={state.worldBackupSelection}
+                onSelectionChange={(sel) => dispatch({ type: "SET_WORLD_BACKUP", selection: sel })}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isMinecraft && !showWorld && (
+        <p className="text-sm text-zinc-500">Keine zusätzlichen Einstellungen für diese Runtime verfügbar.</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 4 — Bestätigung
+// ---------------------------------------------------------------------------
+
+function Step4({ state }: { state: WizardState }) {
+  const showWorldInfo =
+    state.runtime === "minecraft" &&
+    (!state.backupSelection || !state.backupSelection.components.includes("world"));
+
+  const worldDesc =
+    state.worldSource === "generate"
+      ? state.worldSeed ? `Generiert (Seed: ${state.worldSeed})` : "Generiert (zufällig)"
+      : state.worldSource === "import"
+        ? state.worldImportFile ? `Import: ${state.worldImportFile.name}` : "Import (keine Datei)"
+        : state.worldBackupSelection
+          ? `Backup: ${state.worldBackupSelection.backupName}`
+          : "Backup (nicht gewählt)";
+
   const rows = [
     { label: "Name", value: state.name },
     { label: "Identifier", value: state.identifier },
@@ -506,6 +704,13 @@ function Step3({ state }: { state: WizardState }) {
     ...(state.runtime === "minecraft" ? [{ label: "Mod-Loader", value: state.modLoader }] : []),
     { label: "RAM", value: formatMemory(state.memory) },
     { label: "Port", value: String(state.port) },
+    ...(state.runtime === "minecraft" ? [
+      { label: "MOTD", value: state.motd },
+      { label: "Max. Spieler", value: String(state.maxPlayers) },
+      { label: "Schwierigkeit", value: state.difficulty },
+      { label: "Whitelist", value: state.whitelist ? "Ja" : "Nein" },
+    ] : []),
+    ...(showWorldInfo ? [{ label: "Welt", value: worldDesc }] : []),
     ...(state.runtime === "minecraft" && state.jvmPresetId !== "minimal"
       ? [{ label: "JVM Preset", value: JVM_FLAG_PRESETS.find((p) => p.id === state.jvmPresetId)?.label ?? state.jvmPresetId }]
       : []),
@@ -613,6 +818,30 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
             ? "itzg/minecraft-server"
             : "zacheri/hytale-server";
 
+        const hasWorldBackup =
+          state.backupSelection?.components.includes("world") ?? false;
+        const needsPostWorldSetup =
+          state.runtime === "minecraft" && !hasWorldBackup;
+
+        const properties: Record<string, string> =
+          state.runtime === "minecraft"
+            ? {
+                "white-list": String(state.whitelist),
+                "max-players": String(state.maxPlayers),
+                difficulty: state.difficulty,
+                motd: state.motd,
+                ...(needsPostWorldSetup &&
+                state.worldSource === "generate" &&
+                state.worldSeed
+                  ? { "level-seed": state.worldSeed }
+                  : {}),
+              }
+            : {};
+
+        const needsPostCreation =
+          !!state.backupSelection ||
+          (needsPostWorldSetup && state.worldSource !== "generate");
+
         const input = {
           name: state.name,
           identifier: state.identifier,
@@ -624,7 +853,8 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
           version: state.version || undefined,
           modLoader: state.modLoader,
           javaArgs: state.javaArgs || undefined,
-          autoStart: state.backupSelection ? false : state.autoStart,
+          autoStart: needsPostCreation ? false : state.autoStart,
+          properties,
         };
 
         const result = blueprintId
@@ -632,18 +862,18 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
               blueprintId,
               projectKey,
               input,
-              autoStartNow: state.backupSelection ? false : state.autoStart,
+              autoStartNow: needsPostCreation ? false : state.autoStart,
             })
           : await createServerAction({
               projectKey,
               input,
-              autoStartNow: state.backupSelection ? false : state.autoStart,
+              autoStartNow: needsPostCreation ? false : state.autoStart,
             });
 
-        // Restore backup to the newly created server
+        // Restore main backup
         if (state.backupSelection && state.backupSelection.components.length > 0) {
           try {
-            const restoreRes = await fetch(
+            const res = await fetch(
               `/api/backups/${state.backupSelection.backupId}/restore-to/${result.serverId}`,
               {
                 method: "POST",
@@ -651,14 +881,50 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
                 body: JSON.stringify({ components: state.backupSelection.components }),
               },
             );
-            if (!restoreRes.ok) {
-              const data = await restoreRes.json().catch(() => ({}));
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
               toast.error(`Backup-Wiederherstellung fehlgeschlagen: ${data.error || "Unbekannter Fehler"}`);
             } else {
               toast.success("Backup wiederhergestellt!");
             }
           } catch {
             toast.error("Backup-Wiederherstellung fehlgeschlagen");
+          }
+        }
+
+        // World: import from uploaded ZIP
+        if (needsPostWorldSetup && state.worldSource === "import" && state.worldImportFile) {
+          try {
+            const fd = new FormData();
+            fd.append("file", state.worldImportFile);
+            await fetch(`/api/servers/${result.serverId}/files/world.zip`, {
+              method: "POST",
+              body: fd,
+            });
+            toast.success("Welt hochgeladen!");
+          } catch {
+            toast.error("Welt-Upload fehlgeschlagen");
+          }
+        }
+
+        // World: restore from world backup
+        if (needsPostWorldSetup && state.worldSource === "backup" && state.worldBackupSelection) {
+          try {
+            const res = await fetch(
+              `/api/backups/${state.worldBackupSelection.backupId}/restore-to/${result.serverId}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ components: ["world"] }),
+              },
+            );
+            if (!res.ok) {
+              toast.error("Welt-Backup konnte nicht wiederhergestellt werden");
+            } else {
+              toast.success("Welt aus Backup wiederhergestellt!");
+            }
+          } catch {
+            toast.error("Welt-Backup-Wiederherstellung fehlgeschlagen");
           }
         }
 
@@ -692,7 +958,8 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
             {state.step === 0 && <Step0 state={state} dispatch={dispatch} />}
             {state.step === 1 && <Step1 state={state} dispatch={dispatch} />}
             {state.step === 2 && <Step2 state={state} dispatch={dispatch} maxRam={maxRam ?? 32768} />}
-            {state.step === 3 && <Step3 state={state} />}
+            {state.step === 3 && <Step3 state={state} dispatch={dispatch} />}
+            {state.step === 4 && <Step4 state={state} />}
           </motion.div>
         </AnimatePresence>
 
