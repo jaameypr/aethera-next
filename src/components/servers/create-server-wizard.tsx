@@ -58,6 +58,7 @@ import {
   BackupSelector,
   type BackupSelection,
 } from "@/components/backups/backup-selector";
+import { uploadChunked, type UploadProgress } from "@/lib/utils/upload-chunked";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,6 +75,7 @@ interface WizardState {
   packReference: IPackReference;
   packMeta: ResolvedPackInfo | null;
   packResolving: boolean;
+  uploadProgress: UploadProgress | null;
   // Step 1 — Basis
   name: string;
   identifier: string;
@@ -121,6 +123,7 @@ type WizardAction =
   | { type: "SET_PACK_REF"; field: keyof IPackReference; value: string }
   | { type: "SET_PACK_META"; meta: ResolvedPackInfo | null }
   | { type: "SET_PACK_RESOLVING"; value: boolean }
+  | { type: "SET_UPLOAD_PROGRESS"; progress: UploadProgress | null }
   | { type: "RESET"; maxRam?: number };
 
 const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "minimal")!;
@@ -132,6 +135,7 @@ const INITIAL_STATE: WizardState = {
   packReference: {} as IPackReference,
   packMeta: null,
   packResolving: false,
+  uploadProgress: null,
   name: "",
   identifier: "",
   identifierEdited: false,
@@ -231,6 +235,8 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, packMeta: action.meta, errors: {} };
     case "SET_PACK_RESOLVING":
       return { ...state, packResolving: action.value };
+    case "SET_UPLOAD_PROGRESS":
+      return { ...state, uploadProgress: action.progress };
     case "RESET":
       return { ...INITIAL_STATE, maxRam: action.maxRam ?? INITIAL_STATE.maxRam };
     default:
@@ -362,24 +368,50 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
                     const file = e.target.files?.[0];
                     if (!file) return;
                     dispatch({ type: "SET_PACK_RESOLVING", value: true });
+                    dispatch({ type: "SET_UPLOAD_PROGRESS", progress: null });
                     dispatch({ type: "SET_ERRORS", errors: {} });
-                    const buf = await file.arrayBuffer();
-                    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-                    const result = await resolvePackAction({ source: "modrinth", reference: {}, mrpackBase64: b64 });
-                    dispatch({ type: "SET_PACK_RESOLVING", value: false });
-                    if (!result.ok) {
-                      dispatch({ type: "SET_ERRORS", errors: { pack: result.error } });
-                      return;
+                    try {
+                      const { status, body } = await uploadChunked(
+                        file,
+                        "/api/servers/mrpack/chunk",
+                        "/api/servers/mrpack/process",
+                        {},
+                        (p) => dispatch({ type: "SET_UPLOAD_PROGRESS", progress: p }),
+                      );
+                      if (status < 200 || status >= 300) {
+                        let msg = "Upload fehlgeschlagen";
+                        try { msg = (JSON.parse(body) as { error?: string }).error ?? msg; } catch { /* noop */ }
+                        dispatch({ type: "SET_ERRORS", errors: { pack: msg } });
+                        return;
+                      }
+                      const result = JSON.parse(body) as { ok: boolean; data?: ResolvedPackInfo; error?: string };
+                      if (!result.ok || !result.data) {
+                        dispatch({ type: "SET_ERRORS", errors: { pack: result.error ?? "Unbekannter Fehler" } });
+                        return;
+                      }
+                      dispatch({ type: "SET_PACK_META", meta: result.data });
+                      if (result.data.packName && !state.identifierEdited) dispatch({ type: "SET_NAME", value: result.data.packName });
+                    } catch (err) {
+                      dispatch({ type: "SET_ERRORS", errors: { pack: err instanceof Error ? err.message : "Upload fehlgeschlagen" } });
+                    } finally {
+                      dispatch({ type: "SET_PACK_RESOLVING", value: false });
+                      dispatch({ type: "SET_UPLOAD_PROGRESS", progress: null });
                     }
-                    dispatch({ type: "SET_PACK_META", meta: result.data });
-                    if (result.data.packName && !state.identifierEdited) dispatch({ type: "SET_NAME", value: result.data.packName });
                   }}
                 />
-                {state.packResolving && !state.packMeta && (
-                  <p className="flex items-center gap-1.5 text-xs text-zinc-500">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Datei wird verarbeitet…
-                  </p>
+                {state.uploadProgress && (
+                  <div className="space-y-1">
+                    <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                      <div
+                        className="h-full bg-zinc-900 transition-all duration-300 ease-out dark:bg-zinc-100"
+                        style={{ width: `${state.uploadProgress.percent}%` }}
+                      />
+                    </div>
+                    <p className="text-center text-xs text-zinc-500">
+                      {(state.uploadProgress.loaded / 1024 / 1024).toFixed(1)} MB /{" "}
+                      {(state.uploadProgress.total / 1024 / 1024).toFixed(1)} MB ({state.uploadProgress.percent}%)
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
