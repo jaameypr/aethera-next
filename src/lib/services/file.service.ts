@@ -1,7 +1,10 @@
 import "server-only";
 
 import { readdir, readFile as fsReadFile, writeFile as fsWriteFile, rm, stat, mkdir } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import path from "node:path";
+import archiver from "archiver";
 import { connectDB } from "@/lib/db/connection";
 import { ServerModel } from "@/lib/db/models/server";
 import { getServerDataPath } from "@/lib/docker/storage";
@@ -151,4 +154,54 @@ export async function uploadFile(
   await mkdir(path.dirname(resolved), { recursive: true });
   const buffer = Buffer.from(await file.arrayBuffer());
   await fsWriteFile(resolved, buffer);
+}
+
+// ---------------------------------------------------------------------------
+// Download helpers
+// ---------------------------------------------------------------------------
+
+function nodeStreamToWeb(nodeStream: Readable): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      nodeStream.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+      nodeStream.on("end", () => controller.close());
+      nodeStream.on("error", (err) => controller.error(err));
+    },
+    cancel() {
+      nodeStream.destroy();
+    },
+  });
+}
+
+export async function downloadFile(
+  serverId: string,
+  filepath: string,
+): Promise<{ stream: ReadableStream<Uint8Array>; filename: string; size: number }> {
+  const { resolved } = await resolveServerPath(serverId, filepath);
+  const s = await stat(resolved);
+  if (s.isDirectory()) throw new Error("Path is a directory – use downloadFolderAsZip instead");
+
+  return {
+    stream: nodeStreamToWeb(createReadStream(resolved)),
+    filename: path.basename(resolved),
+    size: s.size,
+  };
+}
+
+export async function downloadFolderAsZip(
+  serverId: string,
+  folderPath: string,
+): Promise<{ stream: ReadableStream<Uint8Array>; filename: string }> {
+  const { resolved } = await resolveServerPath(serverId, folderPath);
+  const s = await stat(resolved);
+  if (!s.isDirectory()) throw new Error("Path is not a directory");
+
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.directory(resolved, false);
+  archive.finalize();
+
+  return {
+    stream: nodeStreamToWeb(archive),
+    filename: path.basename(resolved) + ".zip",
+  };
 }
