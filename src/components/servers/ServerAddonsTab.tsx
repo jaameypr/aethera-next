@@ -182,27 +182,51 @@ function AddonSection({
   );
 }
 
-export function ServerAddonsTab({ serverId }: { serverId: string }) {
+export const MOD_LOADERS = ["forge", "fabric"] as const;
+export const PLUGIN_LOADERS = ["paper", "spigot", "purpur"] as const;
+
+export function ServerAddonsTab({
+  serverId,
+  modLoader,
+}: {
+  serverId: string;
+  modLoader?: string;
+}) {
+  const supportsMods = MOD_LOADERS.includes(modLoader as (typeof MOD_LOADERS)[number]);
+  const supportsPlugins = PLUGIN_LOADERS.includes(modLoader as (typeof PLUGIN_LOADERS)[number]);
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <AddonSection
-        serverId={serverId}
-        type="mods"
-        label="Mods"
-        supportsToggle={true}
-      />
-      <AddonSection
-        serverId={serverId}
-        type="plugins"
-        label="Plugins"
-        supportsToggle={false}
-      />
+      {supportsMods && (
+        <AddonSection
+          serverId={serverId}
+          type="mods"
+          label="Mods"
+          supportsToggle={true}
+        />
+      )}
+      {supportsPlugins && (
+        <AddonSection
+          serverId={serverId}
+          type="plugins"
+          label="Plugins"
+          supportsToggle={false}
+        />
+      )}
       <AddonSection
         serverId={serverId}
         type="datapacks"
         label="Datapacks"
         supportsToggle={true}
       />
+      {!supportsMods && !supportsPlugins && (
+        <p className="col-span-full text-sm text-zinc-500">
+          Mods und Plugins sind für{" "}
+          <span className="font-medium capitalize">{modLoader ?? "Vanilla"}</span>-Server nicht
+          verfügbar. Nur Datapacks werden unterstützt.
+        </p>
+      )}
     </div>
   );
 }
+

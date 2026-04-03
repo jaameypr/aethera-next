@@ -24,6 +24,13 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
     if (!server) throw notFound("Server not found");
     if (!(await canAccessServer(server, session.userId))) throw forbidden();
 
+    if (!["forge", "fabric"].includes(server.modLoader ?? "")) {
+      return Response.json(
+        { error: "Mods sind nur für Forge/Fabric-Server verfügbar" },
+        { status: 400 },
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) {

@@ -79,7 +79,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
           <ServerFilesTab serverId={server._id} />
         </TabsContent>
         <TabsContent value="addons">
-          <ServerAddonsTab serverId={server._id} />
+          <ServerAddonsTab serverId={server._id} modLoader={server.modLoader} />
         </TabsContent>
         <TabsContent value="backups">
           <ServerBackupsTab serverId={server._id} serverName={server.name} />

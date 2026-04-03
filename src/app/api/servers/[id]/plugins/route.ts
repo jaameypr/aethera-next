@@ -24,6 +24,13 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
     if (!server) throw notFound("Server not found");
     if (!(await canAccessServer(server, session.userId))) throw forbidden();
 
+    if (!["paper", "spigot", "purpur"].includes(server.modLoader ?? "")) {
+      return Response.json(
+        { error: "Plugins sind nur für Paper/Spigot/Purpur-Server verfügbar" },
+        { status: 400 },
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) {
