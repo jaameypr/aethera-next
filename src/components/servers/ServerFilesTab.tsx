@@ -41,7 +41,7 @@ interface FileTreeNode {
 }
 
 type PendingAction =
-  | { type: "delete"; path: string }
+  | { type: "delete"; path: string; isDirectory: boolean }
   | { type: "move"; from: string; to: string };
 
 const DRAG_TYPE = "application/x-aethera-path";
@@ -127,8 +127,8 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
     }
   }
 
-  function requestDelete(filepath: string) {
-    setPendingAction({ type: "delete", path: filepath });
+  function requestDelete(filepath: string, isDirectory = false) {
+    setPendingAction({ type: "delete", path: filepath, isDirectory });
   }
 
   async function handleMove(from: string, to: string) {
@@ -240,7 +240,9 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
 
   const dialogDescription =
     pendingAction?.type === "delete"
-      ? `Möchtest du "${pendingAction.path}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.`
+      ? pendingAction.isDirectory
+        ? `Möchtest du den Ordner "${pendingAction.path}" und seinen gesamten Inhalt unwiderruflich löschen?`
+        : `Möchtest du "${pendingAction.path}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.`
       : pendingAction?.type === "move"
         ? `Möchtest du "${pendingAction.from}" nach "${pendingAction.to}" verschieben?`
         : "";
@@ -386,7 +388,7 @@ function TreeNode({
   selectedFile: string | null;
   dragOverPath: string | null;
   onSelect: (path: string) => void;
-  onDelete: (path: string) => void;
+  onDelete: (path: string, isDirectory?: boolean) => void;
   onDownload: (path: string) => void;
   onDragOver: (path: string) => void;
   onDrop: (path: string, e: React.DragEvent) => void;
@@ -411,35 +413,43 @@ function TreeNode({
               onDrop(node.path, e);
             }}
           >
-            <button
-              draggable
-              onDragStart={(e) => {
-                e.stopPropagation();
-                e.dataTransfer.setData(DRAG_TYPE, node.path);
-                e.dataTransfer.effectAllowed = "move";
-              }}
-              className={cn(
-                "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                isDragTarget && "bg-blue-50 ring-1 ring-blue-400 dark:bg-blue-900/30",
-              )}
-              style={{ paddingLeft: `${depth * 12 + 4}px` }}
-              onClick={() => setOpen(!open)}
-            >
-              {open ? (
-                <ChevronDown className="h-3 w-3 shrink-0 text-zinc-400" />
-              ) : (
-                <ChevronRight className="h-3 w-3 shrink-0 text-zinc-400" />
-              )}
-              {open ? (
-                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-              ) : (
-                <Folder className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-              )}
-              <span className="truncate text-zinc-700 dark:text-zinc-300">{node.name}</span>
-              {isDragTarget && (
-                <span className="ml-auto shrink-0 text-xs text-blue-400">Ablegen</span>
-              )}
-            </button>
+            <div className="group flex items-center">
+              <button
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.setData(DRAG_TYPE, node.path);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                className={cn(
+                  "flex flex-1 items-center gap-1 rounded px-1 py-0.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                  isDragTarget && "bg-blue-50 ring-1 ring-blue-400 dark:bg-blue-900/30",
+                )}
+                style={{ paddingLeft: `${depth * 12 + 4}px` }}
+                onClick={() => setOpen(!open)}
+              >
+                {open ? (
+                  <ChevronDown className="h-3 w-3 shrink-0 text-zinc-400" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 shrink-0 text-zinc-400" />
+                )}
+                {open ? (
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                ) : (
+                  <Folder className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                )}
+                <span className="truncate text-zinc-700 dark:text-zinc-300">{node.name}</span>
+                {isDragTarget && (
+                  <span className="ml-auto shrink-0 text-xs text-blue-400">Ablegen</span>
+                )}
+              </button>
+              <button
+                className="mr-1 hidden rounded p-0.5 text-zinc-400 hover:text-red-500 group-hover:block"
+                onClick={(e) => { e.stopPropagation(); onDelete(node.path, true); }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
             {open &&
               node.children?.map((child) => (
                 <TreeNode
@@ -478,7 +488,7 @@ function TreeNode({
           <ContextMenuSeparator />
           <ContextMenuItem
             className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-            onClick={() => onDelete(node.path)}
+            onClick={() => onDelete(node.path, true)}
           >
             <Trash2 />
             Löschen
@@ -510,7 +520,7 @@ function TreeNode({
           </button>
           <button
             className="mr-1 hidden rounded p-0.5 text-zinc-400 hover:text-red-500 group-hover:block"
-            onClick={() => onDelete(node.path)}
+            onClick={() => onDelete(node.path, false)}
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -524,7 +534,7 @@ function TreeNode({
         <ContextMenuSeparator />
         <ContextMenuItem
           className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-          onClick={() => onDelete(node.path)}
+          onClick={() => onDelete(node.path, false)}
         >
           <Trash2 />
           Löschen
