@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Folder,
@@ -11,9 +11,11 @@ import {
   ChevronRight,
   ChevronDown,
   Download,
-  MoveRight,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -60,6 +62,26 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [search, setSearch] = useState("");
+
+  /** Flat list of all nodes, used for search results */
+  const flatNodes = useMemo(() => {
+    const out: FileTreeNode[] = [];
+    function walk(nodes: FileTreeNode[]) {
+      for (const n of nodes) {
+        out.push(n);
+        if (n.children) walk(n.children);
+      }
+    }
+    walk(tree);
+    return out;
+  }, [tree]);
+
+  const searchResults = useMemo(() => {
+    if (!search.trim()) return null;
+    const q = search.trim().toLowerCase();
+    return flatNodes.filter((n) => n.name.toLowerCase().includes(q));
+  }, [search, flatNodes]);
 
   useEffect(() => {
     fetchTree();
@@ -314,30 +336,73 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
           </label>
         </div>
 
-        <div className="p-1">
-          {dragOverPath === "" && (
-            <div className="pointer-events-none mb-1 rounded border-2 border-dashed border-blue-400 px-2 py-2 text-center text-xs text-blue-400">
-              Hier ablegen
-            </div>
-          )}
-          {tree.length === 0 && dragOverPath !== "" && (
-            <p className="px-2 py-4 text-center text-xs text-zinc-400">Keine Dateien</p>
-          )}
-          {tree.map((node) => (
-            <TreeNode
-              key={node.path}
-              node={node}
-              depth={0}
-              selectedFile={selectedFile}
-              dragOverPath={dragOverPath}
-              onSelect={handleSelect}
-              onDelete={requestDelete}
-              onDownload={handleDownload}
-              onDragOver={setDragOverPath}
-              onDrop={handleDrop}
-              onUploadInput={handleUploadInput}
+        {/* Search bar */}
+        <div className="border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Suchen…"
+              className="h-7 pl-7 pr-6 text-xs"
             />
-          ))}
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="p-1">
+          {searchResults ? (
+            /* ── Search results (flat list) ── */
+            searchResults.length === 0 ? (
+              <p className="px-2 py-4 text-center text-xs text-zinc-400">Keine Ergebnisse</p>
+            ) : (
+              searchResults.map((node) => (
+                <SearchResultRow
+                  key={node.path}
+                  node={node}
+                  selectedFile={selectedFile}
+                  onSelect={handleSelect}
+                  onDelete={requestDelete}
+                  onDownload={handleDownload}
+                  search={search}
+                />
+              ))
+            )
+          ) : (
+            /* ── Normal tree view ── */
+            <>
+              {dragOverPath === "" && (
+                <div className="pointer-events-none mb-1 rounded border-2 border-dashed border-blue-400 px-2 py-2 text-center text-xs text-blue-400">
+                  Hier ablegen
+                </div>
+              )}
+              {tree.length === 0 && dragOverPath !== "" && (
+                <p className="px-2 py-4 text-center text-xs text-zinc-400">Keine Dateien</p>
+              )}
+              {tree.map((node) => (
+                <TreeNode
+                  key={node.path}
+                  node={node}
+                  depth={0}
+                  selectedFile={selectedFile}
+                  dragOverPath={dragOverPath}
+                  onSelect={handleSelect}
+                  onDelete={requestDelete}
+                  onDownload={handleDownload}
+                  onDragOver={setDragOverPath}
+                  onDrop={handleDrop}
+                  onUploadInput={handleUploadInput}
+                />
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -368,6 +433,81 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
       </div>
     </div>
     </>
+  );
+}
+
+/** Highlights the matched portion of `text` for query `q` */
+function HighlightMatch({ text, query }: { text: string; query: string }) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return <span>{text}</span>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="rounded bg-yellow-200 px-0 dark:bg-yellow-700">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
+function SearchResultRow({
+  node,
+  selectedFile,
+  onSelect,
+  onDelete,
+  onDownload,
+  search,
+}: {
+  node: FileTreeNode;
+  selectedFile: string | null;
+  onSelect: (path: string) => void;
+  onDelete: (path: string, isDirectory?: boolean) => void;
+  onDownload: (path: string) => void;
+  search: string;
+}) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="group flex items-center">
+          <button
+            className={cn(
+              "flex flex-1 items-center gap-1.5 rounded px-1 py-1 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
+              !node.isDirectory && selectedFile === node.path && "bg-zinc-200 dark:bg-zinc-800",
+            )}
+            onClick={() => { if (!node.isDirectory) onSelect(node.path); }}
+          >
+            {node.isDirectory
+              ? <Folder className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+              : <File className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
+            <span className="truncate text-zinc-700 dark:text-zinc-300">
+              <HighlightMatch text={node.name} query={search} />
+            </span>
+            <span className="ml-auto shrink-0 truncate text-xs text-zinc-400" title={node.path}>
+              {node.path.includes("/") ? node.path.split("/").slice(0, -1).join("/") : ""}
+            </span>
+          </button>
+          <button
+            className="mr-1 hidden rounded p-0.5 text-zinc-400 hover:text-red-500 group-hover:block"
+            onClick={() => onDelete(node.path, node.isDirectory)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => onDownload(node.path)}>
+          <Download />
+          {node.isDirectory ? "Als ZIP herunterladen" : "Herunterladen"}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+          onClick={() => onDelete(node.path, node.isDirectory)}
+        >
+          <Trash2 />
+          Löschen
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
