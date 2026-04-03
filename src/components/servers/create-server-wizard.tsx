@@ -267,11 +267,6 @@ const stepSchemas = [
 // Step Components
 // ---------------------------------------------------------------------------
 
-const TYPE_ICONS: Partial<Record<ServerType, string>> = {
-  vanilla: "🌿", paper: "📄", spigot: "🔧", purpur: "🟣",
-  forge: "⚙️", fabric: "🧵", curseforge: "🔥", modrinth: "🌀", hytale: "🟦",
-};
-
 function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
   const typeConfig = SERVER_TYPE_MAP[state.serverType];
   const groups = [
@@ -298,31 +293,27 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
   return (
     <div className="space-y-4">
       {groups.map((g) => (
-        <div key={g.label} className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{g.label}</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {g.types.map((t) => {
-              const cfg = SERVER_TYPE_MAP[t];
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    dispatch({ type: "SET_FIELD", field: "serverType", value: t });
-                    dispatch({ type: "SET_PACK_META", meta: null });
-                    dispatch({ type: "SET_FIELD", field: "packReference", value: {} });
-                  }}
-                  className={`flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                    state.serverType === t
-                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                      : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
-                  }`}
-                >
-                  <span className="text-base">{TYPE_ICONS[t]}</span>
-                  <span className="text-sm font-medium">{cfg.label}</span>
-                </button>
-              );
-            })}
+        <div key={g.label} className="space-y-1.5">
+          <p className="text-xs text-zinc-400">{g.label}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {g.types.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  dispatch({ type: "SET_FIELD", field: "serverType", value: t });
+                  dispatch({ type: "SET_PACK_META", meta: null });
+                  dispatch({ type: "SET_FIELD", field: "packReference", value: {} });
+                }}
+                className={`rounded-md border px-3 py-1 text-sm transition-colors ${
+                  state.serverType === t
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600"
+                }`}
+              >
+                {SERVER_TYPE_MAP[t].label}
+              </button>
+            ))}
           </div>
         </div>
       ))}
