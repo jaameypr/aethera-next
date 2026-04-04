@@ -166,11 +166,34 @@ export function ImportBackupDialog({
     }
   }, []);
 
+  async function pollJobUntilDone(jobId: string): Promise<ImportResult> {
+    const MAX_POLLS = 120; // 2 minutes at 1s intervals
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const res = await fetch(`/api/jobs/${jobId}`);
+      if (!res.ok) throw new Error("Job-Status konnte nicht abgerufen werden");
+      const job = await res.json();
+
+      if (job.status === "done") {
+        const backupId = job.result?.backupId;
+        if (!backupId) throw new Error("Import abgeschlossen, aber kein Backup gefunden");
+        const br = await fetch(`/api/backups/${backupId}`);
+        if (!br.ok) throw new Error("Backup konnte nicht geladen werden");
+        return br.json();
+      }
+
+      if (job.status === "error") {
+        throw new Error(job.error || "Import fehlgeschlagen");
+      }
+    }
+    throw new Error("Import-Timeout: Vorgang hat zu lange gedauert");
+  }
+
   async function handleImport() {
     setLoading(true);
     setProgress(null);
     try {
-      let backup: ImportResult;
+      let jobId: string;
 
       if (tab === "url") {
         if (!url.trim()) {
@@ -189,18 +212,14 @@ export function ImportBackupDialog({
           throw new Error(data.error || `Import fehlgeschlagen (${res.status})`);
         }
 
-        backup = await res.json();
+        ({ jobId } = await res.json());
       } else {
         if (!file) {
           toast.error("Bitte eine Datei auswählen");
           return;
         }
 
-        const { status, body } = await uploadChunked(
-          file,
-          (p) => setProgress(p),
-        );
-
+        const { status, body } = await uploadChunked(file, (p) => setProgress(p));
         setProgress(null);
 
         if (status < 200 || status >= 300) {
@@ -209,9 +228,10 @@ export function ImportBackupDialog({
           throw new Error(errMsg);
         }
 
-        backup = JSON.parse(body);
+        ({ jobId } = JSON.parse(body));
       }
 
+      const backup = await pollJobUntilDone(jobId);
       setResult(backup);
       toast.success("Backup erfolgreich importiert");
       onImported?.(backup);
@@ -429,7 +449,7 @@ export function ImportBackupDialog({
             ) : loading ? (
               <>
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                Verarbeite…
+                Verarbeite… (bitte warten)
               </>
             ) : (
               <>

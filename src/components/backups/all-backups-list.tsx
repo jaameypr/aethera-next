@@ -247,7 +247,7 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
               _id: backup._id,
               serverId: "000000000000000000000000",
               serverName: "Import",
-              name: backup.filename.replace(/\.tar\.gz$/i, ""),
+              name: backup.filename?.replace(/\.tar\.gz$/i, "") ?? backup.filename ?? "",
               filename: backup.filename,
               size: backup.size,
               components: backup.components,
