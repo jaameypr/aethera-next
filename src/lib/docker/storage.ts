@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, rm, stat, readdir } from "node:fs/promises";
+import { mkdir, rm, stat, readdir, rename } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
@@ -44,34 +44,55 @@ export function getUploadDir(): string {
 // Per-server helpers
 // ---------------------------------------------------------------------------
 
-export function getServerDataPath(identifier: string): string {
-  return path.resolve(getDataDir(), identifier);
+export function getServerDataPath(projectKey: string, identifier: string): string {
+  return path.resolve(getDataDir(), `${projectKey}-${identifier}`);
 }
 
-export async function ensureServerDir(identifier: string): Promise<void> {
-  const dir = getServerDataPath(identifier);
-  await mkdir(dir, { recursive: true });
-  // itzg/minecraft-server runs as UID 1000 — ensure the dir is writable
+export async function resolveServerDataPath(projectKey: string, identifier: string): Promise<string> {
+  const newPath = getServerDataPath(projectKey, identifier);
   try {
-    await execFileAsync("chown", ["-R", "1000:1000", dir]);
+    await stat(newPath);
+    return newPath;
   } catch {
-    // chown not available (Windows dev), ignore
+    const legacyPath = path.resolve(getDataDir(), identifier);
+    try {
+      await stat(legacyPath);
+      return legacyPath;
+    } catch {
+      return newPath;
+    }
   }
 }
 
-export async function deleteServerDir(identifier: string): Promise<void> {
-  await rm(getServerDataPath(identifier), { recursive: true, force: true });
+export async function ensureServerDir(projectKey: string, identifier: string): Promise<void> {
+  const newDir = getServerDataPath(projectKey, identifier);
+  const legacyDir = path.resolve(getDataDir(), identifier);
+  try {
+    await stat(legacyDir);
+    try { await stat(newDir); } catch {
+      await rename(legacyDir, newDir);
+      console.log(`[storage] Migrated server dir: ${identifier} → ${projectKey}-${identifier}`);
+    }
+  } catch { /* legacy doesn't exist */ }
+  await mkdir(newDir, { recursive: true });
+  try { await execFileAsync("chown", ["-R", "1000:1000", newDir]); } catch {}
 }
 
-export async function getServerDirSize(identifier: string): Promise<number> {
-  return sumDirSize(getServerDataPath(identifier));
+export async function deleteServerDir(projectKey: string, identifier: string): Promise<void> {
+  await rm(getServerDataPath(projectKey, identifier), { recursive: true, force: true });
+  await rm(path.resolve(getDataDir(), identifier), { recursive: true, force: true }).catch(() => {});
+}
+
+export async function getServerDirSize(projectKey: string, identifier: string): Promise<number> {
+  return sumDirSize(await resolveServerDataPath(projectKey, identifier));
 }
 
 export async function listServerFiles(
+  projectKey: string,
   identifier: string,
   subpath?: string,
 ): Promise<FileEntry[]> {
-  const base = getServerDataPath(identifier);
+  const base = await resolveServerDataPath(projectKey, identifier);
   const target = subpath ? path.resolve(base, subpath) : base;
   return collectFiles(target, base);
 }

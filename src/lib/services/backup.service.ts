@@ -119,7 +119,7 @@ export async function createBackup(
     throw new Error("Server must be stopped to create a backup");
   }
 
-  const serverDir = getServerDataPath(server.identifier);
+  const serverDir = getServerDataPath(server.projectKey, server.identifier);
   const destDir = backupDir(serverId);
   await mkdir(destDir, { recursive: true });
 
@@ -211,7 +211,7 @@ export async function restoreBackup(
   const backup = await BackupModel.findById(backupId);
   if (!backup) throw new Error("Backup not found");
 
-  const serverDir = getServerDataPath(server.identifier);
+  const serverDir = getServerDataPath(server.projectKey, server.identifier);
 
   // Extract tar.gz into server data dir
   await new Promise<void>((resolve, reject) => {
@@ -284,7 +284,7 @@ export async function restoreBackupSelective(
     }
   }
 
-  const serverDir = getServerDataPath(server.identifier);
+  const serverDir = getServerDataPath(server.projectKey, server.identifier);
 
   await new Promise<void>((resolve, reject) => {
     const extract = tar.extract();

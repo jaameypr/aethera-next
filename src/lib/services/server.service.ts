@@ -113,7 +113,7 @@ export async function createServer(
     access: [],
   });
 
-  await ensureServerDir(server.identifier);
+  await ensureServerDir(server.projectKey, server.identifier);
 
   // If an .mrpack was uploaded via the wizard, move it into /data so the
   // itzg image can find it at MODRINTH_MODPACK=/data/pack.mrpack
@@ -121,7 +121,7 @@ export async function createServer(
     try {
       const { getMrpackPackPath } = await import("@/app/api/servers/mrpack/process/route");
       const src = getMrpackPackPath(data.packReference.mrpackUploadId);
-      const dest = path.join(getServerDataPath(server.identifier), "pack.mrpack");
+      const dest = path.join(getServerDataPath(server.projectKey, server.identifier), "pack.mrpack");
       await copyFile(src, dest);
       unlink(src).catch(() => {});
     } catch (err) {
@@ -274,8 +274,8 @@ export async function startServer(
 
     // No container exists — full deploy
     const orch = await getOrchestrator();
-    const dataDir = getServerDataPath(server.identifier);
-    await ensureServerDir(server.identifier);
+    const dataDir = getServerDataPath(server.projectKey, server.identifier);
+    await ensureServerDir(server.projectKey, server.identifier);
 
     const config = deployConfigFromDoc(server, dataDir);
 

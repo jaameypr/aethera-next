@@ -7,7 +7,7 @@ import path from "node:path";
 import archiver from "archiver";
 import { connectDB } from "@/lib/db/connection";
 import { ServerModel } from "@/lib/db/models/server";
-import { getServerDataPath } from "@/lib/docker/storage";
+import { resolveServerDataPath } from "@/lib/docker/storage";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +36,7 @@ async function resolveServerPath(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
 
-  const serverDir = getServerDataPath(server.identifier);
+  const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
   const resolved = path.resolve(serverDir, filepath);
 
   // Ensure the resolved path is within the server directory

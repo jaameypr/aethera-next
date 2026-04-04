@@ -31,7 +31,7 @@ const ADDON_DIRS: Record<AddonType, string> = {
 // ---------------------------------------------------------------------------
 
 function addonDir(server: IServer, type: AddonType): string {
-  return path.join(getServerDataPath(server.identifier), ADDON_DIRS[type]);
+  return path.join(getServerDataPath(server.projectKey, server.identifier), ADDON_DIRS[type]);
 }
 
 function disabledDir(server: IServer, type: AddonType): string {

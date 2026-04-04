@@ -326,7 +326,7 @@ async function createBackupViaWorker(
   });
 
   dispatchBackupJob(job._id.toString(), "backup:create", {
-    serverDir: getServerDataPath(server.identifier),
+    serverDir: getServerDataPath(server.projectKey, server.identifier),
     destDir,
     filename,
     components,
@@ -368,7 +368,7 @@ export async function restoreBackupViaWorker(
 
   dispatchBackupJob(job._id.toString(), "backup:restore", {
     backupPath: backup.path,
-    serverDir: getServerDataPath(server.identifier),
+    serverDir: getServerDataPath(server.projectKey, server.identifier),
     components,
   }).catch((err) => {
     console.error(`[backup-strategy] Failed to dispatch backup:restore job ${job._id}:`, err);
