@@ -12,8 +12,10 @@ import { connectDB } from "@/lib/db/connection";
 import { BackupModel } from "@/lib/db/models/backup";
 import { ServerModel } from "@/lib/db/models/server";
 import { AllBackupsList } from "@/components/backups/all-backups-list";
+import { requireSession } from "@/lib/auth/guards";
 
 export default async function BackupsPage() {
+  const session = await requireSession();
   await connectDB();
 
   const backups = await BackupModel.find()
@@ -42,6 +44,7 @@ export default async function BackupsPage() {
     shareUrl: b.shareUrl,
     errorMessage: b.errorMessage,
     createdAt: b.createdAt.toISOString(),
+    createdBy: b.createdBy?.toString() ?? null,
   }));
 
   return (
@@ -79,7 +82,7 @@ export default async function BackupsPage() {
           </CardContent>
         </Card>
       ) : (
-        <AllBackupsList backups={serialized} />
+        <AllBackupsList backups={serialized} currentUserId={session.userId} />
       )}
     </div>
   );

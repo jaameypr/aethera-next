@@ -39,6 +39,7 @@ interface Backup {
   shareUrl?: string;
   errorMessage?: string;
   createdAt: string;
+  createdBy: string | null;
 }
 
 interface BackupCapabilities {
@@ -81,7 +82,7 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
+export function AllBackupsList({ backups: initial, currentUserId }: { backups: Backup[]; currentUserId: string }) {
   const [backups, setBackups] = useState(initial);
   const [capabilities, setCapabilities] = useState<BackupCapabilities | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
@@ -200,6 +201,7 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
               <div className="flex gap-1 ml-2">
                 {capabilities?.sharing &&
                   backup.status === "completed" &&
+                  backup.createdBy === currentUserId &&
                   !backup.shareUrl && (
                     <Button
                       variant="ghost"
@@ -217,6 +219,7 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
                   )}
                 {capabilities?.sharing &&
                   backup.status === "completed" &&
+                  backup.createdBy === currentUserId &&
                   backup.shareUrl && (
                     <Button
                       variant="ghost"
@@ -254,6 +257,7 @@ export function AllBackupsList({ backups: initial }: { backups: Backup[] }) {
               status: "completed",
               strategy: "import",
               createdAt: new Date().toISOString(),
+              createdBy: currentUserId,
             },
             ...prev,
           ]);
