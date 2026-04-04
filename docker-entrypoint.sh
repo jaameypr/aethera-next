@@ -9,4 +9,9 @@ for dir in \
   mkdir -p "$dir"
 done
 
+# Provide the backup worker script path to the Node.js process.
+# The worker is spawned via exec() at runtime; this env var prevents
+# any build-time path resolution by Turbopack.
+export AETHERA_WORKER_SCRIPT="${AETHERA_WORKER_SCRIPT:-/app/scripts/backup-worker.js}"
+
 exec "$@"
