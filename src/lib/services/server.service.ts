@@ -240,7 +240,6 @@ export async function startServer(
   try {
     // If a stopped container already exists, just start it
     if (server.containerId) {
-      console.log(`[server] startServer: reusing existing container ${server.containerId} for "${server.identifier}" (no redeploy)`);
       const docker = await getDockerClient();
       try {
         await startContainer(docker, server.containerId);
@@ -279,16 +278,10 @@ export async function startServer(
     await ensureServerDir(server.projectKey, server.identifier);
 
     const config = deployConfigFromDoc(server, dataDir);
-    console.log(`[server] startServer: full deploy for "${server.identifier}"`, {
-      image: `${config.image}:${config.tag}`,
-      name: config.name,
-      env: config.env,
-    });
 
     let result;
     try {
       result = await orch.deploy(config);
-      console.log(`[server] startServer: deploy succeeded for "${server.identifier}"`, { containerId: result.containerId, status: result.status });
     } catch (deployErr: any) {
       // Handle stale container conflict — remove old container and retry
       const msg = deployErr?.cause?.json?.message ?? deployErr?.message ?? "";
