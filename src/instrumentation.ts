@@ -7,5 +7,12 @@ export async function register() {
     } catch (error) {
       console.error("[instrumentation] Seed failed:", error);
     }
+
+    try {
+      const { resetStuckJobs } = await import("@/lib/workers/backup-runner");
+      await resetStuckJobs();
+    } catch (error) {
+      console.error("[instrumentation] resetStuckJobs failed:", error);
+    }
   }
 }

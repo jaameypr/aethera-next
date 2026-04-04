@@ -1,13 +1,17 @@
 import "server-only";
 
+import path from "node:path";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connection";
 import { InstalledModuleModel } from "@/lib/db/models/installed-module";
 import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models/backup";
+import { AsyncJobModel, type IAsyncJob } from "@/lib/db/models/async-job";
 import { ServerModel } from "@/lib/db/models/server";
 import { createBackup as createSyncBackup } from "@/lib/services/backup.service";
 import { uploadBackupToShare, isPaperviewReady } from "@/lib/services/paperview.service";
-import { getBackupDir } from "@/lib/docker/storage";
+import { getBackupDir, getServerDataPath } from "@/lib/docker/storage";
 import { logAction } from "@/lib/services/project.service";
+import { dispatchBackupJob } from "@/lib/workers/backup-runner";
 
 /* ------------------------------------------------------------------ */
 /*  Capabilities — what the system can do based on installed modules   */
@@ -50,19 +54,8 @@ export async function createBackupWithStrategy(
     return createAsyncBackup(serverId, components, actorId, caps.sharing);
   }
 
-  // Sync path: create backup in-process, then optionally upload to Paperview
-  const backup = await createSyncBackup(serverId, components, actorId);
-
-  if (caps.sharing) {
-    try {
-      const result = await shareBackup(backup._id.toString());
-      return result;
-    } catch (err) {
-      console.error("[backup-strategy] Paperview upload failed (non-fatal):", err);
-    }
-  }
-
-  return backup;
+  // Worker path: create backup off the main thread
+  return createBackupViaWorker(serverId, components, actorId, caps.sharing);
 }
 
 /* ------------------------------------------------------------------ */
@@ -268,3 +261,151 @@ export async function shareBackup(
 
   return backup.toObject() as IBackup;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Worker-backed paths (built-in fallback — no external module)      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Create a backup using an off-thread worker process.
+ * Returns an IBackup with status "in_progress"; the backup is updated
+ * to "completed" by the runner once the worker finishes.
+ */
+async function createBackupViaWorker(
+  serverId: string,
+  components: BackupComponent[],
+  actorId: string,
+  sharingAvailable: boolean,
+): Promise<IBackup> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (server.status !== "stopped") {
+    throw new Error("Server must be stopped to create a backup");
+  }
+
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeName = server.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `${ts}-${safeName}.tar.gz`;
+  const destDir = path.join(getBackupDir(), serverId);
+  const filePath = path.join(destDir, filename);
+
+  const backup = await BackupModel.create({
+    serverId: server._id,
+    name: server.name,
+    filename,
+    path: filePath,
+    size: 0,
+    components,
+    status: "in_progress",
+    strategy: "sync",
+    createdBy: actorId,
+  });
+
+  const job = await AsyncJobModel.create({
+    type: "backup:create",
+    status: "pending",
+    progress: 0,
+    message: "Queued",
+    payload: {
+      backupId: backup._id.toString(),
+      serverId,
+      actorId,
+      components,
+      sharingAvailable,
+    },
+  });
+
+  await BackupModel.findByIdAndUpdate(backup._id, { jobId: job._id.toString() });
+
+  await logAction(server.projectKey, "BACKUP_STARTED", actorId, {
+    backupId: backup._id.toString(),
+    serverId,
+    strategy: "worker",
+  });
+
+  dispatchBackupJob(job._id.toString(), "backup:create", {
+    serverDir: getServerDataPath(server.identifier),
+    destDir,
+    filename,
+    components,
+  }).catch((err) => {
+    console.error(`[backup-strategy] Failed to dispatch backup:create job ${job._id}:`, err);
+  });
+
+  return (await BackupModel.findById(backup._id).lean()) as IBackup;
+}
+
+/**
+ * Restore selected components from a backup to a server, off the main thread.
+ * Returns a job record that the client can poll via GET /api/jobs/[jobId].
+ */
+export async function restoreBackupViaWorker(
+  backupId: string,
+  serverId: string,
+  components: BackupComponent[],
+  actorId: string,
+): Promise<IAsyncJob> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (server.status !== "stopped") {
+    throw new Error("Server must be stopped to restore a backup");
+  }
+
+  const backup = await BackupModel.findById(backupId);
+  if (!backup) throw new Error("Backup not found");
+
+  const job = await AsyncJobModel.create({
+    type: "backup:restore",
+    status: "pending",
+    progress: 0,
+    message: "Queued",
+    payload: { backupId, serverId, components, actorId },
+  });
+
+  dispatchBackupJob(job._id.toString(), "backup:restore", {
+    backupPath: backup.path,
+    serverDir: getServerDataPath(server.identifier),
+    components,
+  }).catch((err) => {
+    console.error(`[backup-strategy] Failed to dispatch backup:restore job ${job._id}:`, err);
+  });
+
+  return job.toObject() as IAsyncJob;
+}
+
+/**
+ * Import a backup file off the main thread.
+ * Returns a job record; the backup document is created when the worker finishes.
+ */
+export async function importBackupViaWorker(
+  tempFilePath: string,
+  filename: string,
+  actorId: string,
+): Promise<IAsyncJob> {
+  await connectDB();
+
+  const importDir = path.join(getBackupDir(), "imports");
+
+  const job = await AsyncJobModel.create({
+    type: "backup:import",
+    status: "pending",
+    progress: 0,
+    message: "Queued",
+    payload: { actorId },
+  });
+
+  dispatchBackupJob(job._id.toString(), "backup:import", {
+    tempFilePath,
+    filename,
+    importDir,
+  }).catch((err) => {
+    console.error(`[backup-strategy] Failed to dispatch backup:import job ${job._id}:`, err);
+  });
+
+  return job.toObject() as IAsyncJob;
+}
+

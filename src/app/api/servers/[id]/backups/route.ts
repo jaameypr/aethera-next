@@ -26,8 +26,10 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
     if (!(await canAccessServer(server, session.userId))) throw forbidden();
 
     const { components } = await req.json();
+    // Returns a pending IBackup (status "in_progress") with jobId set.
+    // The backup transitions to "completed" once the worker finishes.
     const backup = await createBackupWithStrategy(params.id, components, session.userId);
-    return Response.json(backup, { status: 201 });
+    return Response.json(backup, { status: 202 });
   } catch (error) {
     return errorResponse(error);
   }

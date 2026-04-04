@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth/guards";
 import { errorResponse, badRequest, notFound, forbidden } from "@/lib/api/errors";
-import { restoreBackupSelective } from "@/lib/services/backup.service";
+import { restoreBackupViaWorker } from "@/lib/services/backup-strategy.service";
 import { getServer } from "@/lib/services/server.service";
 import { canAccessServer } from "@/lib/services/server-access";
 import type { BackupComponent } from "@/lib/db/models/backup";
@@ -35,8 +35,8 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
       }
     }
 
-    await restoreBackupSelective(backupId, serverId, components);
-    return Response.json({ success: true });
+    const job = await restoreBackupViaWorker(backupId, serverId, components, session.userId);
+    return Response.json({ jobId: job._id.toString(), status: job.status }, { status: 202 });
   } catch (error) {
     return errorResponse(error);
   }

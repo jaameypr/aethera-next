@@ -3,7 +3,7 @@ import path from "node:path";
 import type { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth/guards";
 import { errorResponse, badRequest } from "@/lib/api/errors";
-import { importBackup } from "@/lib/services/backup.service";
+import { importBackupViaWorker } from "@/lib/services/backup-strategy.service";
 import { downloadFromPaperviewToFile } from "@/lib/services/paperview.service";
 import { getBackupDir } from "@/lib/docker/storage";
 
@@ -33,10 +33,9 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
       tempPath = path.join(importDir, `upload-${uploadId}.tmp`);
       filename = body.filename || "upload.tar.gz";
 
-      // Verify the temp file exists
       try {
         const s = await stat(tempPath);
-        console.log(`[backup-import] Finalizing chunked upload: ${filename} (${s.size} bytes)`);
+        console.log(`[backup-import] Queuing chunked upload: ${filename} (${s.size} bytes)`);
       } catch {
         throw badRequest("Upload not found — chunks may have expired");
       }
@@ -44,10 +43,13 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
       throw badRequest("Provide 'url' or 'uploadId'");
     }
 
-    console.log(`[backup-import] Processing ${filename}`);
-    const backup = await importBackup(tempPath, filename, session.userId);
-    console.log(`[backup-import] Success: ${backup._id} — components: ${backup.components.join(", ")}`);
-    return Response.json(backup, { status: 201 });
+    const job = await importBackupViaWorker(tempPath, filename, session.userId);
+    console.log(`[backup-import] Job queued: ${job._id}`);
+
+    return Response.json(
+      { jobId: job._id.toString(), status: job.status },
+      { status: 202 },
+    );
   } catch (error) {
     console.error("[backup-import] Error:", error);
     return errorResponse(error);
