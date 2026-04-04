@@ -88,7 +88,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
               packType={server.serverType as "curseforge" | "modrinth"}
             />
           ) : (
-            <ServerAddonsTab serverId={server._id} modLoader={server.modLoader} />
+            <ServerAddonsTab serverId={server._id} modLoader={server.modLoader ?? server.serverType} />
           )}
         </TabsContent>
         <TabsContent value="backups">
