@@ -22,6 +22,7 @@ export function containerName(server: IServer): string {
 export function serverEnvFromDoc(server: IServer): Record<string, string> {
   const env: Record<string, string> = {
     EULA: "TRUE",
+    OVERRIDE_SERVER_PROPERTIES: "true",
   };
 
   // --- TYPE ---
