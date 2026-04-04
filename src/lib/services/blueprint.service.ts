@@ -44,7 +44,7 @@ export async function listBlueprints(
   const role = await resolveProjectRole(projectKey, userId);
   if (!role) return [];
 
-  return BlueprintModel.find({ projectKey })
+  return BlueprintModel.find({ projectKey, status: "available" })
     .sort({ createdAt: -1 })
     .lean<IBlueprint[]>();
 }
