@@ -384,9 +384,8 @@ export async function stopServer(
     await orch.destroy(server.containerId, { timeout: 30 });
 
     await ServerModel.findByIdAndUpdate(serverId, {
-      status: "stopped",
-      containerId: undefined,
-      containerStatus: undefined,
+      $set: { status: "stopped" },
+      $unset: { containerId: 1, containerStatus: 1 },
     });
 
     await logAction(server.projectKey, "SERVER_STOPPED", actorId, {

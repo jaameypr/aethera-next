@@ -191,7 +191,14 @@ export async function readPropertiesAction(data: {
   try {
     const server = await getServer(data.serverId);
     if (!server) throw new Error("Server not found");
-    return server.properties ?? {};
+    const props = server.properties ?? {};
+    console.log(
+      `[readPropertiesAction] serverId=${data.serverId} identifier=${server.identifier}`,
+      `isMap=${props instanceof Map}`,
+      `motd=${(props as Record<string, string>)["motd"] ?? (props instanceof Map ? (props as unknown as Map<string,string>).get("motd") : "(no bracket access)")}`,
+      props,
+    );
+    return props;
   } catch (err) {
     throw new Error(
       err instanceof Error ? err.message : "Failed to read properties",
