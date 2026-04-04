@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { JAVA_VERSIONS } from "@/lib/utils/java-version";
 import {
   Dialog,
   DialogContent,
@@ -237,7 +238,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(["8", "11", "17", "21"] as const).map((v) => (
+                  {JAVA_VERSIONS.map((v) => (
                     <SelectItem key={v} value={v}>
                       Java {v}
                     </SelectItem>
