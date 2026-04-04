@@ -1,6 +1,6 @@
 import "server-only";
 
-import { fork } from "node:child_process";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connection";
@@ -33,7 +33,7 @@ type WorkerMsg   = ProgressMsg | DoneMsg | ErrorMsg;
 // Active worker registry (in-process singleton — safe for long-running server)
 // ---------------------------------------------------------------------------
 
-const activeWorkers = new Map<string, ReturnType<typeof fork>>();
+const activeWorkers = new Map<string, ReturnType<typeof spawn>>();
 
 export function isJobActive(jobId: string): boolean {
   return activeWorkers.has(jobId);
@@ -55,10 +55,11 @@ export async function dispatchBackupJob(
   });
 
   const workerScript = resolveWorkerScript();
-  const child = fork(workerScript, [type, JSON.stringify(workerPayload)], {
+  const child = spawn("node", [workerScript, type, JSON.stringify(workerPayload)], {
     env: { ...process.env },
-    // Let stdout/stderr flow to the parent process log
-    silent: false,
+    // inherit stdout/stderr so worker logs appear in the parent process output;
+    // 'ipc' channel enables process.send() / process.on('message') for progress
+    stdio: ["ignore", "inherit", "inherit", "ipc"],
   });
 
   activeWorkers.set(jobId, child);
