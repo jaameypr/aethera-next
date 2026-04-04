@@ -11,6 +11,7 @@ import { PackModsTab } from "./PackModsTab";
 import { ServerBackupsTab } from "./ServerBackupsTab";
 import { ServerAccessTab } from "./ServerAccessTab";
 import { SettingsTab } from "./tabs/SettingsTab";
+import { ConfigurationTab } from "./tabs/ConfigurationTab";
 
 interface ServerPlain {
   _id: string;
@@ -49,6 +50,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
     { value: "files", label: "Dateien" },
     { value: "addons", label: "Mods/Plugins" },
     { value: "backups", label: "Backups" },
+    { value: "config", label: "Konfiguration" },
     { value: "access", label: "Zugriff" },
     { value: "settings", label: "Einstellungen" },
   ];
@@ -93,6 +95,9 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
         </TabsContent>
         <TabsContent value="backups">
           <ServerBackupsTab serverId={server._id} serverName={server.name} />
+        </TabsContent>
+        <TabsContent value="config">
+          <ConfigurationTab serverId={server._id} serverStatus={server.status} />
         </TabsContent>
         <TabsContent value="access">
           <ServerAccessTab serverId={server._id} access={server.access} />
