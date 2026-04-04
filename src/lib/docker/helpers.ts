@@ -121,15 +121,28 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
   // e.g. "white-list" → WHITE_LIST, "max-players" → MAX_PLAYERS
   if (server.properties) {
     const toEnvKey = (key: string) => key.toUpperCase().replace(/-/g, "_");
+    const propsForLog: Record<string, string> = {};
+
     if (server.properties instanceof Map) {
       server.properties.forEach((value, key) => {
-        env[toEnvKey(key)] = String(value);
+        const envKey = toEnvKey(key);
+        env[envKey] = String(value);
+        propsForLog[envKey] = String(value);
       });
     } else {
       Object.entries(server.properties as Record<string, string>).forEach(([key, value]) => {
-        env[toEnvKey(key)] = String(value);
+        const envKey = toEnvKey(key);
+        env[envKey] = String(value);
+        propsForLog[envKey] = String(value);
       });
     }
+
+    console.log(
+      `[docker/helpers] serverEnvFromDoc: properties → env vars for "${server.identifier}":`,
+      propsForLog,
+    );
+  } else {
+    console.log(`[docker/helpers] serverEnvFromDoc: no properties on server "${server.identifier}"`);
   }
 
   // --- User-defined env vars (override all above) ---

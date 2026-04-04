@@ -24,7 +24,8 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
     if (!server) throw notFound("Server not found");
     if (!(await canAccessServer(server, session.userId))) throw forbidden();
 
-    if (!["forge", "fabric"].includes(server.modLoader ?? "")) {
+    const effectiveType = server.modLoader ?? server.serverType ?? "";
+    if (!["forge", "fabric"].includes(effectiveType)) {
       return Response.json(
         { error: "Mods sind nur für Forge/Fabric-Server verfügbar" },
         { status: 400 },

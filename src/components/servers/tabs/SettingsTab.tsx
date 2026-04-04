@@ -70,6 +70,7 @@ export interface ServerPlain {
   memory: number;
   version?: string;
   modLoader?: string;
+  serverType?: string;
   javaArgs?: string;
   javaVersion?: string;
   autoStart: boolean;
@@ -104,7 +105,9 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
       version: server.version ?? "",
       modLoader: (MOD_LOADERS.includes(server.modLoader as ModLoader)
         ? server.modLoader
-        : "vanilla") as ModLoader,
+        : MOD_LOADERS.includes(server.serverType as ModLoader)
+          ? server.serverType
+          : "vanilla") as ModLoader,
       javaArgs: server.javaArgs ?? "",
       autoStart: server.autoStart,
     },

@@ -79,8 +79,14 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
   });
 
   useEffect(() => {
+    let cancelled = false;
+
+    setLoading(true);
+    setRawProperties({});
+
     readPropertiesAction({ serverId })
       .then((props) => {
+        if (cancelled) return;
         setRawProperties(props);
         reset({
           motd: props["motd"] ?? "A Minecraft Server",
@@ -97,8 +103,14 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
           "level-seed": props["level-seed"] ?? "",
         });
       })
-      .catch(() => toast.error("Konfiguration konnte nicht geladen werden"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) toast.error("Konfiguration konnte nicht geladen werden");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
   }, [serverId, reset]);
 
   function onSave(data: ConfigForm) {
