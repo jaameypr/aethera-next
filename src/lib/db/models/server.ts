@@ -177,7 +177,7 @@ const ServerSchema = new Schema<IServer>(
   {
     name: { type: String, required: true, trim: true },
     projectKey: { type: String, required: true, index: true },
-    identifier: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    identifier: { type: String, required: true, trim: true, lowercase: true },
     runtime: { type: String, enum: ["minecraft", "hytale"], required: true },
     image: { type: String, required: true },
     tag: { type: String, required: true },
@@ -213,6 +213,9 @@ const ServerSchema = new Schema<IServer>(
   },
   { timestamps: true },
 );
+
+// identifier must be unique within a project, not globally
+ServerSchema.index({ projectKey: 1, identifier: 1 }, { unique: true });
 
 export const ServerModel: Model<IServer> =
   mongoose.models.Server || mongoose.model<IServer>("Server", ServerSchema);

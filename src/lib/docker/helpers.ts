@@ -11,7 +11,7 @@ import { getDockerType } from "@/lib/config/server-types";
 export function containerName(server: IServer): string {
   const prefix =
     server.runtime === "hytale" ? CONTAINER_PREFIX_HYT : CONTAINER_PREFIX_MC;
-  return `${prefix}${server.identifier}`;
+  return `${prefix}${server.projectKey}-${server.identifier}`;
 }
 
 /**
