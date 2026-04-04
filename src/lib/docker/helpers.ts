@@ -115,7 +115,23 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
 
   if (server.javaArgs) env.JVM_XX_OPTS = server.javaArgs;
 
-  // --- User-defined env vars (override defaults) ---
+  // --- Server properties → itzg env vars ---
+  // itzg reads property keys as env vars: uppercase + hyphens → underscores
+  // e.g. "white-list" → WHITE_LIST, "max-players" → MAX_PLAYERS
+  if (server.properties) {
+    const toEnvKey = (key: string) => key.toUpperCase().replace(/-/g, "_");
+    if (server.properties instanceof Map) {
+      server.properties.forEach((value, key) => {
+        env[toEnvKey(key)] = String(value);
+      });
+    } else {
+      Object.entries(server.properties as Record<string, string>).forEach(([key, value]) => {
+        env[toEnvKey(key)] = String(value);
+      });
+    }
+  }
+
+  // --- User-defined env vars (override all above) ---
   if (server.env) {
     if (server.env instanceof Map) {
       server.env.forEach((value, key) => {
