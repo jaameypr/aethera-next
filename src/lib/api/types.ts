@@ -221,6 +221,8 @@ export interface InstalledModuleResponse {
   status: string;
   exposure: "public" | "internal" | "none";
   manifest?: ModuleManifest;
+  /** Saved config values. Non-secrets: actual value. Secrets: "__SECRET_SET__" if saved, "" if not. */
+  savedConfig: Record<string, string>;
   internalUrl?: string;
   publicUrl?: string;
   assignedPort?: number;

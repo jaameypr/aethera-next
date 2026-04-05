@@ -80,10 +80,17 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     if (Object.keys(configValues).length === 0) return;
     setLoading(true);
     try {
-      const result = await updateModuleConfigAction(
-        mod.moduleId,
-        configValues,
+      // For secret fields, skip empty values (clearing the input shouldn't wipe the secret)
+      const secretKeys = new Set(configurableDefs.filter((d) => d.secret).map((d) => d.key));
+      const payload = Object.fromEntries(
+        Object.entries(configValues).filter(([k, v]) => !(secretKeys.has(k) && v === "")),
       );
+      if (Object.keys(payload).length === 0) {
+        toast.info("Keine Änderungen zum Speichern");
+        setLoading(false);
+        return;
+      }
+      const result = await updateModuleConfigAction(mod.moduleId, payload);
       setMod(result);
       setConfigValues({});
       toast.success("Konfiguration gespeichert");
@@ -334,23 +341,34 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {configurableDefs.map((def) => (
-              <div key={def.key} className="space-y-1">
-                <Label htmlFor={def.key}>{def.label || def.key}</Label>
-                <Input
-                  id={def.key}
-                  type={def.secret ? "password" : "text"}
-                  placeholder={def.default || ""}
-                  value={configValues[def.key] ?? ""}
-                  onChange={(e) =>
-                    setConfigValues((prev) => ({
-                      ...prev,
-                      [def.key]: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            ))}
+            {configurableDefs.map((def) => {
+                const isSecretSet = mod.savedConfig?.[def.key] === "__SECRET_SET__";
+                const savedValue = !def.secret ? (mod.savedConfig?.[def.key] ?? "") : "";
+                const displayValue = configValues[def.key] ?? savedValue;
+                const placeholder = def.secret
+                  ? (isSecretSet ? "••••••••  (saved — type to replace)" : (def.default || ""))
+                  : (def.default || "");
+                return (
+                  <div key={def.key} className="space-y-1">
+                    <Label htmlFor={def.key}>{def.label || def.key}</Label>
+                    {def.description && (
+                      <p className="text-xs text-zinc-500">{def.description}</p>
+                    )}
+                    <Input
+                      id={def.key}
+                      type={def.secret ? "password" : "text"}
+                      placeholder={placeholder}
+                      value={displayValue}
+                      onChange={(e) =>
+                        setConfigValues((prev) => ({
+                          ...prev,
+                          [def.key]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                );
+              })}
             <Button
               onClick={handleSaveConfig}
               disabled={

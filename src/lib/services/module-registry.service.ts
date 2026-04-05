@@ -181,6 +181,10 @@ export async function getModuleCatalog(): Promise<ModuleCatalogEntry[]> {
             type: inst.type,
             exposure: (inst.exposure as "public" | "internal" | "none") ?? "none",
             status: inst.status,
+            manifest: inst.manifest as unknown as import("@/lib/api/types").ModuleManifest,
+            savedConfig: Object.fromEntries(
+              (inst.config ?? []).map((c) => [c.key, c.secret ? (c.value ? "__SECRET_SET__" : "") : c.value]),
+            ),
             internalUrl: inst.internalUrl,
             publicUrl: inst.publicUrl,
             assignedPort: inst.assignedPort,

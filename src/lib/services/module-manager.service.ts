@@ -74,6 +74,9 @@ function toResponse(doc: IInstalledModule): InstalledModuleResponse {
     exposure: doc.exposure ?? "none",
     status: doc.status,
     manifest: doc.manifest as unknown as ModuleManifest,
+    savedConfig: Object.fromEntries(
+      doc.config.map((c) => [c.key, c.secret ? (c.value ? "__SECRET_SET__" : "") : c.value]),
+    ),
     internalUrl: doc.internalUrl,
     publicUrl: doc.publicUrl,
     assignedPort: doc.assignedPort,
