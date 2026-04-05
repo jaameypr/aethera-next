@@ -331,25 +331,38 @@ export function DiscordTab({ serverId }: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {botInviteUrl && (
-            <div className="flex items-center gap-2">
-              <Button asChild variant="outline" size="sm">
-                <a href={botInviteUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3 w-3 mr-1" />
-                  Invite Bot to Discord Server
-                </a>
-              </Button>
-              <span className="text-xs text-zinc-500">
-                (Requires Manage Server permission on the Discord side)
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {botInviteUrl ? (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <a href={botInviteUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    Invite Bot to Discord Server
+                  </a>
+                </Button>
+                <span className="text-xs text-zinc-500">
+                  (Requires Manage Server permission on the Discord side)
+                </span>
+              </>
+            ) : (
+              <p className="text-sm text-zinc-500">
+                Bot invite URL unavailable — make sure the Discord module is running and{" "}
+                <strong>DISCORD_CLIENT_ID</strong> is configured in the module settings.
+              </p>
+            )}
+          </div>
 
           <div className="space-y-2">
-            <Label>Linked Discord Server</Label>
+            <div className="flex items-center gap-2">
+              <Label>Linked Discord Server</Label>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => loadData()}>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Refresh
+              </Button>
+            </div>
             {guilds.length === 0 ? (
               <p className="text-sm text-zinc-500">
-                No Discord servers found. Invite the bot first.
+                No Discord servers found. Invite the bot to your server first, then click Refresh.
               </p>
             ) : (
               <Select
@@ -371,16 +384,10 @@ export function DiscordTab({ serverId }: Props) {
           </div>
 
           {config.guildId && (
-            <div className="flex gap-2 pt-1">
-              <Button variant="outline" size="sm" onClick={handleCreateInvite}>
-                <ExternalLink className="h-3 w-3 mr-1" />
-                Create Invite Link
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => loadData()}>
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Refresh
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={handleCreateInvite}>
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Create Server Invite Link
+            </Button>
           )}
         </CardContent>
       </Card>

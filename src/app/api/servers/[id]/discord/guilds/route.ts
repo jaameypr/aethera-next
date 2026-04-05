@@ -18,12 +18,15 @@ export const GET = withAuth(async (_req: NextRequest, { session, params }) => {
     if (!server) throw notFound("Server not found");
     if (!(await canAccessServer(server, session.userId))) throw forbidden();
 
-    const [guilds, botInvite] = await Promise.all([
+    const [guildsResult, botInviteResult] = await Promise.allSettled([
       getDiscordGuilds(),
       getDiscordBotInviteUrl(),
     ]);
 
-    return Response.json({ guilds, botInviteUrl: botInvite.url });
+    const guilds = guildsResult.status === "fulfilled" ? guildsResult.value : [];
+    const botInviteUrl = botInviteResult.status === "fulfilled" ? (botInviteResult.value?.url ?? null) : null;
+
+    return Response.json({ guilds, botInviteUrl });
   } catch (error) {
     return errorResponse(error);
   }
