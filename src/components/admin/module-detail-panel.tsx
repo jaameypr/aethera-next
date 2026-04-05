@@ -47,14 +47,8 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
 
   // Parse configurable env defs from manifest
-  const manifest = (mod as unknown as { manifest?: Record<string, unknown> })
-    .manifest;
   const configurableDefs: ModuleManifestEnvDef[] =
-    (
-      manifest?.env as {
-        configurable?: ModuleManifestEnvDef[];
-      }
-    )?.configurable ?? [];
+    mod.manifest?.env?.configurable ?? [];
 
   const handleStart = async () => {
     setLoading(true);

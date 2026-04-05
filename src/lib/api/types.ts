@@ -173,6 +173,7 @@ export interface ModuleManifestAuth {
 export interface ModuleManifestEnvDef {
   key: string;
   label: string;
+  description?: string;
   default?: string;
   required?: boolean;
   secret?: boolean;
@@ -219,6 +220,7 @@ export interface InstalledModuleResponse {
   type: "docker" | "code";
   status: string;
   exposure: "public" | "internal" | "none";
+  manifest?: ModuleManifest;
   internalUrl?: string;
   publicUrl?: string;
   assignedPort?: number;

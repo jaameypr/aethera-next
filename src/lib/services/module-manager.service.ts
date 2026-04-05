@@ -73,6 +73,7 @@ function toResponse(doc: IInstalledModule): InstalledModuleResponse {
     type: doc.type,
     exposure: doc.exposure ?? "none",
     status: doc.status,
+    manifest: doc.manifest as unknown as ModuleManifest,
     internalUrl: doc.internalUrl,
     publicUrl: doc.publicUrl,
     assignedPort: doc.assignedPort,
