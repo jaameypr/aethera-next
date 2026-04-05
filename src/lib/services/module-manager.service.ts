@@ -264,14 +264,18 @@ export async function startModule(
   if (doc.status === "running") throw new Error("Module is already running");
 
   if (doc.type === "docker") {
-    if (!doc.containerId) {
-      // Re-deploy if container was removed
-      const manifest = doc.manifest as unknown as ModuleManifest;
-      await deployDockerModule(doc, manifest);
-    } else {
+    const manifest = doc.manifest as unknown as ModuleManifest;
+    if (doc.containerId) {
+      // Remove the existing container so it's re-created with current env vars
       const docker = await getDockerClient();
-      await startContainer(docker, doc.containerId);
+      try {
+        await removeContainer(docker, doc.containerId);
+      } catch {
+        // Container may already be gone — proceed to re-deploy
+      }
+      doc.containerId = undefined;
     }
+    await deployDockerModule(doc, manifest);
   }
 
   doc.status = "running";
