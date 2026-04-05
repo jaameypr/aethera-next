@@ -12,6 +12,7 @@ import { ServerBackupsTab } from "./ServerBackupsTab";
 import { ServerAccessTab } from "./ServerAccessTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { ConfigurationTab } from "./tabs/ConfigurationTab";
+import { DiscordTab } from "./tabs/DiscordTab";
 
 interface ServerPlain {
   _id: string;
@@ -51,6 +52,7 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
     { value: "addons", label: "Mods/Plugins" },
     { value: "backups", label: "Backups" },
     { value: "config", label: "Konfiguration" },
+    { value: "discord", label: "Discord" },
     { value: "access", label: "Zugriff" },
     { value: "settings", label: "Einstellungen" },
   ];
@@ -98,6 +100,9 @@ export function ServerDetailTabs({ server, projectKey }: Props) {
         </TabsContent>
         <TabsContent value="config">
           <ConfigurationTab serverId={server._id} serverStatus={server.status} />
+        </TabsContent>
+        <TabsContent value="discord">
+          <DiscordTab serverId={server._id} />
         </TabsContent>
         <TabsContent value="access">
           <ServerAccessTab serverId={server._id} access={server.access} />
