@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { buildAccessExpCookieOptions } from "@/lib/auth/cookie-options";
 
 const PUBLIC_PATHS = [
   "/",
@@ -65,7 +66,22 @@ export async function middleware(request: NextRequest) {
 
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
-        const response = NextResponse.next();
+
+        // Forward the new access token into the request so that server
+        // components (e.g. requireSession in the layout) read the fresh
+        // token in the same render cycle, not the expired one.
+        const existingCookies = request.headers.get("cookie") ?? "";
+        const filtered = existingCookies
+          .split("; ")
+          .filter((c) => !c.startsWith("access_token="))
+          .join("; ");
+        const updatedCookies = filtered
+          ? `${filtered}; access_token=${data.accessToken}`
+          : `access_token=${data.accessToken}`;
+        const requestHeaders = new Headers(request.headers);
+        requestHeaders.set("cookie", updatedCookies);
+
+        const response = NextResponse.next({ request: { headers: requestHeaders } });
 
         response.cookies.set("access_token", data.accessToken, {
           httpOnly: true,
@@ -73,6 +89,14 @@ export async function middleware(request: NextRequest) {
           sameSite: "lax",
           path: "/",
         });
+        if (data.accessExpiresAt) {
+          const accessExpiresAt = new Date(data.accessExpiresAt);
+          response.cookies.set(
+            "access_token_exp",
+            data.accessExpiresAt,
+            buildAccessExpCookieOptions(accessExpiresAt),
+          );
+        }
         response.cookies.set("refresh_token", data.refreshToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
