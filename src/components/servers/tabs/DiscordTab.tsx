@@ -425,6 +425,16 @@ export function DiscordTab({ serverId }: Props) {
             channels={channels}
             channelsLoading={channelsLoading}
             onChange={(patch) => updateChannelConfig("playerEvents", patch)}
+            warning={
+              <div className="flex items-start gap-2 rounded border border-yellow-700 bg-yellow-950/40 p-3">
+                <TriangleAlert className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-yellow-300">
+                  Join/leave detection only works with <strong>default Minecraft join/leave formatting</strong>.
+                  Plugins that override these messages (e.g. EssentialsX, CustomJoinMessages) may not be
+                  detected or may produce incorrect output.
+                </p>
+              </div>
+            }
           />
 
           {/* Whitelist Requests */}
@@ -437,6 +447,15 @@ export function DiscordTab({ serverId }: Props) {
             channelsLoading={channelsLoading}
             onChange={(patch) => updateChannelConfig("whitelistRequests", patch)}
             showRoleField
+            warning={
+              <div className="flex items-start gap-2 rounded border border-yellow-700 bg-yellow-950/40 p-3">
+                <TriangleAlert className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-yellow-300">
+                  Whitelist request detection only works with <strong>default Minecraft connection-denied formatting</strong>.
+                  Plugins that override these messages may not be detected or may produce incorrect output.
+                </p>
+              </div>
+            }
           />
 
           {/* Pending Requests */}
