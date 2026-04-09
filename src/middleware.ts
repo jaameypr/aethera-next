@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
-import { buildAccessCookieOptions } from "@/lib/auth/cookie-options";
+import { buildAccessExpCookieOptions } from "@/lib/auth/cookie-options";
 
 const PUBLIC_PATHS = [
   "/",
@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
           response.cookies.set(
             "access_token_exp",
             data.accessExpiresAt,
-            buildAccessCookieOptions(accessExpiresAt),
+            buildAccessExpCookieOptions(accessExpiresAt),
           );
         }
         response.cookies.set("refresh_token", data.refreshToken, {
