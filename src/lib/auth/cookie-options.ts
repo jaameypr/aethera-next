@@ -11,6 +11,19 @@ export function buildAccessCookieOptions(): Partial<ResponseCookie> {
   };
 }
 
+/** Non-httpOnly cookie that exposes only the access token's expiry time to client JS. */
+export function buildAccessExpCookieOptions(
+  expiresAt: Date,
+): Partial<ResponseCookie> {
+  return {
+    httpOnly: false,
+    secure: isProduction,
+    sameSite: "lax",
+    path: "/",
+    expires: expiresAt,
+  };
+}
+
 export function buildRefreshCookieOptions(opts?: {
   persist?: boolean;
   refreshExpiresAt?: Date;
