@@ -14,5 +14,12 @@ export async function register() {
     } catch (error) {
       console.error("[instrumentation] resetStuckJobs failed:", error);
     }
+
+    try {
+      const { startEventListener } = await import("@/lib/docker/event-listener");
+      await startEventListener();
+    } catch (error) {
+      console.error("[instrumentation] startEventListener failed:", error);
+    }
   }
 }

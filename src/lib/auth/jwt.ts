@@ -43,17 +43,20 @@ export interface RefreshTokenPayload {
 export async function signAccessToken(
   userId: string,
   roles: string[],
-): Promise<string> {
+): Promise<{ token: string; expiresAt: Date }> {
   const ttl = process.env.JWT_ACCESS_TTL || "15m";
   const expiresIn = parseTTL(ttl);
+  const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
-  return new SignJWT({ roles: Array.from(roles), type: "access" } as unknown as Record<string, unknown>)
+  const token = await new SignJWT({ roles: Array.from(roles), type: "access" } as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuer(getIssuer())
     .setIssuedAt()
-    .setExpirationTime(Math.floor(Date.now() / 1000) + expiresIn)
+    .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
     .sign(getSecret());
+
+  return { token, expiresAt };
 }
 
 export async function signRefreshToken(

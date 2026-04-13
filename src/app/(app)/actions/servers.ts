@@ -26,6 +26,7 @@ import {
   initializeBlueprint,
   type IBlueprint,
 } from "@/lib/services/blueprint.service";
+import { assertServerPermission } from "@/lib/services/server-access";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -82,9 +83,12 @@ export async function startServerAction(data: {
   const session = await requireSession();
 
   try {
-    const result = await startServer(data.serverId, session.userId);
     const server = await getServer(data.serverId);
-    revalidateServer(data.serverId, server?.projectKey);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.start");
+
+    const result = await startServer(data.serverId, session.userId);
+    revalidateServer(data.serverId, server.projectKey);
     return result;
   } catch (err) {
     throw new Error(
@@ -100,6 +104,8 @@ export async function stopServerAction(data: {
 
   try {
     const server = await getServer(data.serverId);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.stop");
     await stopServer(data.serverId, session.userId);
     revalidateServer(data.serverId, server?.projectKey);
   } catch (err) {
@@ -116,6 +122,8 @@ export async function recreateServerAction(data: {
 
   try {
     const server = await getServer(data.serverId);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.start");
     await recreateServer(data.serverId, session.userId);
     revalidateServer(data.serverId, server?.projectKey);
   } catch (err) {
@@ -136,8 +144,10 @@ export async function deleteServerAction(data: {
 
   try {
     const server = await getServer(data.serverId);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.settings");
     await deleteServer(data.serverId, session.userId);
-    revalidateServer(data.serverId, server?.projectKey);
+    revalidateServer(data.serverId, server.projectKey);
   } catch (err) {
     throw new Error(
       err instanceof Error ? err.message : "Failed to delete server",
@@ -149,9 +159,12 @@ export async function updateServerAction(data: {
   serverId: string;
   patch: Record<string, unknown>;
 }): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
 
   try {
+    const server = await getServer(data.serverId);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.settings");
     const updated = await updateServer(data.serverId, data.patch);
     revalidateServer(data.serverId, updated.projectKey);
   } catch (err) {
@@ -169,9 +182,12 @@ export async function writePropertiesAction(data: {
   serverId: string;
   properties: Record<string, string>;
 }): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
 
   try {
+    const server = await getServer(data.serverId);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.settings");
     const updated = await updateServer(data.serverId, {
       properties: data.properties,
     });
@@ -208,9 +224,12 @@ export async function sendConsoleCommandAction(data: {
   serverId: string;
   command: string;
 }): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
 
   try {
+    const server = await getServer(data.serverId);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.console");
     await sendConsoleCommand(data.serverId, data.command);
   } catch (err) {
     throw new Error(

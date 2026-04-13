@@ -7,7 +7,11 @@ import { connectDB } from "@/lib/db/connection";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
 import { BlueprintModel } from "@/lib/db/models/blueprint";
 import { ProjectModel } from "@/lib/db/models/project";
-import { logAction } from "@/lib/services/project.service";
+import {
+  logAction,
+  ROLE_SERVER_PERMISSIONS,
+  type ProjectMemberRole,
+} from "@/lib/services/project.service";
 import { grantIfAbsent } from "@/lib/services/permission-grant.service";
 import {
   getOrchestrator,
@@ -139,6 +143,27 @@ export async function createServer(
   await grantIfAbsent(actorId, `server.read:${server._id.toString()}`);
   await grantIfAbsent(actorId, `server.write:${server._id.toString()}`);
 
+  // Populate server.access for all existing project members so that
+  // assertServerPermission has consistent data regardless of when the
+  // server was created relative to when members were added.
+  const project = await ProjectModel.findOne({ key: projectKey })
+    .select("members")
+    .lean();
+  if (project?.members.length) {
+    const accessEntries = project.members
+      .map((m) => ({
+        userId: m.userId,
+        permissions: ROLE_SERVER_PERMISSIONS[m.role as ProjectMemberRole] ?? [],
+      }))
+      .filter((e) => e.permissions.length > 0);
+
+    if (accessEntries.length > 0) {
+      await ServerModel.findByIdAndUpdate(server._id, {
+        $push: { access: { $each: accessEntries } },
+      });
+    }
+  }
+
   return server.toObject() as IServer;
 }
 
@@ -220,59 +245,41 @@ export async function deleteServer(
 }
 
 // ---------------------------------------------------------------------------
-// LIFECYCLE
+// LIFECYCLE — private execution helpers
+// These assume the caller has already done the status claim in DB.
+// They always throw on error (re-throw after writing "error" to DB).
 // ---------------------------------------------------------------------------
 
-export async function startServer(
+async function _executeStartServer(
   serverId: string,
+  server: IServer,
   actorId: string,
 ): Promise<{ containerId: string }> {
-  await connectDB();
-
-  const server = await ServerModel.findById(serverId);
-  if (!server) throw new Error("Server not found");
-  if (server.status === "running" || server.status === "starting") {
-    throw new Error(`Server is already ${server.status}`);
-  }
-
-  await ServerModel.findByIdAndUpdate(serverId, { status: "starting" });
-
   try {
-    // If a stopped container already exists, just start it
     if (server.containerId) {
       const docker = await getDockerClient();
       try {
         await startContainer(docker, server.containerId);
-
         await ServerModel.findByIdAndUpdate(serverId, {
           status: "running",
           containerStatus: "running",
         });
-
         await logAction(server.projectKey, "SERVER_STARTED", actorId, {
           serverId: server._id.toString(),
           containerId: server.containerId,
         });
-
         return { containerId: server.containerId };
       } catch (containerErr: any) {
         const statusCode =
           containerErr?.statusCode ?? containerErr?.cause?.statusCode ?? 0;
         if (statusCode === 404) {
-          // Container was removed externally — clear stale ref and fall through to full deploy
-          console.log(
-            `[server] Container ${server.containerId} no longer exists, redeploying`,
-          );
-          await ServerModel.findByIdAndUpdate(serverId, {
-            containerId: null,
-          });
+          await ServerModel.findByIdAndUpdate(serverId, { containerId: null });
         } else {
           throw containerErr;
         }
       }
     }
 
-    // No container exists — full deploy
     const orch = await getOrchestrator();
     const dataDir = getServerDataPath(server.projectKey, server.identifier);
     await ensureServerDir(server.projectKey, server.identifier);
@@ -283,7 +290,6 @@ export async function startServer(
     try {
       result = await orch.deploy(config);
     } catch (deployErr: any) {
-      // Handle stale container conflict — remove old container and retry
       const msg = deployErr?.cause?.json?.message ?? deployErr?.message ?? "";
       if (msg.includes("is already in use")) {
         console.log(`[server] Removing stale container ${config.name} and retrying deploy`);
@@ -305,12 +311,10 @@ export async function startServer(
       containerStatus: result.status,
       status: "running",
     });
-
     await logAction(server.projectKey, "SERVER_STARTED", actorId, {
       serverId: server._id.toString(),
       containerId: result.containerId,
     });
-
     return { containerId: result.containerId };
   } catch (err) {
     await ServerModel.findByIdAndUpdate(serverId, {
@@ -319,6 +323,74 @@ export async function startServer(
     });
     throw err;
   }
+}
+
+async function _executeStopServer(
+  serverId: string,
+  server: IServer,
+  actorId: string,
+): Promise<void> {
+  try {
+    const orch = await getOrchestrator();
+    await orch.destroy(server.containerId!, { timeout: 30 });
+    await ServerModel.findByIdAndUpdate(serverId, {
+      $set: { status: "stopped" },
+      $unset: { containerId: 1, containerStatus: 1 },
+    });
+    await logAction(server.projectKey, "SERVER_STOPPED", actorId, {
+      serverId: server._id.toString(),
+    });
+  } catch (err) {
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "error",
+      containerStatus: err instanceof Error ? err.message : "stop failed",
+    });
+    throw err;
+  }
+}
+
+async function _executeSoftStopServer(
+  serverId: string,
+  server: IServer,
+  actorId: string,
+): Promise<void> {
+  try {
+    const docker = await getDockerClient();
+    await stopContainer(docker, server.containerId!, 30);
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "stopped",
+      containerStatus: "exited",
+    });
+    await logAction(server.projectKey, "SERVER_STOPPED", actorId, {
+      serverId: server._id.toString(),
+    });
+  } catch (err) {
+    await ServerModel.findByIdAndUpdate(serverId, {
+      status: "error",
+      containerStatus: err instanceof Error ? err.message : "stop failed",
+    });
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LIFECYCLE — public synchronous versions (block until Docker op completes)
+// ---------------------------------------------------------------------------
+
+export async function startServer(
+  serverId: string,
+  actorId: string,
+): Promise<{ containerId: string }> {
+  await connectDB();
+
+  const server = await ServerModel.findById(serverId);
+  if (!server) throw new Error("Server not found");
+  if (server.status === "running" || server.status === "starting") {
+    throw new Error(`Server is already ${server.status}`);
+  }
+
+  await ServerModel.findByIdAndUpdate(serverId, { status: "starting" });
+  return _executeStartServer(serverId, server, actorId);
 }
 
 /**
@@ -335,26 +407,7 @@ export async function softStopServer(
   if (!server.containerId) throw new Error("Server has no container");
 
   await ServerModel.findByIdAndUpdate(serverId, { status: "stopping" });
-
-  try {
-    const docker = await getDockerClient();
-    await stopContainer(docker, server.containerId, 30);
-
-    await ServerModel.findByIdAndUpdate(serverId, {
-      status: "stopped",
-      containerStatus: "exited",
-    });
-
-    await logAction(server.projectKey, "SERVER_STOPPED", actorId, {
-      serverId: server._id.toString(),
-    });
-  } catch (err) {
-    await ServerModel.findByIdAndUpdate(serverId, {
-      status: "error",
-      containerStatus: err instanceof Error ? err.message : "stop failed",
-    });
-    throw err;
-  }
+  await _executeSoftStopServer(serverId, server, actorId);
 }
 
 /**
@@ -371,26 +424,7 @@ export async function stopServer(
   if (!server.containerId) throw new Error("Server has no container");
 
   await ServerModel.findByIdAndUpdate(serverId, { status: "stopping" });
-
-  try {
-    const orch = await getOrchestrator();
-    await orch.destroy(server.containerId, { timeout: 30 });
-
-    await ServerModel.findByIdAndUpdate(serverId, {
-      $set: { status: "stopped" },
-      $unset: { containerId: 1, containerStatus: 1 },
-    });
-
-    await logAction(server.projectKey, "SERVER_STOPPED", actorId, {
-      serverId: server._id.toString(),
-    });
-  } catch (err) {
-    await ServerModel.findByIdAndUpdate(serverId, {
-      status: "error",
-      containerStatus: err instanceof Error ? err.message : "stop failed",
-    });
-    throw err;
-  }
+  await _executeStopServer(serverId, server, actorId);
 }
 
 export async function recreateServer(
@@ -402,13 +436,142 @@ export async function recreateServer(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
 
-  // Always hard-stop (destroy container) so startServer does a full
-  // redeploy with fresh env vars, picking up any property changes.
   if (server.containerId) {
     await stopServer(serverId, actorId);
   }
-
   await startServer(serverId, actorId);
+}
+
+// ---------------------------------------------------------------------------
+// LIFECYCLE — async "begin" variants (return immediately, Docker runs in background)
+// Use these from API routes to avoid blocking the HTTP response on Docker ops.
+// ---------------------------------------------------------------------------
+
+/**
+ * Atomically claims "starting" state and fires the Docker start in the background.
+ * Returns once the status is set; callers should poll /status for the final state.
+ * Throws if the server is not in a startable state.
+ */
+export async function beginStartServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findOneAndUpdate(
+    { _id: serverId, status: { $in: ["stopped", "error"] } },
+    { $set: { status: "starting" } },
+    { new: false },
+  );
+  if (!server) {
+    const current = await ServerModel.findById(serverId);
+    if (!current) throw new Error("Server not found");
+    throw new Error(`Server cannot be started from state: ${current.status}`);
+  }
+
+  void _executeStartServer(serverId, server, actorId).catch((err) =>
+    console.error(`[server] Background start failed for ${serverId}:`, err),
+  );
+}
+
+/**
+ * Atomically claims "stopping" state (hard-stop) and fires Docker destroy in background.
+ */
+export async function beginStopServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findOneAndUpdate(
+    {
+      _id: serverId,
+      status: { $in: ["running", "starting", "error"] },
+      containerId: { $exists: true, $ne: null },
+    },
+    { $set: { status: "stopping" } },
+    { new: false },
+  );
+  if (!server) {
+    const current = await ServerModel.findById(serverId);
+    if (!current) throw new Error("Server not found");
+    throw new Error(`Server cannot be stopped from state: ${current.status}`);
+  }
+
+  void _executeStopServer(serverId, server, actorId).catch((err) =>
+    console.error(`[server] Background stop failed for ${serverId}:`, err),
+  );
+}
+
+/**
+ * Atomically claims "stopping" state (soft-stop, keeps container) and fires Docker stop in background.
+ */
+export async function beginSoftStopServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findOneAndUpdate(
+    {
+      _id: serverId,
+      status: "running",
+      containerId: { $exists: true, $ne: null },
+    },
+    { $set: { status: "stopping" } },
+    { new: false },
+  );
+  if (!server) {
+    const current = await ServerModel.findById(serverId);
+    if (!current) throw new Error("Server not found");
+    throw new Error(`Server cannot be stopped from state: ${current.status}`);
+  }
+
+  void _executeSoftStopServer(serverId, server, actorId).catch((err) =>
+    console.error(`[server] Background soft-stop failed for ${serverId}:`, err),
+  );
+}
+
+/**
+ * Atomically claims "stopping" and fires a full recreate (hard-stop then start) in background.
+ */
+export async function beginRecreateServer(
+  serverId: string,
+  actorId: string,
+): Promise<void> {
+  await connectDB();
+
+  const server = await ServerModel.findOneAndUpdate(
+    { _id: serverId, status: "running" },
+    { $set: { status: "stopping" } },
+    { new: false },
+  );
+  if (!server) {
+    const current = await ServerModel.findById(serverId);
+    if (!current) throw new Error("Server not found");
+    throw new Error(`Server cannot be restarted from state: ${current.status}`);
+  }
+
+  void (async () => {
+    // Phase 1: hard-stop
+    await _executeStopServer(serverId, server, actorId);
+
+    // Verify stop succeeded before starting
+    const stopped = await ServerModel.findById(serverId);
+    if (!stopped || stopped.status !== "stopped") return;
+
+    // Phase 2: atomically claim "starting"
+    const claimed = await ServerModel.findOneAndUpdate(
+      { _id: serverId, status: "stopped" },
+      { $set: { status: "starting" } },
+      { new: false },
+    );
+    if (!claimed) return;
+
+    await _executeStartServer(serverId, stopped, actorId);
+  })().catch((err) =>
+    console.error(`[server] Background recreate failed for ${serverId}:`, err),
+  );
 }
 
 export async function getServerStatus(
@@ -422,6 +585,11 @@ export async function getServerStatus(
 
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
+
+  // Don't interfere with in-progress lifecycle operations — the background worker updates DB when done.
+  if (server.status === "starting" || server.status === "stopping") {
+    return { status: server.status };
+  }
 
   if (!server.containerId) {
     return { status: server.status };

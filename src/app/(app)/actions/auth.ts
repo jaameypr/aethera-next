@@ -24,6 +24,7 @@ export async function logoutAction() {
   }
 
   cookieStore.delete("access_token");
+  cookieStore.delete("access_token_exp");
   cookieStore.delete("refresh_token");
 
   redirect("/login");

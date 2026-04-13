@@ -17,6 +17,9 @@ export async function syncServerStatus(serverId: string): Promise<void> {
   const server = await ServerModel.findById(serverId);
   if (!server) return;
 
+  // Don't override transitional lifecycle states — the background worker owns them
+  if (server.status === "starting" || server.status === "stopping") return;
+
   // No container tracked — nothing to sync
   if (!server.containerId) {
     if (server.status !== "stopped" && server.status !== "error") {
@@ -69,6 +72,9 @@ export async function syncAllServerStatuses(): Promise<void> {
   const runningContainerIds = new Set<string>();
 
   for (const server of activeServers) {
+    // Don't override transitional lifecycle states — the background worker owns them
+    if (server.status === "starting" || server.status === "stopping") continue;
+
     if (!server.containerId) {
       await ServerModel.findByIdAndUpdate(server._id, { status: "error" });
       continue;

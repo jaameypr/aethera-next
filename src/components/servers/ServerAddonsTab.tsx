@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
-import { Upload, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Upload, Trash2, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ function AddonSection({
   const [items, setItems] = useState<AddonEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   useEffect(() => {
     fetchItems();
@@ -56,23 +57,46 @@ function AddonSection({
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/servers/${serverId}/${type}`, {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) throw new Error((await res.json()).error);
-        toast.success(`${file.name} hochgeladen`);
-        fetchItems();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Upload fehlgeschlagen");
-      }
-    });
     e.target.value = "";
+    if (!file) return;
+
+    setUploadProgress(0);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `/api/servers/${serverId}/${type}`);
+
+        xhr.upload.addEventListener("progress", (ev) => {
+          if (ev.lengthComputable) {
+            setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+          }
+        });
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            try {
+              reject(new Error(JSON.parse(xhr.responseText).error ?? "Upload fehlgeschlagen"));
+            } catch {
+              reject(new Error("Upload fehlgeschlagen"));
+            }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
+        xhr.send(formData);
+      });
+
+      toast.success(`${file.name} hochgeladen`);
+      fetchItems();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload fehlgeschlagen");
+    } finally {
+      setUploadProgress(null);
+    }
   }
 
   async function handleDelete(filename: string) {
@@ -111,20 +135,34 @@ function AddonSection({
     });
   }
 
+  const isUploading = uploadProgress !== null;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-base">{label}</CardTitle>
         <label>
-          <input type="file" className="hidden" onChange={handleUpload} />
-          <Button variant="outline" size="sm" asChild disabled={isPending}>
+          <input type="file" className="hidden" onChange={handleUpload} disabled={isUploading} />
+          <Button variant="outline" size="sm" asChild disabled={isPending || isUploading}>
             <span>
-              <Upload className="mr-1.5 h-3.5 w-3.5" />
-              Hochladen
+              {isUploading ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {isUploading ? `${uploadProgress}%` : "Hochladen"}
             </span>
           </Button>
         </label>
       </CardHeader>
+      {isUploading && (
+        <div className="mx-6 mb-3 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all duration-200"
+            style={{ width: `${uploadProgress}%` }}
+          />
+        </div>
+      )}
       <CardContent>
         {loading ? (
           <p className="text-sm text-zinc-500">Lade…</p>

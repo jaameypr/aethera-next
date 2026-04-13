@@ -5,17 +5,22 @@ import { RefreshTokenModel } from "@/lib/db/models/refresh-token";
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from "@/lib/auth/jwt";
 import {
   buildAccessCookieOptions,
+  buildAccessExpCookieOptions,
   buildRefreshCookieOptions,
 } from "@/lib/auth/cookie-options";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { refreshToken: token } = body;
+    let token: string | undefined;
+    try {
+      const body = await req.json();
+      token = body?.refreshToken;
+    } catch {
+      // No JSON body — fall through to cookie
+    }
 
     if (!token) {
-      // Try reading from cookie
       const cookieToken = req.cookies.get("refresh_token")?.value;
       if (!cookieToken) {
         return NextResponse.json(
@@ -77,7 +82,7 @@ async function handleRefresh(token: string) {
 
   // Create new tokens
   const newJti = crypto.randomUUID();
-  const accessToken = await signAccessToken(user._id.toString(), user.roles);
+  const { token: accessToken, expiresAt: accessExpiresAt } = await signAccessToken(user._id.toString(), user.roles);
   const { token: refreshToken, expiresAt: refreshExpiresAt } =
     await signRefreshToken(user._id.toString(), newJti);
 
@@ -90,6 +95,7 @@ async function handleRefresh(token: string) {
 
   const responseData = {
     accessToken,
+    accessExpiresAt: accessExpiresAt.toISOString(),
     refreshToken,
     refreshExpiresAt: refreshExpiresAt.toISOString(),
     userId: user._id.toString(),
@@ -104,6 +110,11 @@ async function handleRefresh(token: string) {
     "access_token",
     accessToken,
     buildAccessCookieOptions(),
+  );
+  response.cookies.set(
+    "access_token_exp",
+    accessExpiresAt.toISOString(),
+    buildAccessExpCookieOptions(accessExpiresAt),
   );
   response.cookies.set(
     "refresh_token",

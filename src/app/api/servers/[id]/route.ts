@@ -6,7 +6,7 @@ import {
   updateServer,
   deleteServer,
 } from "@/lib/services/server.service";
-import { canAccessServer } from "@/lib/services/server-access";
+import { canAccessServer, assertServerPermission } from "@/lib/services/server-access";
 
 export const GET = withAuth(async (_req: NextRequest, { session, params }) => {
   try {
@@ -24,7 +24,7 @@ export const PATCH = withAuth(async (req: NextRequest, { session, params }) => {
   try {
     const server = await getServer(params.id);
     if (!server) throw notFound("Server not found");
-    if (!(await canAccessServer(server, session.userId))) throw forbidden();
+    await assertServerPermission(server, session.userId, "server.settings");
 
     const body = await req.json();
     const updated = await updateServer(params.id, body);
@@ -39,7 +39,7 @@ export const DELETE = withAuth(
     try {
       const server = await getServer(params.id);
       if (!server) throw notFound("Server not found");
-      if (!(await canAccessServer(server, session.userId))) throw forbidden();
+      await assertServerPermission(server, session.userId, "server.settings");
 
       await deleteServer(params.id, session.userId);
       return new Response(null, { status: 204 });

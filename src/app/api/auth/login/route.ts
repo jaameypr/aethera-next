@@ -6,6 +6,7 @@ import { comparePassword } from "@/lib/auth/password";
 import { signAccessToken, signRefreshToken } from "@/lib/auth/jwt";
 import {
   buildAccessCookieOptions,
+  buildAccessExpCookieOptions,
   buildRefreshCookieOptions,
 } from "@/lib/auth/cookie-options";
 import crypto from "crypto";
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     // Create refresh token
     const jti = crypto.randomUUID();
-    const accessToken = await signAccessToken(
+    const { token: accessToken, expiresAt: accessExpiresAt } = await signAccessToken(
       user._id.toString(),
       user.roles,
     );
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
 
     const responseData = {
       accessToken,
+      accessExpiresAt: accessExpiresAt.toISOString(),
       refreshToken,
       refreshExpiresAt: refreshExpiresAt.toISOString(),
       userId: user._id.toString(),
@@ -83,6 +85,11 @@ export async function POST(req: NextRequest) {
       "access_token",
       accessToken,
       buildAccessCookieOptions(),
+    );
+    response.cookies.set(
+      "access_token_exp",
+      accessExpiresAt.toISOString(),
+      buildAccessExpCookieOptions(accessExpiresAt),
     );
     response.cookies.set(
       "refresh_token",
