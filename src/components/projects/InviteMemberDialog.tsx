@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
+import { useState, useTransition, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { Search, Shield, Wrench, Eye, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,53 +17,12 @@ import {
   searchUsersAction,
 } from "@/app/(app)/actions/projects";
 import type { ProjectMemberRole } from "@/lib/services/project.service";
+import { useLocale } from "@/context/locale-context";
 
 interface UserResult {
   _id: string;
   username: string;
 }
-
-const ROLES: {
-  value: ProjectMemberRole;
-  label: string;
-  icon: React.ElementType;
-  color: string;
-  bg: string;
-  border: string;
-  description: string;
-  perms: string[];
-}[] = [
-  {
-    value: "admin",
-    label: "Admin",
-    icon: Shield,
-    color: "text-purple-600 dark:text-purple-400",
-    bg: "bg-purple-50 dark:bg-purple-950/30",
-    border: "border-purple-300 dark:border-purple-700",
-    description: "Full project control",
-    perms: ["Blueprints verwalten", "Mitglieder einladen", "Server starten/stoppen", "Konsole & Dateien", "Backups", "Einstellungen"],
-  },
-  {
-    value: "manager",
-    label: "Manager",
-    icon: Wrench,
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-50 dark:bg-blue-950/30",
-    border: "border-blue-300 dark:border-blue-700",
-    description: "Server verwalten",
-    perms: ["Blueprints initialisieren", "Server starten/stoppen", "Konsole", "Dateien & Backups"],
-  },
-  {
-    value: "viewer",
-    label: "Viewer",
-    icon: Eye,
-    color: "text-zinc-600 dark:text-zinc-400",
-    bg: "bg-zinc-50 dark:bg-zinc-900",
-    border: "border-zinc-300 dark:border-zinc-700",
-    description: "Nur lesen",
-    perms: ["Server-Status sehen", "Logs lesen", "Keine Konsole", "Keine Dateien"],
-  },
-];
 
 interface InviteMemberDialogProps {
   projectKey: string;
@@ -84,6 +43,43 @@ export function InviteMemberDialog({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { t } = useLocale();
+
+  const ROLES = useMemo(
+    () => [
+      {
+        value: "admin" as ProjectMemberRole,
+        label: "Admin",
+        icon: Shield,
+        color: "text-purple-600 dark:text-purple-400",
+        bg: "bg-purple-50 dark:bg-purple-950/30",
+        border: "border-purple-300 dark:border-purple-700",
+        description: t("projects.invite.adminDesc"),
+        perms: t("projects.invite.adminPerms").split("|"),
+      },
+      {
+        value: "manager" as ProjectMemberRole,
+        label: "Manager",
+        icon: Wrench,
+        color: "text-blue-600 dark:text-blue-400",
+        bg: "bg-blue-50 dark:bg-blue-950/30",
+        border: "border-blue-300 dark:border-blue-700",
+        description: t("projects.invite.managerDesc"),
+        perms: t("projects.invite.managerPerms").split("|"),
+      },
+      {
+        value: "viewer" as ProjectMemberRole,
+        label: "Viewer",
+        icon: Eye,
+        color: "text-zinc-600 dark:text-zinc-400",
+        bg: "bg-zinc-50 dark:bg-zinc-900",
+        border: "border-zinc-300 dark:border-zinc-700",
+        description: t("projects.invite.viewerDesc"),
+        perms: t("projects.invite.viewerPerms").split("|"),
+      },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -127,10 +123,10 @@ export function InviteMemberDialog({
     startTransition(async () => {
       try {
         await addProjectMemberAction({ projectKey, userId: selected._id, role });
-        toast.success(`${selected.username} wurde eingeladen`);
+        toast.success(t("projects.invite.inviteSuccess", { name: selected.username }));
         onOpenChange(false);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler beim Einladen");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -141,9 +137,9 @@ export function InviteMemberDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Mitglied einladen</DialogTitle>
+          <DialogTitle>{t("projects.invite.title")}</DialogTitle>
           <DialogDescription>
-            Suche einen Benutzer und weise ihm eine Rolle zu.
+            {t("projects.invite.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -154,7 +150,7 @@ export function InviteMemberDialog({
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
               <Input
                 className="pl-9"
-                placeholder="Benutzername suchen…"
+                placeholder={t("projects.invite.searchPlaceholder")}
                 value={query}
                 onChange={(e) => handleQueryChange(e.target.value)}
                 onFocus={() => query && setShowDropdown(true)}
@@ -184,13 +180,15 @@ export function InviteMemberDialog({
             )}
 
             {showDropdown && !searching && query && results.length === 0 && (
-              <p className="text-xs text-zinc-400 px-1">Kein Benutzer gefunden.</p>
+              <p className="text-xs text-zinc-400 px-1">{t("projects.invite.noUsersFound")}</p>
             )}
           </div>
 
           {/* Role cards */}
           <div className="space-y-1.5">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Rolle</p>
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {t("projects.invite.roleLabel")}
+            </p>
             <div className="space-y-2">
               {ROLES.map((r) => {
                 const Icon = r.icon;
@@ -240,8 +238,8 @@ export function InviteMemberDialog({
               <selectedRole.icon className="mr-2 h-4 w-4" />
             )}
             {selected
-              ? `${selected.username} als ${selectedRole.label} einladen`
-              : "Benutzer auswählen…"}
+              ? t("projects.invite.inviteBtn", { name: selected.username, role: selectedRole.label })
+              : t("projects.invite.selectUserBtn")}
           </Button>
         </div>
       </DialogContent>

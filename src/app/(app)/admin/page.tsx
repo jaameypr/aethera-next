@@ -8,11 +8,14 @@ import type { PermissionEntry } from "@/lib/api/types";
 import { getOrchestrator, getDockerClient } from "@/lib/docker/orchestrator";
 import { listContainers } from "@pruefertit/docker-orchestrator";
 import { AdminDashboardClient } from "@/components/admin/admin-dashboard";
+import { getServerT } from "@/lib/i18n/server";
 
 export default async function AdminDashboardPage() {
   const session = await requireSession();
   const user = await getUserById(session.userId);
   if (!user) redirect("/login");
+
+  const { t } = await getServerT();
 
   const allRoles = await listAllRoles();
   const userRoles = allRoles.filter((r) => user.roles.includes(r.name));
@@ -60,7 +63,7 @@ export default async function AdminDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
         <p className="text-sm text-zinc-500">
-          System-Übersicht und Docker-Status
+          {t("admin.subtitle")}
         </p>
       </div>
       <AdminDashboardClient data={systemData} />

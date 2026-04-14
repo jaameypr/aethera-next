@@ -11,6 +11,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/context/locale-context";
 
 interface ServerSummary {
   _id: string;
@@ -31,6 +32,7 @@ export function ProjectCard({
   description,
   servers,
 }: ProjectCardProps) {
+  const { t } = useLocale();
   const running = servers.filter((s) => s.status === "running").length;
   const total = servers.length;
 
@@ -55,7 +57,7 @@ export function ProjectCard({
       <CardContent className="flex-1">
         {servers.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Keine Server vorhanden
+            {t("projects.card.noServers")}
           </p>
         ) : (
           <ul className="space-y-1.5">
@@ -77,7 +79,7 @@ export function ProjectCard({
             ))}
             {servers.length > 5 && (
               <li className="text-xs text-zinc-400">
-                +{servers.length - 5} weitere
+                {t("projects.card.more", { count: servers.length - 5 })}
               </li>
             )}
           </ul>
@@ -88,13 +90,13 @@ export function ProjectCard({
         <Button variant="outline" size="sm" asChild>
           <Link href={`/projects/${projectKey}`}>
             <Eye className="mr-1.5 h-3.5 w-3.5" />
-            Öffnen
+            {t("projects.card.open")}
           </Link>
         </Button>
         {running < total && total > 0 && (
           <Button variant="secondary" size="sm" disabled>
             <Play className="mr-1.5 h-3.5 w-3.5" />
-            Alle starten
+            {t("projects.card.startAll")}
           </Button>
         )}
       </CardFooter>

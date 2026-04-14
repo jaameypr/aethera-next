@@ -12,16 +12,17 @@ import {
 import { FolderKanban, Server, Users } from "lucide-react";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
+import { getServerT } from "@/lib/i18n/server";
 
 export default async function DashboardPage() {
   const session = await requireSession();
+  const { t } = await getServerT();
   const [user, projects, canCreate] = await Promise.all([
     getUserById(session.userId),
     listProjects(session.userId),
     checkPermission(session.userId, "projects.create"),
   ]);
 
-  // Fetch servers per project in parallel
   const projectsWithServers = await Promise.all(
     projects.map(async (project) => {
       const servers = await listServers(project.key, session.userId);
@@ -46,22 +47,22 @@ export default async function DashboardPage() {
 
   const stats = [
     {
-      label: "Projekte",
+      label: t("dashboard.stats.projects"),
       value: projects.length,
       icon: FolderKanban,
-      description: `${projects.length} aktiv`,
+      description: t("dashboard.stats.projectsDesc", { count: projects.length }),
     },
     {
-      label: "Server",
+      label: t("dashboard.stats.servers"),
       value: totalServers,
       icon: Server,
-      description: `${runningServers} laufend`,
+      description: t("dashboard.stats.serversDesc", { count: runningServers }),
     },
     {
-      label: "Mitglieder",
+      label: t("dashboard.stats.members"),
       value: totalMembers,
       icon: Users,
-      description: "Aktive Nutzer",
+      description: t("dashboard.stats.membersDesc"),
     },
   ];
 
@@ -70,10 +71,10 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-            Dashboard
+            {t("dashboard.title")}
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400">
-            Willkommen zurück, {user?.username || "User"}
+            {t("dashboard.welcome", { username: user?.username ?? "User" })}
           </p>
         </div>
         <CreateProjectDialog canCreate={canCreate} />
@@ -103,14 +104,14 @@ export default async function DashboardPage() {
       {/* Projects Grid */}
       <div>
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Deine Projekte
+          {t("dashboard.yourProjects")}
         </h2>
         {projectsWithServers.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <FolderKanban className="mx-auto mb-3 h-10 w-10 text-zinc-400" />
               <p className="text-zinc-500 dark:text-zinc-400">
-                Noch keine Projekte vorhanden. Erstelle dein erstes Projekt!
+                {t("dashboard.noProjects")}
               </p>
             </CardContent>
           </Card>

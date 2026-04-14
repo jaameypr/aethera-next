@@ -27,6 +27,7 @@ import {
   disableUserAction,
   resetUserPasswordAction,
 } from "@/app/(app)/actions/admin";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import {
   Plus,
@@ -52,6 +53,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
     emailSent: boolean;
     username: string;
   } | null>(null);
+  const { t } = useLocale();
 
   // Create form state
   const [newUsername, setNewUsername] = useState("");
@@ -100,7 +102,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
         });
       }
 
-      toast.success(`User "${newUsername}" created`);
+      toast.success(t("admin.users.userCreated", { name: newUsername }));
       setCreateOpen(false);
       resetCreateForm();
     } catch (err) {
@@ -133,7 +135,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       setUsers((prev) =>
         prev.map((u) => (u._id === editUser._id ? updated : u)),
       );
-      toast.success("User updated");
+      toast.success(t("admin.users.userUpdated"));
       setEditUser(null);
     } catch (err) {
       toast.error(
@@ -157,7 +159,9 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
         ),
       );
       toast.success(
-        `User "${user.username}" ${user.enabled ? "disabled" : "enabled"}`,
+        user.enabled
+          ? t("admin.users.userDisabled", { name: user.username })
+          : t("admin.users.userEnabled", { name: user.username }),
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -172,7 +176,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
         emailSent: result.emailSent,
         username: user.username,
       });
-      toast.success("Password reset");
+      toast.success(t("admin.users.passwordReset"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     }
@@ -183,7 +187,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
     try {
       await deleteUserAction(deleteConfirm._id);
       setUsers((prev) => prev.filter((u) => u._id !== deleteConfirm._id));
-      toast.success(`User "${deleteConfirm.username}" deleted`);
+      toast.success(t("admin.users.userDeleted", { name: deleteConfirm.username }));
       setDeleteConfirm(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -195,13 +199,13 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-            Users
+            {t("admin.users.title")}
           </h1>
-          <p className="text-zinc-500">Manage user accounts</p>
+          <p className="text-zinc-500">{t("admin.users.subtitle")}</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Create User
+          {t("admin.users.createUser")}
         </Button>
       </div>
 
@@ -211,7 +215,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
           <Card>
             <CardContent className="flex flex-col items-center py-12 text-center">
               <Users className="mb-3 h-10 w-10 text-zinc-300" />
-              <p className="text-zinc-500">No users found</p>
+              <p className="text-zinc-500">{t("admin.users.noUsers")}</p>
             </CardContent>
           </Card>
         )}
@@ -225,13 +229,13 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{user.username}</p>
                   <StatusBadge variant={user.enabled ? "enabled" : "disabled"}>
-                    {user.enabled ? "Active" : "Disabled"}
+                    {user.enabled ? t("admin.users.active") : t("admin.users.disabled")}
                   </StatusBadge>
                 </div>
                 <p className="text-sm text-zinc-500">{user.email}</p>
                 {user.roles.length > 0 && (
                   <p className="text-xs text-zinc-400">
-                    Roles: {user.roles.join(", ")}
+                    {t("admin.users.roles")}: {user.roles.join(", ")}
                   </p>
                 )}
               </div>
@@ -244,7 +248,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleResetPassword(user)}
-                  title="Reset Password"
+                  title={t("admin.users.resetPassword")}
                 >
                   <KeyRound className="h-4 w-4" />
                 </Button>
@@ -252,7 +256,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                   variant="ghost"
                   size="icon"
                   onClick={() => openEdit(user)}
-                  title="Edit"
+                  title={t("common.edit")}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -260,7 +264,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                   variant="ghost"
                   size="icon"
                   onClick={() => setDeleteConfirm(user)}
-                  title="Delete"
+                  title={t("common.delete")}
                   className="text-red-500 hover:text-red-700"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -275,15 +279,12 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create User</DialogTitle>
-            <DialogDescription>
-              Create a new user account. Leave password empty to generate a
-              temporary password.
-            </DialogDescription>
+            <DialogTitle>{t("admin.users.createUser")}</DialogTitle>
+            <DialogDescription>{t("admin.users.createUserDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Username</Label>
+              <Label>{t("admin.users.username")}</Label>
               <Input
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
@@ -291,7 +292,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>{t("admin.users.email")}</Label>
               <Input
                 type="email"
                 value={newEmail}
@@ -300,11 +301,11 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Password (optional)</Label>
+              <Label>{t("admin.users.password")}</Label>
               <PasswordInput
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Leave empty for temp password"
+                placeholder={t("admin.users.passwordPlaceholder")}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -312,10 +313,10 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                 checked={newEnabled}
                 onCheckedChange={setNewEnabled}
               />
-              <Label>Enabled</Label>
+              <Label>{t("admin.users.enabled")}</Label>
             </div>
             <div className="space-y-2">
-              <Label>Roles</Label>
+              <Label>{t("admin.users.roles")}</Label>
               <div className="space-y-2">
                 {roles.map((role) => (
                   <div key={role._id} className="flex items-center gap-2">
@@ -347,10 +348,10 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                 resetCreateForm();
               }}
             >
-              Cancel
+              {t("admin.users.cancel")}
             </Button>
             <Button onClick={handleCreate} disabled={createLoading}>
-              {createLoading ? "Creating..." : "Create User"}
+              {createLoading ? t("admin.users.creating") : t("admin.users.createUser")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -360,21 +361,19 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>
-              Update user details and permissions.
-            </DialogDescription>
+            <DialogTitle>{t("admin.users.editUser")}</DialogTitle>
+            <DialogDescription>{t("admin.users.editUserDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Username</Label>
+              <Label>{t("admin.users.username")}</Label>
               <Input
                 value={editUsername}
                 onChange={(e) => setEditUsername(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>{t("admin.users.email")}</Label>
               <Input
                 type="email"
                 value={editEmail}
@@ -382,7 +381,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Roles</Label>
+              <Label>{t("admin.users.roles")}</Label>
               <div className="space-y-2">
                 {roles.map((role) => (
                   <div key={role._id} className="flex items-center gap-2">
@@ -410,10 +409,10 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUser(null)}>
-              Cancel
+              {t("admin.users.cancel")}
             </Button>
             <Button onClick={handleUpdate} disabled={editLoading}>
-              {editLoading ? "Saving..." : "Save Changes"}
+              {editLoading ? t("admin.users.saving") : t("admin.users.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -423,18 +422,17 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
+            <DialogTitle>{t("admin.users.deleteUser")}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete user &quot;{deleteConfirm?.username}
-              &quot;? This action cannot be undone.
+              {t("admin.users.deleteUserDesc", { name: deleteConfirm?.username ?? "" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
-              Cancel
+              {t("admin.users.cancel")}
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
-              Delete
+              {t("admin.users.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -447,21 +445,21 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Temporary Password</DialogTitle>
+            <DialogTitle>{t("admin.users.tempPassword")}</DialogTitle>
             <DialogDescription>
               {tempPasswordResult?.emailSent
-                ? `A password reset email has been sent to the user. The temporary password is also shown below for your reference.`
-                : `SMTP is not configured. Please share the temporary password with "${tempPasswordResult?.username}" manually.`}
+                ? t("admin.users.tempPasswordEmailSent")
+                : t("admin.users.tempPasswordManual", { username: tempPasswordResult?.username ?? "" })}
             </DialogDescription>
           </DialogHeader>
           {tempPasswordResult && (
             <CopyableField
-              label="Temporary Password"
+              label={t("admin.users.tempPassword")}
               value={tempPasswordResult.tempPassword}
             />
           )}
           <DialogFooter>
-            <Button onClick={() => setTempPasswordResult(null)}>Close</Button>
+            <Button onClick={() => setTempPasswordResult(null)}>{t("common.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

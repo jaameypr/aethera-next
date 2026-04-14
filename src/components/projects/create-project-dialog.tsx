@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,25 +19,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createProjectAction } from "@/app/(app)/actions/projects";
+import { useLocale } from "@/context/locale-context";
 
-const schema = z.object({
-  name: z.string().min(1, "Name ist erforderlich").max(64, "Maximal 64 Zeichen"),
-  key: z
-    .string()
-    .min(1, "Key ist erforderlich")
-    .max(32, "Maximal 32 Zeichen")
-    .regex(
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Nur Kleinbuchstaben, Zahlen und Bindestriche",
-    ),
-});
-
-type FormValues = z.infer<typeof schema>;
+type FormValues = { name: string; key: string };
 
 export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean } = {}) {
   if (!canCreate) return null;
 
   const [open, setOpen] = useState(false);
+  const { t } = useLocale();
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        name: z
+          .string()
+          .min(1, t("projects.validation.nameRequired"))
+          .max(64, t("projects.validation.nameMaxLength")),
+        key: z
+          .string()
+          .min(1, t("projects.validation.keyRequired"))
+          .max(32, t("projects.validation.keyMaxLength"))
+          .regex(
+            /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+            t("projects.validation.keyFormat"),
+          ),
+      }),
+    [t],
+  );
 
   const {
     register,
@@ -61,11 +70,11 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
   async function onSubmit(data: FormValues) {
     try {
       await createProjectAction({ key: data.key, name: data.name });
-      toast.success("Projekt erstellt");
+      toast.success(t("projects.create.title"));
       reset();
       setOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler beim Erstellen");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     }
   }
 
@@ -74,25 +83,25 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-1.5 h-4 w-4" />
-          Neues Projekt
+          {t("projects.create.trigger")}
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>Projekt erstellen</DialogTitle>
+            <DialogTitle>{t("projects.create.title")}</DialogTitle>
             <DialogDescription>
-              Erstelle ein neues Projekt um deine Server zu organisieren.
+              {t("projects.create.description")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-4 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="project-name">Name</Label>
+              <Label htmlFor="project-name">{t("projects.create.name")}</Label>
               <Input
                 id="project-name"
-                placeholder="Mein Projekt"
+                placeholder={t("projects.create.namePlaceholder")}
                 {...register("name", {
                   onChange: (e) => {
                     const slug = slugify(e.target.value);
@@ -106,10 +115,10 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="project-key">Key</Label>
+              <Label htmlFor="project-key">{t("projects.create.key")}</Label>
               <Input
                 id="project-key"
-                placeholder="mein-projekt"
+                placeholder={t("projects.create.keyPlaceholder")}
                 className="font-mono"
                 {...register("key")}
               />
@@ -117,7 +126,7 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
                 <p className="text-sm text-red-500">{errors.key.message}</p>
               )}
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Wird in URLs und API-Aufrufen verwendet. Kann nicht geändert werden.
+                {t("projects.create.keyHint")}
               </p>
             </div>
           </div>
@@ -128,10 +137,10 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
               variant="outline"
               onClick={() => setOpen(false)}
             >
-              Abbrechen
+              {t("projects.create.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Erstelle…" : "Erstellen"}
+              {isSubmitting ? t("projects.create.creating") : t("projects.create.create")}
             </Button>
           </DialogFooter>
         </form>

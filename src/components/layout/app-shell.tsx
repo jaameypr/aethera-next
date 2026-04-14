@@ -20,45 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { UserProfileButton } from "./user-profile-button";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { useLocale } from "@/context/locale-context";
 import type { CurrentUserResponse } from "@/lib/api/types";
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  disabled?: boolean;
-}
-
-interface NavGroup {
-  title: string;
-  items: NavItem[];
-}
-
-const navGroups: NavGroup[] = [
-  {
-    title: "Workspace",
-    items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Projekte", href: "/projects", icon: FolderKanban },
-    ],
-  },
-  {
-    title: "Verzeichnis",
-    items: [
-      { label: "Upload", href: "/verzeichnis/upload", icon: Upload },
-      { label: "Backups", href: "/verzeichnis/backups", icon: HardDrive },
-      { label: "Dateien", href: "/verzeichnis/dateien", icon: Files },
-    ],
-  },
-  {
-    title: "Admin",
-    items: [
-      { label: "Benutzer", href: "/admin/users", icon: Users },
-      { label: "Rollen", href: "/admin/roles", icon: ShieldCheck },
-      { label: "Module", href: "/admin/modules", icon: Puzzle },
-    ],
-  },
-];
 
 export interface ModuleSidebarItem {
   moduleId: string;
@@ -79,6 +43,33 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useLocale();
+
+  const navGroups = [
+    {
+      title: t("nav.workspace"),
+      items: [
+        { label: t("nav.dashboard"), href: "/dashboard", icon: LayoutDashboard },
+        { label: t("nav.projects"), href: "/projects", icon: FolderKanban },
+      ],
+    },
+    {
+      title: t("nav.verzeichnis"),
+      items: [
+        { label: t("nav.upload"), href: "/verzeichnis/upload", icon: Upload },
+        { label: t("nav.backups"), href: "/verzeichnis/backups", icon: HardDrive },
+        { label: t("nav.files"), href: "/verzeichnis/dateien", icon: Files },
+      ],
+    },
+    {
+      title: t("nav.admin"),
+      items: [
+        { label: t("nav.users"), href: "/admin/users", icon: Users },
+        { label: t("nav.roles"), href: "/admin/roles", icon: ShieldCheck },
+        { label: t("nav.modules"), href: "/admin/modules", icon: Puzzle },
+      ],
+    },
+  ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-950">
@@ -140,27 +131,19 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
                   return (
                     <Link
                       key={item.href}
-                      href={item.disabled ? "#" : item.href}
+                      href={item.href}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                         isActive
                           ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
                           : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
-                        item.disabled &&
-                          "cursor-not-allowed opacity-40 hover:bg-transparent dark:hover:bg-transparent",
                         collapsed && "justify-center px-0",
                       )}
-                      aria-disabled={item.disabled}
                       title={collapsed ? item.label : undefined}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.label}</span>}
-                      {!collapsed && item.disabled && (
-                        <span className="ml-auto text-[10px] uppercase text-zinc-400">
-                          Soon
-                        </span>
-                      )}
                     </Link>
                   );
                 })}
@@ -173,7 +156,7 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
             <div className="mb-4">
               {!collapsed && (
                 <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Module
+                  {t("nav.modulesSection")}
                 </p>
               )}
               {collapsed && <Separator className="mb-2" />}
@@ -211,7 +194,7 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
           {!collapsed && (
             <div className="mb-4">
               <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Projekte
+                {t("nav.projectsSection")}
               </p>
               {projects && projects.length > 0 ? (
                 <div className="flex flex-col gap-0.5">
@@ -238,15 +221,25 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
                 </div>
               ) : (
                 <p className="px-3 py-2 text-xs text-zinc-400 dark:text-zinc-500">
-                  Noch keine Projekte
+                  {t("nav.noProjects")}
                 </p>
               )}
             </div>
           )}
         </nav>
 
-        {/* User profile button */}
-        <div className="border-t border-zinc-200 p-2 dark:border-zinc-800">
+        {/* Bottom: language switcher + user profile */}
+        <div className="border-t border-zinc-200 p-2 dark:border-zinc-800 space-y-1">
+          {!collapsed && (
+            <div className="px-1">
+              <LanguageSwitcher className="w-full justify-start" />
+            </div>
+          )}
+          {collapsed && (
+            <div className="flex justify-center">
+              <LanguageSwitcher compact />
+            </div>
+          )}
           <UserProfileButton user={currentUser} collapsed={collapsed} />
         </div>
       </aside>

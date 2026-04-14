@@ -17,9 +17,11 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LogIn } from "lucide-react";
+import { useLocale } from "@/context/locale-context";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -47,7 +49,7 @@ export default function LoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("An error occurred. Please try again.");
+      setError(t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -59,7 +61,7 @@ export default function LoginPage() {
         <CardTitle className="text-2xl">
           {process.env.NEXT_PUBLIC_APP_NAME || "Aethera"}
         </CardTitle>
-        <CardDescription>Sign in to your account</CardDescription>
+        <CardDescription>{t("auth.login.subtitle")}</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -69,7 +71,7 @@ export default function LoginPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="usernameOrEmail">Username or Email</Label>
+            <Label htmlFor="usernameOrEmail">{t("auth.login.usernameOrEmail")}</Label>
             <Input
               id="usernameOrEmail"
               value={usernameOrEmail}
@@ -80,12 +82,12 @@ export default function LoginPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.login.password")}</Label>
             <PasswordInput
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={t("auth.login.password")}
               required
             />
           </div>
@@ -96,18 +98,18 @@ export default function LoginPage() {
               onCheckedChange={(checked) => setRemember(checked === true)}
             />
             <Label htmlFor="remember" className="text-sm font-normal">
-              Remember me
+              {t("auth.login.rememberMe")}
             </Label>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={loading}>
             <LogIn className="mr-2 h-4 w-4" />
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? t("auth.login.signingIn") : t("auth.login.signIn")}
           </Button>
           <p className="text-center text-sm text-zinc-500">
             <Link href="/" className="hover:underline">
-              Back to home
+              {t("auth.login.backToHome")}
             </Link>
           </p>
         </CardFooter>

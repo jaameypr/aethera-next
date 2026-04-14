@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { UserProfileDialog } from "./user-profile-dialog";
 import { logoutAction } from "@/app/(app)/actions/auth";
+import { useLocale } from "@/context/locale-context";
 import type { CurrentUserResponse } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ interface UserProfileButtonProps {
 export function UserProfileButton({ user, collapsed }: UserProfileButtonProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const { t } = useLocale();
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -60,12 +62,12 @@ export function UserProfileButton({ user, collapsed }: UserProfileButtonProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setProfileOpen(true)}>
             <KeyRound className="mr-2 h-4 w-4" />
-            Change Password
+            {t("profile.changePassword")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout} disabled={loggingOut}>
             <LogOut className="mr-2 h-4 w-4" />
-            {loggingOut ? "Logging out..." : "Logout"}
+            {loggingOut ? t("profile.loggingOut") : t("profile.logout")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

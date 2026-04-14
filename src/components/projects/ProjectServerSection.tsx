@@ -29,6 +29,7 @@ import {
 import { CreateBlueprintDialog } from "@/components/projects/CreateBlueprintDialog";
 import { CreateServerWizard } from "@/components/servers/create-server-wizard";
 import { deleteBlueprintAction, updateBlueprintAction } from "@/app/(app)/actions/servers";
+import { useLocale } from "@/context/locale-context";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,15 +85,16 @@ export function ProjectServerSection({
   const [editMaxRam, setEditMaxRam] = useState(2048);
   const [isDeleting, startDelete] = useTransition();
   const [isEditing, startEdit] = useTransition();
+  const { t } = useLocale();
 
   function handleDelete() {
     if (!deleteTarget) return;
     startDelete(async () => {
       try {
         await deleteBlueprintAction({ blueprintId: deleteTarget._id, projectKey });
-        toast.success("Blueprint gelöscht");
+        toast.success(t("projects.servers.blueprintDeleted"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler beim Löschen");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       } finally {
         setDeleteTarget(null);
       }
@@ -115,9 +117,9 @@ export function ProjectServerSection({
           name: editName,
           maxRam: editMaxRam,
         });
-        toast.success("Blueprint aktualisiert");
+        toast.success(t("projects.servers.blueprintUpdated"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler beim Speichern");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       } finally {
         setEditTarget(null);
       }
@@ -128,13 +130,13 @@ export function ProjectServerSection({
     <div className="space-y-6">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Server</h2>
+        <h2 className="text-lg font-semibold">{t("projects.servers.title")}</h2>
         {isAdmin && (
           <div className="flex items-center">
             <Button asChild className="rounded-r-none">
               <Link href={`/projects/${projectKey}/servers/new`}>
                 <Plus className="mr-2 h-4 w-4" />
-                Server erstellen
+                {t("projects.servers.createServer")}
               </Link>
             </Button>
             <DropdownMenu>
@@ -142,7 +144,7 @@ export function ProjectServerSection({
                 <Button
                   variant="default"
                   className="rounded-l-none border-l border-primary-foreground/20 px-2"
-                  aria-label="Weitere Optionen"
+                  aria-label={t("projects.servers.moreOptions")}
                 >
                   <ChevronDown className="h-4 w-4" />
                 </Button>
@@ -150,7 +152,7 @@ export function ProjectServerSection({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setCreateBlueprintOpen(true)}>
                   <Layers className="mr-2 h-4 w-4" />
-                  Blueprint erstellen
+                  {t("projects.servers.createBlueprint")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -162,7 +164,7 @@ export function ProjectServerSection({
       {servers.length === 0 && blueprints.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-zinc-500">
-            Noch keine Server in diesem Projekt.
+            {t("projects.servers.noServersProject")}
           </CardContent>
         </Card>
       ) : (
@@ -203,7 +205,7 @@ export function ProjectServerSection({
             </Link>
           ))}
 
-          {/* Blueprint cards — same grid, after servers */}
+          {/* Blueprint cards */}
           {blueprints.map((bp) => (
             <Card
               key={bp._id}
@@ -222,7 +224,7 @@ export function ProjectServerSection({
                         : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
-                    {bp.status === "available" ? "Verfügbar" : "Belegt"}
+                    {bp.status === "available" ? t("projects.servers.blueprintAvailable") : t("projects.servers.blueprintClaimed")}
                   </span>
                 </div>
               </CardHeader>
@@ -230,9 +232,9 @@ export function ProjectServerSection({
                 <div className="text-sm text-zinc-500 space-y-1 mb-3">
                   <p className="flex items-center gap-1">
                     <MemoryStick className="h-3.5 w-3.5" />
-                    Max. {ramLabel(bp.maxRam)} RAM
+                    {t("projects.blueprints.maxRam")} {ramLabel(bp.maxRam)}
                   </p>
-                  <p className="text-xs text-zinc-400">Blueprint · nicht initialisiert</p>
+                  <p className="text-xs text-zinc-400">{t("projects.servers.blueprintNotInit")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {bp.status === "available" && (
@@ -243,7 +245,7 @@ export function ProjectServerSection({
                       onClick={() => setInitTarget(bp)}
                     >
                       <Zap className="mr-1.5 h-3 w-3" />
-                      Initialisieren
+                      {t("projects.servers.initialize")}
                     </Button>
                   )}
                   {isAdmin && bp.status === "available" && (
@@ -293,17 +295,17 @@ export function ProjectServerSection({
       <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Blueprint löschen?</DialogTitle>
+            <DialogTitle>{t("projects.servers.confirmDeleteBlueprintTitle")}</DialogTitle>
             <DialogDescription>
-              Der Blueprint <strong>{deleteTarget?.name}</strong> wird dauerhaft gelöscht.
+              {t("projects.servers.confirmDeleteBlueprintDesc", { name: deleteTarget?.name ?? "" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
-              Abbrechen
+              {t("projects.servers.cancel")}
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? "Löschen…" : "Löschen"}
+              {isDeleting ? t("projects.servers.deleting") : t("projects.servers.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -312,14 +314,14 @@ export function ProjectServerSection({
       <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) setEditTarget(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Blueprint bearbeiten</DialogTitle>
+            <DialogTitle>{t("projects.servers.editBlueprintTitle")}</DialogTitle>
             <DialogDescription>
-              Passe den Namen und das RAM-Limit des Blueprints an.
+              {t("projects.servers.editBlueprintDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-bp-name">Name</Label>
+              <Label htmlFor="edit-bp-name">{t("projects.servers.addServer")}</Label>
               <Input
                 id="edit-bp-name"
                 value={editName}
@@ -328,7 +330,7 @@ export function ProjectServerSection({
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Maximales RAM</Label>
+                <Label>{t("projects.servers.maxRamLabel")}</Label>
                 <span className="text-sm font-semibold">{ramLabel(editMaxRam)}</span>
               </div>
               <Slider
@@ -346,10 +348,10 @@ export function ProjectServerSection({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)} disabled={isEditing}>
-              Abbrechen
+              {t("projects.servers.cancel")}
             </Button>
             <Button onClick={handleEdit} disabled={isEditing || !editName.trim()}>
-              {isEditing ? "Speichere…" : "Speichern"}
+              {isEditing ? t("projects.servers.saving") : t("projects.servers.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

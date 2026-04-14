@@ -15,9 +15,11 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Shield } from "lucide-react";
+import { useLocale } from "@/context/locale-context";
 
 export default function SetupPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [username, setUsername] = useState("admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +29,6 @@ export default function SetupPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Check if setup is needed
     fetch("/api/setup")
       .then((res) => res.json())
       .then((data) => {
@@ -47,12 +48,12 @@ export default function SetupPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("profile.passwordMismatch"));
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setError(t("profile.passwordTooShort"));
       return;
     }
 
@@ -67,14 +68,14 @@ export default function SetupPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Setup failed");
+        setError(data.error || t("common.error"));
         return;
       }
 
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("An error occurred. Please try again.");
+      setError(t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -84,7 +85,7 @@ export default function SetupPage() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <p className="text-zinc-500">Checking setup status...</p>
+          <p className="text-zinc-500">{t("auth.setup.checkingStatus")}</p>
         </CardContent>
       </Card>
     );
@@ -96,10 +97,8 @@ export default function SetupPage() {
         <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
           <Shield className="h-6 w-6" />
         </div>
-        <CardTitle className="text-2xl">Initial Setup</CardTitle>
-        <CardDescription>
-          Create the administrator account to get started
-        </CardDescription>
+        <CardTitle className="text-2xl">{t("auth.setup.title")}</CardTitle>
+        <CardDescription>{t("auth.setup.description")}</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -109,7 +108,7 @@ export default function SetupPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username">{t("auth.setup.username")}</Label>
             <Input
               id="username"
               value={username}
@@ -119,7 +118,7 @@ export default function SetupPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email (optional)</Label>
+            <Label htmlFor="email">{t("auth.setup.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -129,29 +128,29 @@ export default function SetupPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.setup.password")}</Label>
             <PasswordInput
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 8 characters"
+              placeholder={t("auth.setup.passwordHint")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword">{t("auth.setup.confirmPassword")}</Label>
             <PasswordInput
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repeat password"
+              placeholder={t("auth.setup.repeatPassword")}
               required
             />
           </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Create Admin Account"}
+            {loading ? t("auth.setup.creatingAccount") : t("auth.setup.createAccount")}
           </Button>
         </CardFooter>
       </form>

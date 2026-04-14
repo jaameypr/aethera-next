@@ -8,6 +8,7 @@ import { connectDB } from "@/lib/db/connection";
 import { ProjectServerSection } from "@/components/projects/ProjectServerSection";
 import { ProjectMembersPanel } from "@/components/projects/ProjectMembersPanel";
 import { DeleteProjectSection } from "@/components/projects/DeleteProjectSection";
+import { getServerT } from "@/lib/i18n/server";
 
 interface Props {
   params: Promise<{ key: string }>;
@@ -16,6 +17,7 @@ interface Props {
 export default async function ProjectDetailPage({ params }: Props) {
   const { key } = await params;
   const session = await requireSession();
+  const { t } = await getServerT();
 
   const project = await getProject(key);
   if (!project) return notFound();
@@ -34,17 +36,20 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   await connectDB();
   const ownerUser = await UserModel.findById(project.owner).select("username").lean();
-  const ownerUsername = (ownerUser as { username?: string } | null)?.username ?? "Unknown";
+  const ownerUsername = (ownerUser as { username?: string } | null)?.username ?? t("common.unknown");
   const running = servers.filter((s) => s.status === "running");
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <p className="text-sm text-zinc-500">Projekt</p>
+        <p className="text-sm text-zinc-500">{t("projects.detail.projectLabel")}</p>
         <h1 className="text-2xl font-bold">{project.name}</h1>
         <p className="text-sm text-zinc-400">
-          {project.key} · {servers.length} Server · {running.length} laufend
+          {project.key} · {t("projects.detail.serversRunning", {
+            servers: servers.length,
+            running: running.length,
+          })}
         </p>
       </div>
 
@@ -94,4 +99,3 @@ export default async function ProjectDetailPage({ params }: Props) {
     </div>
   );
 }
-

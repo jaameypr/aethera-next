@@ -32,14 +32,14 @@ import {
   Loader2,
 } from "lucide-react";
 import type { InstalledModuleResponse, ModuleCatalogEntry } from "@/lib/api/types";
-import {
-  getModuleCatalogAction,
+import { getModuleCatalogAction,
   installModuleAction,
   uninstallModuleAction,
   startModuleAction,
   stopModuleAction,
   updateModuleAction,
 } from "@/app/(app)/actions/modules";
+import { useLocale } from "@/context/locale-context";
 
 interface ModulesPanelProps {
   initialModules: InstalledModuleResponse[];
@@ -68,6 +68,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmUninstall, setConfirmUninstall] =
     useState<InstalledModuleResponse | null>(null);
+  const { t } = useLocale();
 
   const loadCatalog = async () => {
     setCatalogLoading(true);
@@ -76,7 +77,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       setCatalog(data);
     } catch (err) {
       toast.error(
-        `Fehler beim Laden des Katalogs: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`,
+        `${t("admin.modules.loadCatalogError")}: ${err instanceof Error ? err.message : t("common.error")}`,
       );
     } finally {
       setCatalogLoading(false);
@@ -92,11 +93,11 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
     try {
       const result = await installModuleAction({ moduleId, version });
       setModules((prev) => [...prev, result]);
-      toast.success(`${result.name} installiert`);
+      toast.success(t("admin.modules.moduleInstalled", { name: result.name }));
       await loadCatalog();
     } catch (err) {
       toast.error(
-        `Installation fehlgeschlagen: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`,
+        `${t("admin.modules.install")} ${t("common.error").toLowerCase()}: ${err instanceof Error ? err.message : t("common.error")}`,
       );
     } finally {
       setActionLoading(null);
@@ -109,11 +110,11 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       await uninstallModuleAction(moduleId);
       setModules((prev) => prev.filter((m) => m.moduleId !== moduleId));
       setConfirmUninstall(null);
-      toast.success("Modul deinstalliert");
+      toast.success(t("admin.modules.moduleUninstalled"));
       await loadCatalog();
     } catch (err) {
       toast.error(
-        `Deinstallation fehlgeschlagen: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`,
+        `${t("admin.modules.uninstall")} ${t("common.error").toLowerCase()}: ${err instanceof Error ? err.message : t("common.error")}`,
       );
     } finally {
       setActionLoading(null);
@@ -127,10 +128,10 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       setModules((prev) =>
         prev.map((m) => (m.moduleId === moduleId ? result : m)),
       );
-      toast.success("Modul gestartet");
+      toast.success(t("admin.modules.moduleStarted"));
     } catch (err) {
       toast.error(
-        `Start fehlgeschlagen: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`,
+        `${t("admin.modules.start")} ${t("common.error").toLowerCase()}: ${err instanceof Error ? err.message : t("common.error")}`,
       );
     } finally {
       setActionLoading(null);
@@ -144,10 +145,10 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       setModules((prev) =>
         prev.map((m) => (m.moduleId === moduleId ? result : m)),
       );
-      toast.success("Modul gestoppt");
+      toast.success(t("admin.modules.moduleStopped"));
     } catch (err) {
       toast.error(
-        `Stopp fehlgeschlagen: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`,
+        `${t("admin.modules.stop")} ${t("common.error").toLowerCase()}: ${err instanceof Error ? err.message : t("common.error")}`,
       );
     } finally {
       setActionLoading(null);
@@ -161,11 +162,11 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       setModules((prev) =>
         prev.map((m) => (m.moduleId === moduleId ? result : m)),
       );
-      toast.success(`Modul auf v${version} aktualisiert`);
+      toast.success(t("admin.modules.moduleUpdated", { version }));
       await loadCatalog();
     } catch (err) {
       toast.error(
-        `Update fehlgeschlagen: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`,
+        `${t("admin.modules.update")} ${t("common.error").toLowerCase()}: ${err instanceof Error ? err.message : t("common.error")}`,
       );
     } finally {
       setActionLoading(null);
@@ -187,10 +188,10 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-            Module
+            {t("admin.modules.title")}
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Installierte und verfügbare Module verwalten
+            {t("admin.modules.subtitle")}
           </p>
         </div>
         <Button
@@ -202,20 +203,19 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
           <RefreshCw
             className={`mr-2 h-4 w-4 ${catalogLoading ? "animate-spin" : ""}`}
           />
-          Aktualisieren
+          {t("admin.modules.refresh")}
         </Button>
       </div>
 
       {/* Installed modules */}
       <section>
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Installiert ({modules.length})
+          {t("admin.modules.installedCount", { count: modules.length })}
         </h2>
         {modules.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              Keine Module installiert. Durchsuche den Katalog unten, um Module
-              hinzuzufügen.
+              {t("admin.modules.noModulesDesc")}
             </CardContent>
           </Card>
         ) : (
@@ -261,7 +261,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
                           ) : (
                             <Play className="mr-1 h-3 w-3" />
                           )}
-                          Start
+                          {t("admin.modules.start")}
                         </Button>
                       )}
                       {mod.status === "running" && (
@@ -273,7 +273,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
                             disabled={actionLoading === mod.moduleId}
                           >
                             <Square className="mr-1 h-3 w-3" />
-                            Stop
+                            {t("admin.modules.stop")}
                           </Button>
                           {mod.exposure === "public" && (
                             <Button size="sm" variant="outline" asChild>
@@ -283,7 +283,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
                                 rel="noopener noreferrer"
                               >
                                 <ExternalLink className="mr-1 h-3 w-3" />
-                                Öffnen
+                                {t("admin.modules.open")}
                               </a>
                             </Button>
                           )}
@@ -307,7 +307,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
                       )}
                       <Link href={`/admin/modules/${mod.moduleId}`}>
                         <Button size="sm" variant="ghost">
-                          Details
+                          {t("admin.modules.details")}
                         </Button>
                       </Link>
                       <Button
@@ -330,21 +330,21 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       {/* Available modules from registry */}
       <section>
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Verfügbar ({availableModules.length})
+          {t("admin.modules.availableCount", { count: availableModules.length })}
         </h2>
         {catalogLoading ? (
           <Card>
             <CardContent className="flex items-center justify-center py-8 text-sm text-zinc-500">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Lade Katalog…
+              {t("admin.modules.loadingCatalog")}
             </CardContent>
           </Card>
         ) : availableModules.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
               {catalog.length === 0
-                ? "Registry nicht erreichbar oder MODULE_REGISTRY_URL nicht konfiguriert."
-                : "Alle verfügbaren Module sind bereits installiert."}
+                ? t("admin.modules.registryUnavailable")
+                : t("admin.modules.allInstalled")}
             </CardContent>
           </Card>
         ) : (
@@ -398,7 +398,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
                         ) : (
                           <Download className="mr-1 h-3 w-3" />
                         )}
-                        Installieren
+                        {t("admin.modules.install")}
                       </Button>
                     </div>
                   </CardContent>
@@ -416,11 +416,9 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modul deinstallieren</DialogTitle>
+            <DialogTitle>{t("admin.modules.confirmUninstall")}</DialogTitle>
             <DialogDescription>
-              Möchtest du <strong>{confirmUninstall?.name}</strong> wirklich
-              deinstallieren? Der Container und die Konfiguration werden
-              entfernt.
+              {t("admin.modules.confirmUninstallDesc", { name: confirmUninstall?.name ?? "" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -428,7 +426,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
               variant="outline"
               onClick={() => setConfirmUninstall(null)}
             >
-              Abbrechen
+              {t("admin.modules.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -446,7 +444,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
               ) : (
                 <Trash2 className="mr-1 h-4 w-4" />
               )}
-              Deinstallieren
+              {t("admin.modules.uninstall")}
             </Button>
           </DialogFooter>
         </DialogContent>

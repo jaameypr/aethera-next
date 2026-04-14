@@ -33,6 +33,7 @@ import {
   removeServerMemberAction,
 } from "@/app/(app)/actions/servers";
 import type { ProjectMemberRole } from "@/lib/services/project.service";
+import { useLocale } from "@/context/locale-context";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,14 +69,6 @@ const ROLE_META: Record<string, { label: string; icon: React.ElementType; color:
   viewer:  { label: "Viewer",  icon: Eye,    color: "text-zinc-500 dark:text-zinc-400",      badge: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
   member:  { label: "Manager", icon: Wrench, color: "text-blue-600 dark:text-blue-400",     badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
 };
-
-const SERVER_PERM_OPTIONS = [
-  { value: "server.start",    label: "Start/Stop" },
-  { value: "server.console",  label: "Konsole" },
-  { value: "server.files",    label: "Dateien" },
-  { value: "server.backups",  label: "Backups" },
-  { value: "server.settings", label: "Einstellungen" },
-];
 
 function Avatar({ name, role }: { name: string; role: string }) {
   const colors: Record<string, string> = {
@@ -114,15 +107,24 @@ function MemberRow({
   const [isPending, startTransition] = useTransition();
   const meta = ROLE_META[member.role] ?? ROLE_META.viewer;
   const Icon = meta.icon;
+  const { t } = useLocale();
+
+  const SERVER_PERM_OPTIONS = [
+    { value: "server.start",    label: t("projects.members.permStart") },
+    { value: "server.console",  label: t("projects.members.permConsole") },
+    { value: "server.files",    label: t("projects.members.permFiles") },
+    { value: "server.backups",  label: t("projects.members.permBackups") },
+    { value: "server.settings", label: t("projects.members.permSettings") },
+  ];
 
   function handleRoleChange(newRole: ProjectMemberRole) {
     startTransition(async () => {
       try {
         await updateProjectMemberRoleAction({ projectKey, userId: member.userId, role: newRole });
         onRoleChanged(member.userId, newRole);
-        toast.success("Rolle aktualisiert");
+        toast.success(t("projects.members.roleUpdated"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -132,9 +134,9 @@ function MemberRow({
       try {
         await removeProjectMemberAction({ projectKey, userId: member.userId });
         onRemoved(member.userId);
-        toast.success(`${member.username} entfernt`);
+        toast.success(t("projects.members.memberRemoved", { name: member.username }));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       } finally {
         setConfirmRemove(false);
       }
@@ -158,7 +160,7 @@ function MemberRow({
           prev.map((s) => s.serverId === serverId ? { ...s, permissions: newPerms } : s),
         );
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -190,9 +192,9 @@ function MemberRow({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="admin">{t("projects.members.roles.admin")}</SelectItem>
                     <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="viewer">{t("projects.members.roles.viewer")}</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -225,7 +227,9 @@ function MemberRow({
           {/* Per-server permissions expanded */}
           {expanded && serverAccess.length > 0 && (
             <div className="border-t border-zinc-100 px-4 pb-3 pt-2 dark:border-zinc-800">
-              <p className="mb-2 text-xs font-medium text-zinc-400 uppercase tracking-wide">Server-Berechtigungen</p>
+              <p className="mb-2 text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                {t("projects.members.serverPermissions")}
+              </p>
               <div className="space-y-2">
                 {serverAccess.map((srv) => (
                   <div key={srv.serverId}>
@@ -265,18 +269,18 @@ function MemberRow({
       <Dialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mitglied entfernen?</DialogTitle>
+            <DialogTitle>{t("projects.members.removeConfirm")}</DialogTitle>
             <DialogDescription>
-              <strong>{member.username}</strong> verliert den Zugriff auf dieses Projekt und alle Server darin.
+              {t("projects.members.removeConfirmDescFull", { name: member.username })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmRemove(false)} disabled={isPending}>
-              Abbrechen
+              {t("projects.members.cancel")}
             </Button>
             <Button variant="destructive" onClick={handleRemove} disabled={isPending}>
               {isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-              Entfernen
+              {t("projects.members.remove")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -297,6 +301,7 @@ export function ProjectMembersPanel({
 }: ProjectMembersPanelProps) {
   const [members, setMembers] = useState(initialMembers);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const { t } = useLocale();
 
   function handleRemoved(userId: string) {
     setMembers((prev) => prev.filter((m) => m.userId !== userId));
@@ -311,11 +316,11 @@ export function ProjectMembersPanel({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Mitglieder</h2>
+        <h2 className="text-lg font-semibold">{t("projects.members.title")}</h2>
         {isAdmin && (
           <Button size="sm" onClick={() => setInviteOpen(true)}>
             <UserPlus className="mr-1.5 h-4 w-4" />
-            Einladen
+            {t("projects.members.invite")}
           </Button>
         )}
       </div>
@@ -331,7 +336,7 @@ export function ProjectMembersPanel({
               <p className="truncate font-medium text-sm">{ownerUsername}</p>
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                 <Crown className="h-3 w-3" />
-                Eigentümer
+                {t("projects.members.owner")}
               </span>
             </div>
           </CardContent>
@@ -340,7 +345,7 @@ export function ProjectMembersPanel({
         {/* Members */}
         {members.length === 0 && (
           <p className="py-4 text-center text-sm text-zinc-500">
-            Noch keine Mitglieder. {isAdmin && "Lade jemanden ein!"}
+            {isAdmin ? t("projects.members.noMembersInvite") : t("projects.members.noMembers")}
           </p>
         )}
         {members.map((m) => (
@@ -360,7 +365,6 @@ export function ProjectMembersPanel({
         open={inviteOpen}
         onOpenChange={(o) => {
           setInviteOpen(o);
-          // Refresh is handled by server revalidation — page will re-render
         }}
       />
     </div>

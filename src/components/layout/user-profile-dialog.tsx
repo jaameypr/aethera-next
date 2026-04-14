@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { changePasswordAction } from "@/app/(app)/actions/profile";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 
 interface UserProfileDialogProps {
@@ -29,32 +30,33 @@ export function UserProfileDialog({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { t } = useLocale();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("profile.passwordMismatch"));
       return;
     }
 
     if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters");
+      setError(t("profile.passwordTooShort"));
       return;
     }
 
     setLoading(true);
     try {
       await changePasswordAction({ currentPassword, newPassword });
-      toast.success("Password changed successfully");
+      toast.success(t("profile.passwordChanged"));
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       onOpenChange(false);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to change password",
+        err instanceof Error ? err.message : t("profile.failedToChange"),
       );
     } finally {
       setLoading(false);
@@ -65,9 +67,9 @@ export function UserProfileDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Change Password</DialogTitle>
+          <DialogTitle>{t("profile.changePassword")}</DialogTitle>
           <DialogDescription>
-            Enter your current password and choose a new one.
+            {t("profile.changePasswordDesc")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -77,7 +79,7 @@ export function UserProfileDialog({
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="currentPassword">Current Password</Label>
+            <Label htmlFor="currentPassword">{t("profile.currentPassword")}</Label>
             <PasswordInput
               id="currentPassword"
               value={currentPassword}
@@ -86,17 +88,17 @@ export function UserProfileDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="newPassword">New Password</Label>
+            <Label htmlFor="newPassword">{t("profile.newPassword")}</Label>
             <PasswordInput
               id="newPassword"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Minimum 8 characters"
+              placeholder={t("profile.passwordMinChars")}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+            <Label htmlFor="confirmNewPassword">{t("profile.confirmNewPassword")}</Label>
             <PasswordInput
               id="confirmNewPassword"
               value={confirmPassword}
@@ -110,10 +112,10 @@ export function UserProfileDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("profile.cancel")}
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Changing..." : "Change Password"}
+              {loading ? t("profile.changing") : t("profile.changePasswordBtn")}
             </Button>
           </div>
         </form>

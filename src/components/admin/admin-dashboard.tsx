@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 import SystemMetricsCharts from "@/components/admin/SystemMetricsCharts";
 
 // ---------------------------------------------------------------------------
@@ -62,15 +63,16 @@ function DaemonBadge({
 }: {
   status: "connected" | "disconnected" | "reconnecting";
 }) {
+  const { t } = useLocale();
   const colors = {
     connected: "bg-emerald-500",
     disconnected: "bg-red-500",
     reconnecting: "bg-amber-500",
   };
   const labels = {
-    connected: "Verbunden",
-    disconnected: "Getrennt",
-    reconnecting: "Verbindung wird hergestellt…",
+    connected: t("admin.dashboard.daemonConnected"),
+    disconnected: t("admin.dashboard.daemonDisconnected"),
+    reconnecting: t("admin.dashboard.daemonReconnecting"),
   };
   return (
     <span className="inline-flex items-center gap-1.5 text-sm">
@@ -85,15 +87,16 @@ function CircuitBadge({
 }: {
   state: "closed" | "open" | "half-open";
 }) {
+  const { t } = useLocale();
   const colors = {
     closed: "text-emerald-500",
     open: "text-red-500",
     "half-open": "text-amber-500",
   };
   const labels = {
-    closed: "Geschlossen (OK)",
-    open: "Offen (Fehler)",
-    "half-open": "Halb-offen",
+    closed: t("admin.dashboard.circuitClosed"),
+    open: t("admin.dashboard.circuitOpen"),
+    "half-open": t("admin.dashboard.circuitHalfOpen"),
   };
   return (
     <span className={cn("text-sm font-medium", colors[state])}>
@@ -161,10 +164,11 @@ function MetricBadge({ value }: { value?: number }) {
 // ---------------------------------------------------------------------------
 
 function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
+  const { t } = useLocale();
   if (containers.length === 0) {
     return (
       <p className="py-4 text-center text-sm text-zinc-500">
-        Keine Container gefunden
+        {t("admin.dashboard.noContainers")}
       </p>
     );
   }
@@ -174,12 +178,12 @@ function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">Name</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">Image</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">Status</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">CPU</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">RAM</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">Ports</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">{t("admin.dashboard.colName")}</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">{t("admin.dashboard.colImage")}</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">{t("admin.dashboard.colStatus")}</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">{t("admin.dashboard.colCpu")}</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">{t("admin.dashboard.colRam")}</th>
+            <th className="px-3 py-2 text-left font-medium text-zinc-500">{t("admin.dashboard.colPorts")}</th>
           </tr>
         </thead>
         <tbody>
@@ -232,6 +236,7 @@ function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
 export function AdminDashboardClient({ data }: { data: SystemData }) {
   const [systemData, setSystemData] = useState<SystemData>(data);
   const [refreshing, setRefreshing] = useState(false);
+  const { t } = useLocale();
 
   async function refresh() {
     setRefreshing(true);
@@ -266,17 +271,17 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
 
   return (
     <div className="space-y-6">
-      {/* Quick stats — 3 cards (RAM-Nutzung replaced by live chart below) */}
+      {/* Quick stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          title="Container"
+          title={t("admin.dashboard.container")}
           value={`${systemData.containerCount.running} / ${systemData.containerCount.total}`}
-          subtitle="Running / Total"
+          subtitle={t("admin.dashboard.runningTotal")}
           icon={Server}
         />
         <StatCard
-          title="Docker Daemon"
-          value={systemData.docker?.daemon ?? "unbekannt"}
+          title={t("admin.dashboard.dockerDaemon")}
+          value={systemData.docker?.daemon ?? t("common.unknown")}
           subtitle={
             systemData.docker
               ? `Circuit: ${systemData.docker.circuit}`
@@ -285,40 +290,40 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
           icon={Activity}
         />
         <StatCard
-          title="Aktive Streams"
+          title={t("admin.dashboard.activeStreams")}
           value={String(systemData.docker?.activeStreams ?? 0)}
-          subtitle={`${systemData.docker?.pendingOperations ?? 0} ausstehend`}
+          subtitle={`${systemData.docker?.pendingOperations ?? 0} ${t("admin.dashboard.pendingOps")}`}
           icon={HardDrive}
         />
       </div>
 
-      {/* Live system metrics charts (replaces static RAM-Nutzung card) */}
+      {/* Live system metrics charts */}
       <SystemMetricsCharts />
 
       {/* Docker Health */}
       {systemData.docker && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Docker-Status</CardTitle>
+            <CardTitle className="text-base">{t("admin.dashboard.dockerStatus")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-500">Daemon</span>
+              <span className="text-sm text-zinc-500">{t("admin.dashboard.daemon")}</span>
               <DaemonBadge status={systemData.docker.daemon} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-500">Circuit Breaker</span>
+              <span className="text-sm text-zinc-500">{t("admin.dashboard.circuitBreaker")}</span>
               <CircuitBadge state={systemData.docker.circuit} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-500">Aktive Streams</span>
+              <span className="text-sm text-zinc-500">{t("admin.dashboard.activeStreams")}</span>
               <span className="text-sm font-medium">
                 {systemData.docker.activeStreams}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-zinc-500">
-                Ausstehende Operationen
+                {t("admin.dashboard.pendingOps")}
               </span>
               <span className="text-sm font-medium">
                 {systemData.docker.pendingOperations}
@@ -328,7 +333,7 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
         </Card>
       )}
 
-      {/* RAM progress (static snapshot from last poll) */}
+      {/* RAM */}
       {(() => {
         const memUsedPct =
           systemData.memory.total > 0
@@ -337,11 +342,11 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
         return (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Arbeitsspeicher</CardTitle>
+              <CardTitle className="text-base">{t("admin.dashboard.memory")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Belegt</span>
+                <span className="text-zinc-500">{t("admin.dashboard.memUsed")}</span>
                 <span className="font-medium">
                   {formatBytes(systemData.memory.used)}
                 </span>
@@ -360,8 +365,8 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
                 />
               </div>
               <div className="flex justify-between text-xs text-zinc-500">
-                <span>Frei: {formatBytes(systemData.memory.free)}</span>
-                <span>Total: {formatBytes(systemData.memory.total)}</span>
+                <span>{t("admin.dashboard.memFree")}: {formatBytes(systemData.memory.free)}</span>
+                <span>{t("admin.dashboard.memTotal")}: {formatBytes(systemData.memory.total)}</span>
               </div>
             </CardContent>
           </Card>
@@ -372,7 +377,7 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">
-            Container ({systemData.containers.length})
+            {t("admin.dashboard.container")} ({systemData.containers.length})
           </CardTitle>
           <Button
             variant="ghost"

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { cookies } from "next/headers";
 import { Toaster } from "sonner";
+import { LocaleProvider } from "@/context/locale-context";
+import { resolveLocale } from "@/lib/i18n/index";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -20,18 +23,23 @@ export const metadata: Metadata = {
   description: "Aethera — Project Management Platform",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const locale = resolveLocale(cookieStore.get("locale")?.value);
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
-        <Toaster position="bottom-right" richColors />
+        <LocaleProvider initialLocale={locale}>
+          {children}
+          <Toaster position="bottom-right" richColors />
+        </LocaleProvider>
       </body>
     </html>
   );

@@ -16,11 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { createBlueprintAction } from "@/app/(app)/actions/servers";
-
-const schema = z.object({
-  name: z.string().min(1, "Name ist erforderlich").max(48),
-  maxRam: z.number().min(512, "Mindestens 512 MB").max(65536),
-});
+import { useLocale } from "@/context/locale-context";
 
 interface CreateBlueprintDialogProps {
   projectKey: string;
@@ -37,6 +33,12 @@ export function CreateBlueprintDialog({
   const [maxRam, setMaxRam] = useState(2048);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
+  const { t } = useLocale();
+
+  const schema = z.object({
+    name: z.string().min(1, t("projects.blueprints.nameRequired")).max(48),
+    maxRam: z.number().min(512, t("projects.blueprints.minRam")).max(65536),
+  });
 
   function reset() {
     setName("");
@@ -64,10 +66,10 @@ export function CreateBlueprintDialog({
     startTransition(async () => {
       try {
         await createBlueprintAction({ projectKey, name, maxRam });
-        toast.success("Blueprint erstellt");
+        toast.success(t("projects.blueprints.blueprintCreated"));
         handleClose(false);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler beim Erstellen");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -78,21 +80,20 @@ export function CreateBlueprintDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Blueprint erstellen</DialogTitle>
+          <DialogTitle>{t("projects.blueprints.createTitle")}</DialogTitle>
           <DialogDescription>
-            Ein Blueprint reserviert einen Server-Slot mit einem maximalen RAM-Limit.
-            Projektmitglieder können diesen Slot dann konfigurieren und initialisieren.
+            {t("projects.blueprints.desc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="bp-name">Name</Label>
+            <Label htmlFor="bp-name">{t("projects.servers.addServer")}</Label>
             <Input
               id="bp-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="z.B. Survival Server"
+              placeholder={t("projects.blueprints.namePlaceholder")}
               autoFocus
             />
             {errors.name && (
@@ -102,7 +103,7 @@ export function CreateBlueprintDialog({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Maximales RAM</Label>
+              <Label>{t("projects.servers.maxRamLabel")}</Label>
               <span className="text-sm font-semibold">{ramLabel}</span>
             </div>
             <Slider
@@ -124,10 +125,10 @@ export function CreateBlueprintDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => handleClose(false)} disabled={isPending}>
-            Abbrechen
+            {t("projects.servers.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={isPending}>
-            {isPending ? "Erstelle…" : "Blueprint erstellen"}
+            {isPending ? t("common.creating") : t("projects.blueprints.createTitle")}
           </Button>
         </DialogFooter>
       </DialogContent>

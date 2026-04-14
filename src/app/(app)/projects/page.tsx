@@ -4,9 +4,11 @@ import { listServers } from "@/lib/services/server.service";
 import { checkPermission } from "@/lib/services/permission-check";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
+import { getServerT } from "@/lib/i18n/server";
 
 export default async function ProjectsPage() {
   const session = await requireSession();
+  const { t } = await getServerT();
   const [projects, canCreate] = await Promise.all([
     listProjects(session.userId),
     checkPermission(session.userId, "projects.create"),
@@ -30,11 +32,11 @@ export default async function ProjectsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Projekte</h1>
+          <h1 className="text-2xl font-bold">{t("projects.title")}</h1>
           <p className="text-sm text-zinc-500">
             {projects.length === 0
-              ? "Noch keine Projekte vorhanden"
-              : `${projects.length} Projekt${projects.length !== 1 ? "e" : ""}`}
+              ? t("projects.noProjectsDesc")
+              : t("projects.subtitle", { count: projects.length })}
           </p>
         </div>
         <CreateProjectDialog canCreate={canCreate} />
@@ -42,7 +44,7 @@ export default async function ProjectsPage() {
 
       {projectsWithServers.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 py-16 text-center text-zinc-500 dark:text-zinc-400">
-          <p className="text-sm">Erstelle dein erstes Projekt um zu starten.</p>
+          <p className="text-sm">{t("dashboard.noProjectsHint")}</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

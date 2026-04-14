@@ -7,39 +7,37 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { getServerT } from "@/lib/i18n/server";
 
-const sections = [
-  {
-    href: "/verzeichnis/upload",
-    icon: Upload,
-    title: "Upload",
-    description:
-      "Lade Welt-Dateien, Datenpakete oder andere Ressourcen hoch. Dateien werden nach 48 Stunden automatisch gelöscht.",
-  },
-  {
-    href: "/verzeichnis/backups",
-    icon: HardDrive,
-    title: "Backups",
-    description:
-      "Verwalte Backups deiner Server. Erstelle manuelle Sicherungen oder stelle frühere Zustände wieder her.",
-  },
-  {
-    href: "/verzeichnis/dateien",
-    icon: Files,
-    title: "Dateien",
-    description:
-      "Zeige alle hochgeladenen Dateien an. Lade sie herunter oder lösche sie.",
-  },
-];
+export default async function VerzeichnisPage() {
+  const { t } = await getServerT();
 
-export default function VerzeichnisPage() {
+  const sections = [
+    {
+      href: "/verzeichnis/upload",
+      icon: Upload,
+      title: t("verzeichnis.upload.title"),
+      description: t("verzeichnis.upload.description"),
+    },
+    {
+      href: "/verzeichnis/backups",
+      icon: HardDrive,
+      title: t("verzeichnis.backups.title"),
+      description: t("verzeichnis.backups.description"),
+    },
+    {
+      href: "/verzeichnis/dateien",
+      icon: Files,
+      title: t("verzeichnis.files.title"),
+      description: t("verzeichnis.files.description"),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Verzeichnis</h1>
-        <p className="text-sm text-zinc-500">
-          Uploads, Backups und Dateiverwaltung
-        </p>
+        <h1 className="text-2xl font-bold">{t("verzeichnis.title")}</h1>
+        <p className="text-sm text-zinc-500">{t("verzeichnis.subtitle")}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
