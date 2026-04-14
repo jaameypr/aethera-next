@@ -38,9 +38,10 @@ interface AppShellProps {
   currentUser: CurrentUserResponse;
   projects?: Array<{ _id: string; key: string; name: string }>;
   moduleItems?: ModuleSidebarItem[];
+  isAdmin?: boolean;
 }
 
-export function AppShell({ children, currentUser, projects, moduleItems }: AppShellProps) {
+export function AppShell({ children, currentUser, projects, moduleItems, isAdmin }: AppShellProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -62,14 +63,18 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
         { label: t("nav.files"), href: "/verzeichnis/dateien", icon: Files },
       ],
     },
-    {
-      title: t("nav.admin"),
-      items: [
-        { label: t("nav.users"), href: "/admin/users", icon: Users },
-        { label: t("nav.roles"), href: "/admin/roles", icon: ShieldCheck },
-        { label: t("nav.modules"), href: "/admin/modules", icon: Puzzle },
-      ],
-    },
+    ...(isAdmin
+      ? [
+          {
+            title: t("nav.admin"),
+            items: [
+              { label: t("nav.users"), href: "/admin/users", icon: Users },
+              { label: t("nav.roles"), href: "/admin/roles", icon: ShieldCheck },
+              { label: t("nav.modules"), href: "/admin/modules", icon: Puzzle },
+            ],
+          },
+        ]
+      : []),
   ];
 
   return (
