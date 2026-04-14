@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import { Toaster } from "sonner";
 import { LocaleProvider } from "@/context/locale-context";
+import { ThemeProvider, type Theme } from "@/context/theme-context";
 import { resolveLocale } from "@/lib/i18n/index";
 import "./globals.css";
 
@@ -23,6 +24,10 @@ export const metadata: Metadata = {
   description: "Aethera — Project Management Platform",
 };
 
+function resolveTheme(raw: string | undefined): Theme {
+  return raw === "dark" ? "dark" : "light";
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -30,16 +35,23 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const locale = resolveLocale(cookieStore.get("locale")?.value);
+  const theme = resolveTheme(cookieStore.get("theme")?.value);
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html
+      lang={locale}
+      className={theme === "dark" ? "dark" : undefined}
+      suppressHydrationWarning
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LocaleProvider initialLocale={locale}>
-          {children}
-          <Toaster position="bottom-right" richColors />
-        </LocaleProvider>
+        <ThemeProvider initialTheme={theme}>
+          <LocaleProvider initialLocale={locale}>
+            {children}
+            <Toaster position="bottom-right" richColors />
+          </LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

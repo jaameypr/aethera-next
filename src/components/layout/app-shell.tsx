@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { UserProfileButton } from "./user-profile-button";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 import { useLocale } from "@/context/locale-context";
 import type { CurrentUserResponse } from "@/lib/api/types";
 
@@ -228,15 +229,17 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
           )}
         </nav>
 
-        {/* Bottom: language switcher + user profile */}
+        {/* Bottom: theme + language switcher + user profile */}
         <div className="border-t border-zinc-200 p-2 dark:border-zinc-800 space-y-1">
           {!collapsed && (
-            <div className="px-1">
-              <LanguageSwitcher className="w-full justify-start" />
+            <div className="px-1 flex items-center gap-2">
+              <ThemeSwitcher />
+              <LanguageSwitcher className="flex-1 justify-start" />
             </div>
           )}
           {collapsed && (
-            <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <ThemeSwitcher />
               <LanguageSwitcher compact />
             </div>
           )}

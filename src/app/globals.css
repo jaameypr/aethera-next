@@ -15,11 +15,11 @@
   --foreground: #09090b;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-  }
+@custom-variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
 }
 
 body {
