@@ -14,7 +14,8 @@ import { connectDB } from "@/lib/db/connection";
 import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models/backup";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
 import { logAction } from "@/lib/services/project.service";
-import { getBackupDir, getServerDataPath } from "@/lib/docker/storage";
+import { getBackupDir, getServerDataPath, resolveServerDataPath } from "@/lib/docker/storage";
+import { badRequest } from "@/lib/api/errors";
 
 // ---------------------------------------------------------------------------
 // Component → directory mapping (relative to server data dir)
@@ -116,10 +117,10 @@ export async function createBackup(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new Error("Server must be stopped to create a backup");
+    throw badRequest("Server must be stopped to create a backup");
   }
 
-  const serverDir = getServerDataPath(server.projectKey, server.identifier);
+  const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
   const destDir = backupDir(serverId);
   await mkdir(destDir, { recursive: true });
 
@@ -205,13 +206,13 @@ export async function restoreBackup(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new Error("Server must be stopped to restore a backup");
+    throw badRequest("Server must be stopped to restore a backup");
   }
 
   const backup = await BackupModel.findById(backupId);
   if (!backup) throw new Error("Backup not found");
 
-  const serverDir = getServerDataPath(server.projectKey, server.identifier);
+  const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
 
   // Extract tar.gz into server data dir
   await new Promise<void>((resolve, reject) => {
@@ -268,7 +269,7 @@ export async function restoreBackupSelective(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new Error("Server must be stopped to restore a backup");
+    throw badRequest("Server must be stopped to restore a backup");
   }
 
   const backup = await BackupModel.findById(backupId);
@@ -284,7 +285,7 @@ export async function restoreBackupSelective(
     }
   }
 
-  const serverDir = getServerDataPath(server.projectKey, server.identifier);
+  const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
 
   await new Promise<void>((resolve, reject) => {
     const extract = tar.extract();

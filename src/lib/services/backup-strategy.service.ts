@@ -1,5 +1,6 @@
 import "server-only";
 
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connection";
@@ -9,9 +10,10 @@ import { AsyncJobModel, type IAsyncJob } from "@/lib/db/models/async-job";
 import { ServerModel } from "@/lib/db/models/server";
 import { createBackup as createSyncBackup } from "@/lib/services/backup.service";
 import { uploadBackupToShare, isPaperviewReady } from "@/lib/services/paperview.service";
-import { getBackupDir, getServerDataPath } from "@/lib/docker/storage";
+import { getBackupDir, getServerDataPath, resolveServerDataPath } from "@/lib/docker/storage";
 import { logAction } from "@/lib/services/project.service";
 import { dispatchBackupJob } from "@/lib/workers/backup-runner";
+import { badRequest } from "@/lib/api/errors";
 
 /* ------------------------------------------------------------------ */
 /*  Capabilities — what the system can do based on installed modules   */
@@ -73,8 +75,20 @@ async function createAsyncBackup(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new Error("Server must be stopped to create a backup");
+    throw badRequest("Server must be stopped to create a backup");
   }
+
+  // Resolve actual data directory (handles legacy identifier-only dir naming)
+  const dataPath = await resolveServerDataPath(server.projectKey, server.identifier);
+  try {
+    await stat(dataPath);
+  } catch {
+    throw badRequest(
+      `Server data directory does not exist (${dataPath}). ` +
+        "Ensure the server has been started at least once before creating a backup.",
+    );
+  }
+  const serverDataIdentifier = path.basename(dataPath);
 
   const asyncMod = await InstalledModuleModel.findOne({
     moduleId: "async-backups",
@@ -127,7 +141,7 @@ async function createAsyncBackup(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       serverId: server._id.toString(),
-      serverIdentifier: server.identifier,
+      serverIdentifier: serverDataIdentifier,
       serverName: server.name,
       components,
       callbackUrl,
@@ -282,7 +296,7 @@ async function createBackupViaWorker(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new Error("Server must be stopped to create a backup");
+    throw badRequest("Server must be stopped to create a backup");
   }
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
@@ -325,8 +339,9 @@ async function createBackupViaWorker(
     strategy: "worker",
   });
 
+  const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
   dispatchBackupJob(job._id.toString(), "backup:create", {
-    serverDir: getServerDataPath(server.projectKey, server.identifier),
+    serverDir,
     destDir,
     filename,
     components,
@@ -352,7 +367,7 @@ export async function restoreBackupViaWorker(
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
   if (server.status !== "stopped") {
-    throw new Error("Server must be stopped to restore a backup");
+    throw badRequest("Server must be stopped to restore a backup");
   }
 
   const backup = await BackupModel.findById(backupId);
@@ -366,9 +381,10 @@ export async function restoreBackupViaWorker(
     payload: { backupId, serverId, components, actorId },
   });
 
+  const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
   dispatchBackupJob(job._id.toString(), "backup:restore", {
     backupPath: backup.path,
-    serverDir: getServerDataPath(server.projectKey, server.identifier),
+    serverDir,
     components,
   }).catch((err) => {
     console.error(`[backup-strategy] Failed to dispatch backup:restore job ${job._id}:`, err);
