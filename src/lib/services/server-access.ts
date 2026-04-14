@@ -33,6 +33,33 @@ export async function canAccessServer(
 }
 
 /**
+ * Return the calling user's effective context for a server:
+ * - isOwner: true when the user owns the project (all operations allowed)
+ * - permissions: the permission list from their server.access entry, or []
+ *
+ * Use this in server components to gate tab visibility without a full DB
+ * round-trip per permission check.
+ */
+export async function getServerUserContext(
+  server: IServer,
+  userId: string,
+): Promise<{ isOwner: boolean; permissions: string[] }> {
+  await connectDB();
+  const project = await ProjectModel.findOne({ key: server.projectKey })
+    .select("owner")
+    .lean();
+
+  if (!project) return { isOwner: false, permissions: [] };
+
+  if (project.owner.toString() === userId) {
+    return { isOwner: true, permissions: [] };
+  }
+
+  const entry = server.access?.find((a) => a.userId.toString() === userId);
+  return { isOwner: false, permissions: entry?.permissions ?? [] };
+}
+
+/**
  * Assert that a user holds a specific operation permission on a server.
  * The project owner is always permitted. For all others, the check is
  * based solely on their entry in server.access — the canonical per-server

@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth/guards";
-import { errorResponse, badRequest, notFound, forbidden } from "@/lib/api/errors";
+import { errorResponse, badRequest, notFound } from "@/lib/api/errors";
 import { restoreBackupViaWorker } from "@/lib/services/backup-strategy.service";
 import { getServer } from "@/lib/services/server.service";
-import { canAccessServer } from "@/lib/services/server-access";
+import { assertServerPermission } from "@/lib/services/server-access";
 import type { BackupComponent } from "@/lib/db/models/backup";
 
 const VALID_COMPONENTS: BackupComponent[] = [
@@ -20,7 +20,7 @@ export const POST = withAuth(async (req: NextRequest, { session, params }) => {
 
     const server = await getServer(serverId);
     if (!server) throw notFound("Server not found");
-    if (!(await canAccessServer(server, session.userId))) throw forbidden();
+    await assertServerPermission(server, session.userId, "server.backups");
 
     const body = await req.json();
     const components: BackupComponent[] = body.components;

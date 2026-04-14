@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import { getServer } from "@/lib/services/server.service";
 import { getOrchestrator } from "@/lib/docker/orchestrator";
-import { canAccessServer } from "@/lib/services/server-access";
+import { assertServerPermission } from "@/lib/services/server-access";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,9 @@ export async function GET(
   if (!server) {
     return Response.json({ error: "Server not found" }, { status: 404 });
   }
-  if (!(await canAccessServer(server, userId))) {
+  try {
+    await assertServerPermission(server, userId, "server.console");
+  } catch {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!server.containerId || server.status !== "running") {

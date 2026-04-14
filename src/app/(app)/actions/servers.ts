@@ -202,13 +202,13 @@ export async function writePropertiesAction(data: {
 export async function readPropertiesAction(data: {
   serverId: string;
 }): Promise<Record<string, string>> {
-  await requireSession();
+  const session = await requireSession();
 
   try {
     const server = await getServer(data.serverId);
     if (!server) throw new Error("Server not found");
-    const props = server.properties ?? {};
-    return props;
+    await assertServerPermission(server, session.userId, "server.settings");
+    return server.properties ?? {};
   } catch (err) {
     throw new Error(
       err instanceof Error ? err.message : "Failed to read properties",
@@ -262,12 +262,13 @@ export async function grantServerAccessAction(data: {
   userId: string;
   permissions: string[];
 }): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
   await connectDB();
 
   try {
     const server = await ServerModel.findById(data.serverId);
     if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.settings");
 
     const existing = server.access.some(
       (a) => a.userId.toString() === data.userId,
@@ -295,12 +296,13 @@ export async function removeServerMemberAction(data: {
   serverId: string;
   userId: string;
 }): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
   await connectDB();
 
   try {
     const server = await ServerModel.findById(data.serverId);
     if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.settings");
 
     await ServerModel.updateOne(
       { _id: data.serverId },
@@ -320,10 +322,14 @@ export async function updateServerAccessAction(data: {
   userId: string;
   permissions: string[];
 }): Promise<void> {
-  await requireSession();
+  const session = await requireSession();
   await connectDB();
 
   try {
+    const server = await ServerModel.findById(data.serverId);
+    if (!server) throw new Error("Server not found");
+    await assertServerPermission(server, session.userId, "server.settings");
+
     const result = await ServerModel.updateOne(
       { _id: data.serverId, "access.userId": data.userId },
       { $set: { "access.$.permissions": data.permissions } },
@@ -333,8 +339,7 @@ export async function updateServerAccessAction(data: {
       throw new Error("Server or access entry not found");
     }
 
-    const server = await getServer(data.serverId);
-    revalidateServer(data.serverId, server?.projectKey);
+    revalidateServer(data.serverId, server.projectKey);
   } catch (err) {
     throw new Error(
       err instanceof Error ? err.message : "Failed to update access",

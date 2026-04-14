@@ -14,7 +14,10 @@ export const GET = withAuth(async (_req: NextRequest, { session, params }) => {
     if (!server) throw notFound("Server not found");
     if (!(await canAccessServer(server, session.userId))) throw forbidden();
 
-    return Response.json(server);
+    // Never expose env or properties — those may contain secrets and are
+    // served through dedicated endpoints that enforce server.settings permission.
+    const { env: _env, properties: _props, ...safe } = server as any;
+    return Response.json(safe);
   } catch (error) {
     return errorResponse(error);
   }

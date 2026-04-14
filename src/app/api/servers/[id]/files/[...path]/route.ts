@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth/guards";
-import { errorResponse, forbidden, notFound } from "@/lib/api/errors";
+import { errorResponse, notFound } from "@/lib/api/errors";
 import { getServer } from "@/lib/services/server.service";
 import {
   readFile,
@@ -11,7 +11,7 @@ import {
   downloadFolderAsZip,
   moveFile,
 } from "@/lib/services/file.service";
-import { canAccessServer } from "@/lib/services/server-access";
+import { assertServerPermission } from "@/lib/services/server-access";
 
 function extractFilepath(params: { path: string[] }): string {
   return params.path.join("/");
@@ -21,7 +21,7 @@ export const GET = withAuth<{ id: string; path: string[] }>(async (req: NextRequ
   try {
     const server = await getServer(params.id);
     if (!server) throw notFound("Server not found");
-    if (!(await canAccessServer(server, session.userId))) throw forbidden();
+    await assertServerPermission(server, session.userId, "server.files");
 
     const filepath = extractFilepath(params);
     const url = new URL(req.url);
@@ -59,7 +59,7 @@ export const PUT = withAuth<{ id: string; path: string[] }>(async (req: NextRequ
   try {
     const server = await getServer(params.id);
     if (!server) throw notFound("Server not found");
-    if (!(await canAccessServer(server, session.userId))) throw forbidden();
+    await assertServerPermission(server, session.userId, "server.files");
 
     const filepath = extractFilepath(params);
     const { content } = await req.json();
@@ -75,7 +75,7 @@ export const DELETE = withAuth<{ id: string; path: string[] }>(
     try {
       const server = await getServer(params.id);
       if (!server) throw notFound("Server not found");
-      if (!(await canAccessServer(server, session.userId))) throw forbidden();
+      await assertServerPermission(server, session.userId, "server.files");
 
       const filepath = extractFilepath(params);
       await deleteFile(params.id, filepath);
@@ -90,7 +90,7 @@ export const POST = withAuth<{ id: string; path: string[] }>(async (req: NextReq
   try {
     const server = await getServer(params.id);
     if (!server) throw notFound("Server not found");
-    if (!(await canAccessServer(server, session.userId))) throw forbidden();
+    await assertServerPermission(server, session.userId, "server.files");
 
     const filepath = extractFilepath(params);
     const url = new URL(req.url);
