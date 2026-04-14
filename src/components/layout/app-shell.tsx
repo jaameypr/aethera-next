@@ -229,21 +229,24 @@ export function AppShell({ children, currentUser, projects, moduleItems }: AppSh
           )}
         </nav>
 
-        {/* Bottom: theme + language switcher + user profile */}
+        {/* Bottom: user profile, separator, then theme + language controls */}
         <div className="border-t border-zinc-200 p-2 dark:border-zinc-800 space-y-1">
+          <UserProfileButton user={currentUser} collapsed={collapsed} />
+          <div className="flex justify-center py-0.5">
+            <div className="h-px w-4/5 bg-zinc-200 dark:bg-zinc-800 rounded-full" />
+          </div>
           {!collapsed && (
-            <div className="px-1 flex items-center gap-2">
+            <div className="px-1 flex items-center gap-1">
               <ThemeSwitcher />
-              <LanguageSwitcher className="flex-1 justify-start" />
+              <LanguageSwitcher side="right" className="flex-1 justify-start" />
             </div>
           )}
           {collapsed && (
             <div className="flex flex-col items-center gap-2">
               <ThemeSwitcher />
-              <LanguageSwitcher compact />
+              <LanguageSwitcher compact side="right" />
             </div>
           )}
-          <UserProfileButton user={currentUser} collapsed={collapsed} />
         </div>
       </aside>
 
