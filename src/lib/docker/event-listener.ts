@@ -41,7 +41,7 @@ export async function startEventListener(): Promise<void> {
             status: "error",
             containerStatus: `died (exit ${exitCode ?? "?"})`,
           },
-          { new: false },
+          { returnDocument: "before" },
         );
 
         // Only notify as a crash if the server was not already being stopped intentionally
@@ -68,7 +68,7 @@ export async function startEventListener(): Promise<void> {
             status: "stopped",
             containerStatus: undefined,
           },
-          { new: true },
+          { returnDocument: "after" },
         );
 
         // Only notify if the update was actually applied (i.e. server wasn't already stopped)
@@ -94,7 +94,7 @@ export async function startEventListener(): Promise<void> {
             status: "running",
             containerStatus: "running",
           },
-          { new: true },
+          { returnDocument: "after" },
         );
 
         if (newDoc) {

@@ -464,7 +464,7 @@ export async function beginStartServer(
   const server = await ServerModel.findOneAndUpdate(
     { _id: serverId, status: { $in: ["stopped", "error"] } },
     { $set: { status: "starting" } },
-    { new: false },
+    { returnDocument: "before" },
   );
   if (!server) {
     const current = await ServerModel.findById(serverId);
@@ -510,7 +510,7 @@ export async function beginStopServer(
       containerId: { $exists: true, $ne: null },
     },
     { $set: { status: "stopping" } },
-    { new: false },
+    { returnDocument: "before" },
   );
   if (!server) {
     const current = await ServerModel.findById(serverId);
@@ -539,7 +539,7 @@ export async function beginSoftStopServer(
       containerId: { $exists: true, $ne: null },
     },
     { $set: { status: "stopping" } },
-    { new: false },
+    { returnDocument: "before" },
   );
   if (!server) {
     const current = await ServerModel.findById(serverId);
@@ -567,7 +567,7 @@ export async function beginRecreateServer(
   const server = await ServerModel.findOneAndUpdate(
     { _id: serverId, status: "running" },
     { $set: { status: "stopping" } },
-    { new: false },
+    { returnDocument: "before" },
   );
   if (!server) {
     const current = await ServerModel.findById(serverId);
@@ -599,7 +599,7 @@ export async function beginRecreateServer(
     const claimed = await ServerModel.findOneAndUpdate(
       { _id: serverId, status: "stopped" },
       { $set: { status: "starting" } },
-      { new: false },
+      { returnDocument: "before" },
     );
     if (!claimed) return;
 
