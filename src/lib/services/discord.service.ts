@@ -11,31 +11,7 @@ import { badRequest, notFound } from "@/lib/api/errors";
 // Config
 // ---------------------------------------------------------------------------
 
-const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const DISCORD_API = "https://discord.com/api/v10";
 const VERIFICATION_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-function requireToken(): string {
-  if (!DISCORD_BOT_TOKEN) {
-    throw badRequest("Discord integration is not configured");
-  }
-  return DISCORD_BOT_TOKEN;
-}
-
-async function discordFetch(
-  path: string,
-  options: RequestInit = {},
-): Promise<Response> {
-  const token = requireToken();
-  return fetch(`${DISCORD_API}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bot ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-}
 
 // ---------------------------------------------------------------------------
 // 1. Verification Flow
@@ -79,6 +55,15 @@ export async function consumeVerificationCode(
 
   if (!verification) {
     throw badRequest("Invalid or expired verification code");
+  }
+
+  // Conflict: this guild is already linked to a different project
+  const guildConflict = await ProjectModel.findOne({
+    discordGuildId: guildId,
+    key: { $ne: verification.projectKey },
+  }).lean();
+  if (guildConflict) {
+    throw badRequest("This Discord server is already linked to another project");
   }
 
   verification.consumed = true;
@@ -141,96 +126,4 @@ export async function unlinkDiscordFromUser(userId: string): Promise<void> {
 export async function getUserByDiscordId(discordId: string) {
   await connectDB();
   return UserModel.findOne({ discordId }).lean();
-}
-
-// ---------------------------------------------------------------------------
-// 3. Notifications
-// ---------------------------------------------------------------------------
-
-export async function notifyServerEvent(
-  projectKey: string,
-  event: string,
-  details: string,
-): Promise<void> {
-  await connectDB();
-
-  const project = await ProjectModel.findOne({ key: projectKey })
-    .select("discordGuildId name")
-    .lean<IProject>();
-
-  if (!project?.discordGuildId) return; // no linked guild
-
-  const channelId = await findNotificationChannel(project.discordGuildId);
-  if (!channelId) return;
-
-  const colorMap: Record<string, number> = {
-    SERVER_STARTED: 0x22c55e,  // green
-    SERVER_STOPPED: 0xef4444,  // red
-    BACKUP_CREATED: 0x3b82f6,  // blue
-    SERVER_ERROR: 0xf59e0b,    // amber
-  };
-
-  await discordFetch(`/channels/${channelId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({
-      embeds: [
-        {
-          title: `🎮 ${event.replace(/_/g, " ")}`,
-          description: details,
-          color: colorMap[event] ?? 0x6366f1,
-          footer: { text: `Projekt: ${project.name}` },
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    }),
-  });
-}
-
-async function findNotificationChannel(
-  guildId: string,
-): Promise<string | null> {
-  try {
-    const res = await discordFetch(`/guilds/${guildId}/channels`);
-    if (!res.ok) return null;
-
-    const channels = (await res.json()) as {
-      id: string;
-      name: string;
-      type: number;
-    }[];
-
-    // Prefer a channel named "aethera" or "server-status", fall back to first text channel
-    const preferred = channels.find(
-      (c) =>
-        c.type === 0 &&
-        (c.name === "aethera" || c.name === "server-status"),
-    );
-    if (preferred) return preferred.id;
-
-    const firstText = channels.find((c) => c.type === 0);
-    return firstText?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 4. Helpers
-// ---------------------------------------------------------------------------
-
-export function isDiscordConfigured(): boolean {
-  return !!DISCORD_BOT_TOKEN;
-}
-
-export async function getGuildInfo(
-  guildId: string,
-): Promise<{ id: string; name: string; icon: string | null } | null> {
-  try {
-    const res = await discordFetch(`/guilds/${guildId}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return { id: data.id, name: data.name, icon: data.icon };
-  } catch {
-    return null;
-  }
 }
