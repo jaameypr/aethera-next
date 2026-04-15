@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Save,
   Trash2,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,6 +73,7 @@ interface ServerDiscordConfig {
   playerChat: ChannelConfig;
   playerEvents: ChannelConfig;
   whitelistRequests: ChannelConfig;
+  serverEvents: ChannelConfig;
 }
 
 interface WhitelistRequest {
@@ -91,6 +93,7 @@ const EMPTY_CONFIG: ServerDiscordConfig = {
   playerChat: { ...EMPTY_CHANNEL_CONFIG },
   playerEvents: { ...EMPTY_CHANNEL_CONFIG },
   whitelistRequests: { ...EMPTY_CHANNEL_CONFIG },
+  serverEvents: { ...EMPTY_CHANNEL_CONFIG },
 };
 
 // ---------------------------------------------------------------------------
@@ -139,7 +142,7 @@ export function DiscordTab({ serverId }: Props) {
 
       if (configRes.ok) {
         const data = await configRes.json();
-        setConfig(data ?? EMPTY_CONFIG);
+        setConfig(data ? { ...EMPTY_CONFIG, ...data } : EMPTY_CONFIG);
       }
 
       if (guildsRes.ok) {
@@ -256,7 +259,7 @@ export function DiscordTab({ serverId }: Props) {
   // -------------------------------------------------------------------------
 
   function updateChannelConfig(
-    key: keyof Pick<ServerDiscordConfig, "playerChat" | "playerEvents" | "whitelistRequests">,
+    key: keyof Pick<ServerDiscordConfig, "playerChat" | "playerEvents" | "whitelistRequests" | "serverEvents">,
     patch: Partial<ChannelConfig>,
   ) {
     setConfig((prev) => ({
@@ -274,6 +277,7 @@ export function DiscordTab({ serverId }: Props) {
       playerChat:        { ...prev.playerChat,        channelId: null },
       playerEvents:      { ...prev.playerEvents,      channelId: null },
       whitelistRequests: { ...prev.whitelistRequests, channelId: null },
+      serverEvents:      { ...prev.serverEvents,      channelId: null },
     }));
   }
 
@@ -456,6 +460,17 @@ export function DiscordTab({ serverId }: Props) {
                 </p>
               </div>
             }
+          />
+
+          {/* Server Events */}
+          <ChannelConfigCard
+            title="Server Events"
+            description="Post notifications when the server starts, stops, crashes, or a backup completes."
+            icon={<Activity className="h-4 w-4" />}
+            config={config.serverEvents}
+            channels={channels}
+            channelsLoading={channelsLoading}
+            onChange={(patch) => updateChannelConfig("serverEvents", patch)}
           />
 
           {/* Pending Requests */}

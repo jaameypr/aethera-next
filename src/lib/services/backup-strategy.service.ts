@@ -14,6 +14,7 @@ import { getBackupDir, getServerDataPath, resolveServerDataPath } from "@/lib/do
 import { logAction } from "@/lib/services/project.service";
 import { dispatchBackupJob } from "@/lib/workers/backup-runner";
 import { badRequest } from "@/lib/api/errors";
+import { sendServerEventToDiscordModule } from "@/lib/services/discord-module.service";
 
 /* ------------------------------------------------------------------ */
 /*  Capabilities — what the system can do based on installed modules   */
@@ -239,6 +240,17 @@ export async function completeAsyncBackup(payload: {
         jobId: payload.jobId,
       },
     );
+
+    const details =
+      payload.status === "completed"
+        ? `Backup "${payload.filename ?? backup.filename}" completed successfully.`
+        : `Backup failed: ${payload.error ?? "Unknown error"}`;
+    sendServerEventToDiscordModule(
+      server._id.toString(),
+      payload.status === "completed" ? "BACKUP_COMPLETED" : "BACKUP_FAILED",
+      server.name,
+      details,
+    ).catch((e) => console.warn("[backup-strategy] Discord notify failed:", e));
   }
 
   return backup.toObject() as IBackup;

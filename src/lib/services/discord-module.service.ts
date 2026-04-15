@@ -114,6 +114,38 @@ export async function getPendingWhitelistRequests(serverId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Server lifecycle event notifications
+// ---------------------------------------------------------------------------
+
+export type DiscordServerEventType =
+  | "SERVER_STARTED"
+  | "SERVER_STOPPED"
+  | "SERVER_ERROR"
+  | "BACKUP_COMPLETED"
+  | "BACKUP_FAILED";
+
+/**
+ * Notifies the Discord module of a server lifecycle event so it can post
+ * an embed to the configured serverEvents channel.
+ * Fire-and-forget — errors are swallowed to never block the caller.
+ */
+export async function sendServerEventToDiscordModule(
+  serverId: string,
+  eventType: DiscordServerEventType,
+  serverName: string,
+  details?: string,
+): Promise<void> {
+  try {
+    await discordModuleFetch(`/api/servers/${serverId}/event`, {
+      method: "POST",
+      body: JSON.stringify({ eventType, serverName, details: details ?? "" }),
+    });
+  } catch {
+    // Discord module unavailable or request failed — silently ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
 // API key validation helper (for internal Aethera endpoints)
 // ---------------------------------------------------------------------------
 

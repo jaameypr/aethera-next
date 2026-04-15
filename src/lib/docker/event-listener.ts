@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db/connection";
 import { ServerModel } from "@/lib/db/models/server";
 import { getDockerClient } from "@/lib/docker/orchestrator";
 import { subscribeEvents } from "@pruefertit/docker-orchestrator";
+import { sendServerEventToDiscordModule } from "@/lib/services/discord-module.service";
 
 let initialized = false;
 
@@ -31,14 +32,27 @@ export async function startEventListener(): Promise<void> {
 
         await connectDB();
         const containerId = event.actor.id;
+        const exitCode = event.actor.attributes["exitCode"];
 
-        await ServerModel.updateOne(
+        // Get pre-update state to distinguish crashes from intentional stops
+        const oldDoc = await ServerModel.findOneAndUpdate(
           { containerId },
           {
             status: "error",
-            containerStatus: `died (exit ${event.actor.attributes["exitCode"] ?? "?"})`,
+            containerStatus: `died (exit ${exitCode ?? "?"})`,
           },
+          { new: false },
         );
+
+        // Only notify as a crash if the server was not already being stopped intentionally
+        if (oldDoc && oldDoc.status !== "stopping") {
+          sendServerEventToDiscordModule(
+            oldDoc._id.toString(),
+            "SERVER_ERROR",
+            oldDoc.name,
+            `Server crashed (exit code: ${exitCode ?? "?"})`,
+          ).catch((e) => console.warn("[event-listener] Discord notify failed:", e));
+        }
       });
 
       subscription.on("container.stop", async (event) => {
@@ -48,13 +62,24 @@ export async function startEventListener(): Promise<void> {
         const containerId = event.actor.id;
 
         // Keep containerId — container still exists (just stopped). Only destroy removes it.
-        await ServerModel.updateOne(
+        const newDoc = await ServerModel.findOneAndUpdate(
           { containerId, status: { $ne: "stopped" } },
           {
             status: "stopped",
             containerStatus: undefined,
           },
+          { new: true },
         );
+
+        // Only notify if the update was actually applied (i.e. server wasn't already stopped)
+        if (newDoc) {
+          sendServerEventToDiscordModule(
+            newDoc._id.toString(),
+            "SERVER_STOPPED",
+            newDoc.name,
+            "Server has been stopped.",
+          ).catch((e) => console.warn("[event-listener] Discord notify failed:", e));
+        }
       });
 
       subscription.on("container.start", async (event) => {
@@ -63,13 +88,23 @@ export async function startEventListener(): Promise<void> {
         await connectDB();
         const containerId = event.actor.id;
 
-        await ServerModel.updateOne(
+        const newDoc = await ServerModel.findOneAndUpdate(
           { containerId },
           {
             status: "running",
             containerStatus: "running",
           },
+          { new: true },
         );
+
+        if (newDoc) {
+          sendServerEventToDiscordModule(
+            newDoc._id.toString(),
+            "SERVER_STARTED",
+            newDoc.name,
+            "Server is now online.",
+          ).catch((e) => console.warn("[event-listener] Discord notify failed:", e));
+        }
       });
 
       subscription.on("container.destroy", async (event) => {
@@ -78,6 +113,8 @@ export async function startEventListener(): Promise<void> {
         await connectDB();
         const containerId = event.actor.id;
 
+        // container.stop fires before destroy for graceful shutdowns and already sends
+        // SERVER_STOPPED; skip notification here to avoid duplicates.
         await ServerModel.updateOne(
           { containerId },
           {

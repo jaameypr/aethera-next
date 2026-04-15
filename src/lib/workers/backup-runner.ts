@@ -7,6 +7,7 @@ import { AsyncJobModel, type AsyncJobType } from "@/lib/db/models/async-job";
 import { BackupModel } from "@/lib/db/models/backup";
 import { logAction } from "@/lib/services/project.service";
 import { ServerModel } from "@/lib/db/models/server";
+import { sendServerEventToDiscordModule } from "@/lib/services/discord-module.service";
 
 // ---------------------------------------------------------------------------
 // Worker script resolution
@@ -61,6 +62,27 @@ export async function dispatchBackupJob(
         { _id: jobId, status: { $in: ["pending", "running"] } },
         { status: "error", error: err.message },
       ).catch(() => {});
+    }
+
+    // For backup:create jobs, send a Discord notification on completion or failure.
+    // Look up the backup by jobId (set when the backup record is created) to get the
+    // server context without relying on the payload (which is overwritten by workerPayload).
+    if (type === "backup:create") {
+      BackupModel.findOne({ jobId }).then(async (backup) => {
+        if (!backup) return;
+        const server = await ServerModel.findById(backup.serverId);
+        if (!server) return;
+
+        const details = err
+          ? `Backup failed: ${err.message}`
+          : `Backup "${backup.filename}" completed successfully.`;
+        await sendServerEventToDiscordModule(
+          server._id.toString(),
+          err ? "BACKUP_FAILED" : "BACKUP_COMPLETED",
+          server.name,
+          details,
+        );
+      }).catch((e) => console.warn("[backup-runner] Discord notify failed:", e));
     }
   });
 }
