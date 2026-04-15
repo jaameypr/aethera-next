@@ -78,8 +78,9 @@ Pack-driven servers resolve Minecraft version, loader, and loader version automa
 - Read and write individual files without leaving the panel
 
 ### 🤝 Discord Integration
-- **Guild linking** — associate a project with a Discord guild (name + icon synced)
-- **Verification flow** — users link their Discord account via a time-limited token challenge
+- **Admin setup** — set `DISCORD_BOT_TOKEN` in the environment and invite the bot to Discord once
+- **Project linking** — a project manager generates a short-lived verification code in the panel, then uses it via the bot command in their Discord guild to link the project to that guild
+- **Event notifications** — once linked, the bot posts server events (started, stopped, backup created, error) as embeds to a `#aethera` or `#server-status` channel, falling back to the first available text channel
 - **Discord module** — optional Spring Boot bot that polls server logs and handles whitelist approval callbacks
 
 ### 🧩 Module System
