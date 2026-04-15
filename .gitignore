@@ -49,3 +49,9 @@ next-env.d.ts
 
 # claude ai
 .claude/
+
+# ide
+.idea/
+
+# local docs
+docs/
