@@ -107,7 +107,7 @@ Pack-driven servers resolve Minecraft version, loader, and loader version automa
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | [Next.js 15](https://nextjs.org) (App Router) |
+| Framework | [Next.js 16](https://nextjs.org) (App Router) |
 | Language | TypeScript |
 | Database | MongoDB 7 via Mongoose |
 | Container orchestration | Docker (via `@pruefertit/docker-orchestrator`) |
