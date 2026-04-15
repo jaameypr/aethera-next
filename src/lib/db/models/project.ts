@@ -12,9 +12,6 @@ export interface IProject extends Document {
   description?: string;
   owner: mongoose.Types.ObjectId;
   members: IMember[];
-  discordGuildId?: string;
-  discordGuildName?: string;
-  discordGuildIcon?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,9 +31,6 @@ const ProjectSchema = new Schema<IProject>(
     description: { type: String },
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true },
     members: [MemberSchema],
-    discordGuildId: { type: String },
-    discordGuildName: { type: String },
-    discordGuildIcon: { type: String },
   },
   { timestamps: true },
 );
