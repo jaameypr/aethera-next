@@ -27,6 +27,7 @@ export default async function ProjectDetailPage({ params }: Props) {
     (m) => m.userId.toString() === session.userId,
   );
   const isAdmin = isOwner || member?.role === "admin";
+  const canInitialize = isOwner || (member !== undefined && member.role !== "viewer");
 
   const [servers, blueprints, membersData] = await Promise.all([
     listServers(key, session.userId),
@@ -75,6 +76,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             serverId: b.serverId?.toString(),
           }))}
           isAdmin={!!isAdmin}
+          canInitialize={!!canInitialize}
         />
 
         {/* Right: members sidebar */}

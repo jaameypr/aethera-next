@@ -35,12 +35,14 @@ interface BlueprintsListProps {
   projectKey: string;
   blueprints: Blueprint[];
   isAdmin: boolean;
+  canInitialize: boolean;
 }
 
 export function BlueprintsList({
   projectKey,
   blueprints,
   isAdmin,
+  canInitialize,
 }: BlueprintsListProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Blueprint | null>(null);
@@ -115,7 +117,7 @@ export function BlueprintsList({
                 </div>
               </CardHeader>
               <CardContent className="flex items-center gap-2">
-                {isAdmin && bp.status === "available" && (
+                {canInitialize && bp.status === "available" && (
                   <Button
                     size="sm"
                     className="flex-1"

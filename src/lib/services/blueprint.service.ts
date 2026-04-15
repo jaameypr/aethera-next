@@ -19,7 +19,7 @@ export type { IBlueprint };
 async function resolveProjectRole(
   projectKey: string,
   userId: string,
-): Promise<"owner" | "admin" | "member" | null> {
+): Promise<"owner" | "admin" | "manager" | "viewer" | null> {
   await connectDB();
   const project = await ProjectModel.findOne({ key: projectKey }).lean();
   if (!project) return null;
@@ -28,7 +28,9 @@ async function resolveProjectRole(
 
   const member = project.members.find((m) => m.userId.toString() === userId);
   if (!member) return null;
-  return member.role === "admin" ? "admin" : "member";
+  if (member.role === "admin") return "admin";
+  if (member.role === "viewer") return "viewer";
+  return "manager"; // "manager" and legacy "member" both treated as manager
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +139,7 @@ export async function initializeBlueprint(
   }
 
   const role = await resolveProjectRole(blueprint.projectKey, actorId);
-  if (role !== "owner" && role !== "admin") throw forbidden();
+  if (role === "viewer" || !role) throw forbidden();
 
   if (serverData.memory > blueprint.maxRam) {
     throw new Error(

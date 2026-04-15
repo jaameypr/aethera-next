@@ -58,6 +58,7 @@ interface ProjectServerSectionProps {
   servers: Server[];
   blueprints: Blueprint[];
   isAdmin: boolean;
+  canInitialize: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +77,7 @@ export function ProjectServerSection({
   servers,
   blueprints,
   isAdmin,
+  canInitialize,
 }: ProjectServerSectionProps) {
   const [createBlueprintOpen, setCreateBlueprintOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Blueprint | null>(null);
@@ -237,7 +239,7 @@ export function ProjectServerSection({
                   <p className="text-xs text-zinc-400">{t("projects.servers.blueprintNotInit")}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {bp.status === "available" && (
+                  {canInitialize && bp.status === "available" && (
                     <Button
                       size="sm"
                       variant="outline"
