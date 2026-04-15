@@ -333,7 +333,6 @@ function Step0({
     { label: "Vanilla & Plugins", types: ["vanilla", "paper", "spigot", "purpur"] },
     { label: "Mods", types: ["forge", "fabric"] },
     { label: "Modpacks", types: ["curseforge", "modrinth"] },
-    { label: "Andere", types: ["hytale"] },
   ];
 
   async function handleResolve() {
@@ -1077,31 +1076,23 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
     startTransition(async () => {
       dispatch({ type: "SET_SUBMITTING", value: true });
       try {
-        const runtime = getRuntimeFromType(state.serverType);
-        const image =
-          runtime === "minecraft"
-            ? "itzg/minecraft-server"
-            : "zacheri/hytale-server";
+        const image = "itzg/minecraft-server";
 
         const hasWorldBackup =
           state.backupSelection?.components.includes("world") ?? false;
-        const needsPostWorldSetup =
-          runtime === "minecraft" && !hasWorldBackup;
+        const needsPostWorldSetup = !hasWorldBackup;
 
-        const properties: Record<string, string> =
-          runtime === "minecraft"
-            ? {
-                "white-list": String(state.whitelist),
-                "max-players": String(state.maxPlayers),
-                difficulty: state.difficulty,
-                motd: state.motd,
-                ...(needsPostWorldSetup &&
-                state.worldSource === "generate" &&
-                state.worldSeed
-                  ? { "level-seed": state.worldSeed }
-                  : {}),
-              }
-            : {};
+        const properties: Record<string, string> = {
+            "white-list": String(state.whitelist),
+            "max-players": String(state.maxPlayers),
+            difficulty: state.difficulty,
+            motd: state.motd,
+            ...(needsPostWorldSetup &&
+            state.worldSource === "generate" &&
+            state.worldSeed
+              ? { "level-seed": state.worldSeed }
+              : {}),
+          };
 
         const needsPostCreation =
           !!state.backupSelection ||
@@ -1110,7 +1101,7 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
         const input = {
           name: state.name,
           identifier: state.identifier,
-          runtime,
+          runtime: "minecraft" as const,
           image,
           tag: `java${state.javaVersion}`,
           port: state.port,

@@ -289,7 +289,6 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
     { label: "Vanilla & Plugins", types: ["vanilla", "paper", "spigot", "purpur"] as ServerType[] },
     { label: "Mods", types: ["forge", "fabric"] as ServerType[] },
     { label: "Modpacks", types: ["curseforge", "modrinth"] as ServerType[] },
-    { label: "Andere", types: ["hytale"] as ServerType[] },
   ];
 
   async function handleResolve() {
@@ -960,31 +959,23 @@ export function CreateServerWizard({
   function handleSubmit() {
     startTransition(async () => {
       try {
-        const runtime = getRuntimeFromType(state.serverType);
-        const image =
-          runtime === "minecraft"
-            ? process.env.NEXT_PUBLIC_MINECRAFT_IMAGE || "itzg/minecraft-server"
-            : process.env.NEXT_PUBLIC_HYTALE_IMAGE || "zacheri/hytale-server:latest";
+        const image = process.env.NEXT_PUBLIC_MINECRAFT_IMAGE || "itzg/minecraft-server";
 
         const hasWorldBackup =
           state.backupSelection?.components.includes("world") ?? false;
-        const needsPostWorldSetup =
-          runtime === "minecraft" && !hasWorldBackup;
+        const needsPostWorldSetup = !hasWorldBackup;
 
-        const properties: Record<string, string> =
-          runtime === "minecraft"
-            ? {
-                "white-list": String(state.whitelist),
-                "max-players": String(state.maxPlayers),
-                difficulty: state.difficulty,
-                motd: state.motd,
-                ...(needsPostWorldSetup &&
-                state.worldSource === "generate" &&
-                state.worldSeed
-                  ? { "level-seed": state.worldSeed }
-                  : {}),
-              }
-            : {};
+        const properties: Record<string, string> = {
+            "white-list": String(state.whitelist),
+            "max-players": String(state.maxPlayers),
+            difficulty: state.difficulty,
+            motd: state.motd,
+            ...(needsPostWorldSetup &&
+            state.worldSource === "generate" &&
+            state.worldSeed
+              ? { "level-seed": state.worldSeed }
+              : {}),
+          };
 
         const needsPostCreation =
           !!state.backupSelection ||
@@ -993,7 +984,7 @@ export function CreateServerWizard({
         const input = {
           name: state.name,
           identifier: state.identifier,
-          runtime,
+          runtime: "minecraft" as const,
           image,
           tag: `java${state.javaVersion}`,
           port: state.port,

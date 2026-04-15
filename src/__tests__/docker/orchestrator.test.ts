@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from "vitest";
 // Mock the orchestrator module internals — we test helpers in isolation
 vi.mock("@/lib/docker/orchestrator", () => ({
   CONTAINER_PREFIX_MC: "aethera-mc-",
-  CONTAINER_PREFIX_HYT: "aethera-hyt-",
   getOrchestrator: vi.fn(),
   getDockerClient: vi.fn(),
 }));
@@ -16,7 +15,6 @@ vi.mock("@pruefertit/docker-orchestrator", () => ({
 
 import {
   CONTAINER_PREFIX_MC,
-  CONTAINER_PREFIX_HYT,
 } from "@/lib/docker/orchestrator";
 import { containerName, serverEnvFromDoc } from "@/lib/docker/helpers";
 
@@ -29,11 +27,6 @@ describe("containerName", () => {
     const server = { runtime: "minecraft", identifier: "survival" } as Parameters<typeof containerName>[0];
     expect(containerName(server)).toBe("aethera-mc-survival");
   });
-
-  it("prefixes hytale servers with aethera-hyt-", () => {
-    const server = { runtime: "hytale", identifier: "creative" } as Parameters<typeof containerName>[0];
-    expect(containerName(server)).toBe("aethera-hyt-creative");
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -43,10 +36,6 @@ describe("containerName", () => {
 describe("CONTAINER_PREFIX constants", () => {
   it("has correct minecraft prefix", () => {
     expect(CONTAINER_PREFIX_MC).toBe("aethera-mc-");
-  });
-
-  it("has correct hytale prefix", () => {
-    expect(CONTAINER_PREFIX_HYT).toBe("aethera-hyt-");
   });
 });
 

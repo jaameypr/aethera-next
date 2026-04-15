@@ -45,7 +45,7 @@ export type { LogEntry };
 export interface ServerCreateInput {
   name: string;
   identifier: string;
-  runtime: "minecraft" | "hytale";
+  runtime: "minecraft";
   image: string;
   tag: string;
   port: number;

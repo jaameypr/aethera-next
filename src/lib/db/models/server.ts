@@ -76,7 +76,7 @@ export interface IServer extends Document {
   name: string;
   projectKey: string;
   identifier: string;
-  runtime: "minecraft" | "hytale";
+  runtime: "minecraft";
   image: string;
   tag: string;
   status: "stopped" | "starting" | "running" | "stopping" | "error";
@@ -170,7 +170,7 @@ const ExcludedPackModSchema = new Schema<IExcludedPackMod>(
 
 const SERVER_TYPES = [
   "vanilla", "paper", "spigot", "purpur",
-  "forge", "fabric", "curseforge", "modrinth", "hytale",
+  "forge", "fabric", "curseforge", "modrinth",
 ] as const;
 
 const ServerSchema = new Schema<IServer>(
@@ -178,7 +178,7 @@ const ServerSchema = new Schema<IServer>(
     name: { type: String, required: true, trim: true },
     projectKey: { type: String, required: true, index: true },
     identifier: { type: String, required: true, trim: true, lowercase: true },
-    runtime: { type: String, enum: ["minecraft", "hytale"], required: true },
+    runtime: { type: String, enum: ["minecraft"], required: true },
     image: { type: String, required: true },
     tag: { type: String, required: true },
     status: {

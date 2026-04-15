@@ -12,7 +12,6 @@ export type { ContainerConfig };
 export type DockerClient = Awaited<ReturnType<typeof createClient>>["docker"];
 
 export const CONTAINER_PREFIX_MC = "aethera-mc-";
-export const CONTAINER_PREFIX_HYT = "aethera-hyt-";
 
 let _orchestrator: Orchestrator | null = null;
 let _docker: DockerClient | null = null;
@@ -45,31 +44,6 @@ async function init(): Promise<void> {
           readyCheck: {
             type: "log",
             match: "Done",
-            timeout: 120_000,
-          },
-          gracefulStop: {
-            command: "stop",
-            waitForExit: true,
-            timeout: 30_000,
-          },
-        }),
-      );
-
-      // Hytale preset
-      orch.presets.register(
-        definePreset({
-          name: "hytale",
-          config: {
-            image:
-              process.env.AETHERA_HYTALE_IMAGE || "zacheri/hytale-server:latest",
-            tag: "latest",
-            env: {},
-            mounts: [],
-            labels: { "aethera.type": "hytale" },
-          },
-          readyCheck: {
-            type: "log",
-            match: "Server started",
             timeout: 120_000,
           },
           gracefulStop: {

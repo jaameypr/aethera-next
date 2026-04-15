@@ -49,7 +49,6 @@ Server-level permissions (`server.start`, `server.stop`, `server.console`, `serv
 | Fabric | Modded | — |
 | CurseForge | Pack | ✅ |
 | Modrinth | Pack | ✅ |
-| Hytale | Other | — |
 
 Pack-driven servers resolve Minecraft version, loader, and loader version automatically from pack metadata.
 

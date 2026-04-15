@@ -2,16 +2,14 @@ import "server-only";
 
 import type { ContainerConfig } from "@pruefertit/docker-orchestrator";
 import type { IServer } from "../db/models/server";
-import { CONTAINER_PREFIX_MC, CONTAINER_PREFIX_HYT } from "./orchestrator";
+import { CONTAINER_PREFIX_MC } from "./orchestrator";
 import { getDockerType } from "@/lib/config/server-types";
 
 /**
  * Deterministic container name from a server document.
  */
 export function containerName(server: IServer): string {
-  const prefix =
-    server.runtime === "hytale" ? CONTAINER_PREFIX_HYT : CONTAINER_PREFIX_MC;
-  return `${prefix}${server.projectKey}-${server.identifier}`;
+  return `${CONTAINER_PREFIX_MC}${server.projectKey}-${server.identifier}`;
 }
 
 /**
@@ -166,7 +164,7 @@ export function deployConfigFromDoc(
   }
 
   return {
-    preset: server.runtime === "hytale" ? "hytale" : "minecraft",
+    preset: "minecraft",
     name: containerName(server),
     image: server.image,
     // For itzg, use java{n} tag to select the correct JDK bundled in that image variant

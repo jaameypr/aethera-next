@@ -12,8 +12,7 @@ export type ServerType =
   | "forge"
   | "fabric"
   | "curseforge"
-  | "modrinth"
-  | "hytale";
+  | "modrinth";
 
 export type PackSource = "curseforge" | "modrinth";
 
@@ -22,13 +21,10 @@ export interface ServerTypeConfig {
   label: string;
   /** Short description shown in wizard */
   description: string;
-  /** Underlying Docker runtime preset */
-  runtime: "minecraft" | "hytale";
   /**
    * itzg/minecraft-server TYPE env var value.
-   * null = not a Minecraft image (e.g. Hytale).
    */
-  dockerType: string | null;
+  dockerType: string;
   /** Pack-driven install source; undefined for manual types */
   packSource?: PackSource;
   /** Whether version is resolved from the pack (not user-entered) */
@@ -41,14 +37,13 @@ export interface ServerTypeConfig {
    * For UI grouping: "vanilla-like" = simple server types,
    * "modded" = loader-based, "pack" = pack-driven
    */
-  group: "vanilla-like" | "modded" | "pack" | "other";
+  group: "vanilla-like" | "modded" | "pack";
 }
 
 export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   vanilla: {
     label: "Vanilla",
     description: "Reiner Vanilla-Server ohne Mods",
-    runtime: "minecraft",
     dockerType: "VANILLA",
     isPack: false,
     supportsManualVersion: true,
@@ -58,7 +53,6 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   paper: {
     label: "Paper",
     description: "Optimierter Bukkit-Fork mit Plugin-Support",
-    runtime: "minecraft",
     dockerType: "PAPER",
     isPack: false,
     supportsManualVersion: true,
@@ -68,7 +62,6 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   spigot: {
     label: "Spigot",
     description: "Bewährter Bukkit-Fork mit Plugin-Support",
-    runtime: "minecraft",
     dockerType: "SPIGOT",
     isPack: false,
     supportsManualVersion: true,
@@ -78,7 +71,6 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   purpur: {
     label: "Purpur",
     description: "Paper-Fork mit erweiterten Konfigurationsoptionen",
-    runtime: "minecraft",
     dockerType: "PURPUR",
     isPack: false,
     supportsManualVersion: true,
@@ -88,7 +80,6 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   forge: {
     label: "Forge",
     description: "Klassischer Mod-Loader für umfangreiche Mods",
-    runtime: "minecraft",
     dockerType: "FORGE",
     isPack: false,
     supportsManualVersion: true,
@@ -98,7 +89,6 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   fabric: {
     label: "Fabric",
     description: "Leichtgewichtiger Mod-Loader, schnelle Updates",
-    runtime: "minecraft",
     dockerType: "FABRIC",
     isPack: false,
     supportsManualVersion: true,
@@ -108,7 +98,6 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   curseforge: {
     label: "CurseForge",
     description: "Modpack von CurseForge installieren",
-    runtime: "minecraft",
     dockerType: "AUTO_CURSEFORGE",
     packSource: "curseforge",
     isPack: true,
@@ -119,23 +108,12 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   modrinth: {
     label: "Modrinth",
     description: "Modpack von Modrinth (.mrpack) installieren",
-    runtime: "minecraft",
     dockerType: "MODRINTH",
     packSource: "modrinth",
     isPack: true,
     supportsManualVersion: false,
     hasLoader: false,
     group: "pack",
-  },
-  hytale: {
-    label: "Hytale",
-    description: "Hytale-Server (Early Access)",
-    runtime: "hytale",
-    dockerType: null,
-    isPack: false,
-    supportsManualVersion: true,
-    hasLoader: false,
-    group: "other",
   },
 };
 
@@ -149,7 +127,6 @@ export const SERVER_TYPE_ORDER: ServerType[] = [
   "fabric",
   "curseforge",
   "modrinth",
-  "hytale",
 ];
 
 /** Helper: derive Docker TYPE string from a serverType, falling back to modLoader */
@@ -158,13 +135,13 @@ export function getDockerType(
   modLoader?: string | null,
 ): string {
   if (serverType && SERVER_TYPE_MAP[serverType]?.dockerType) {
-    return SERVER_TYPE_MAP[serverType].dockerType!;
+    return SERVER_TYPE_MAP[serverType].dockerType;
   }
   if (modLoader) return modLoader.toUpperCase();
   return "VANILLA";
 }
 
-/** Helper: derive runtime from serverType */
-export function getRuntimeFromType(serverType: ServerType): "minecraft" | "hytale" {
-  return SERVER_TYPE_MAP[serverType]?.runtime ?? "minecraft";
+/** Helper: all server types use the minecraft runtime */
+export function getRuntimeFromType(_serverType: ServerType): "minecraft" {
+  return "minecraft";
 }
