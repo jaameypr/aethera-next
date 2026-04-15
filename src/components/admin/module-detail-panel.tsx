@@ -23,6 +23,7 @@ import {
   Loader2,
   Heart,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import type { InstalledModuleResponse, ModuleManifestEnvDef } from "@/lib/api/types";
 import {
@@ -32,7 +33,16 @@ import {
   updateModulePublicUrlAction,
   checkModuleHealthAction,
   uninstallModuleAction,
+  reinstallModuleAction,
 } from "@/app/(app)/actions/modules";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ModuleDetailPanelProps {
   module: InstalledModuleResponse;
@@ -45,6 +55,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [publicUrl, setPublicUrl] = useState(initial.publicUrl ?? "");
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
+  const [showReinstallConfirm, setShowReinstallConfirm] = useState(false);
 
   // Parse configurable env defs from manifest
   const configurableDefs: ModuleManifestEnvDef[] =
@@ -131,6 +142,20 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       router.push("/admin/modules");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Fehler");
+      setLoading(false);
+    }
+  };
+
+  const handleReinstall = async () => {
+    setShowReinstallConfirm(false);
+    setLoading(true);
+    try {
+      const result = await reinstallModuleAction(mod.moduleId);
+      setMod(result);
+      toast.success("Modul neu installiert");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fehler");
+    } finally {
       setLoading(false);
     }
   };
@@ -230,6 +255,16 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
             </span>
           )}
           <div className="flex-1" />
+          {["running", "stopped", "error"].includes(mod.status) && mod.type === "docker" && (
+            <Button
+              variant="outline"
+              onClick={() => setShowReinstallConfirm(true)}
+              disabled={loading}
+            >
+              <RotateCcw className="mr-1 h-4 w-4" />
+              Neu installieren
+            </Button>
+          )}
           <Button
             variant="destructive"
             onClick={handleUninstall}
@@ -240,6 +275,34 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Reinstall confirmation dialog */}
+      <Dialog open={showReinstallConfirm} onOpenChange={setShowReinstallConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modul neu installieren?</DialogTitle>
+            <DialogDescription>
+              Der Container von <strong>{mod.name}</strong> wird gestoppt,
+              entfernt und neu erstellt. Alle Konfigurationen und Umgebungsvariablen
+              bleiben erhalten. Die Datenbank und Volumes des Moduls werden nicht
+              gelöscht.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReinstallConfirm(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleReinstall} disabled={loading}>
+              {loading ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-1 h-4 w-4" />
+              )}
+              Neu installieren
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Info */}
       <Card>

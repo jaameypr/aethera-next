@@ -370,6 +370,80 @@ export async function updateModule(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Reinstall                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Reinstall a module by stopping and removing the existing container, then
+ * redeploying it using the stored manifest and config. All env vars
+ * (including secrets and API keys) are preserved. The module database and
+ * volumes are never touched.
+ */
+export async function reinstallModule(
+  moduleId: string,
+): Promise<InstalledModuleResponse> {
+  await connectDB();
+
+  const doc = await InstalledModuleModel.findOne({ moduleId });
+  if (!doc) throw new Error(`Module "${moduleId}" is not installed`);
+
+  if (doc.type !== "docker") {
+    throw new Error(`Reinstall is only supported for docker modules`);
+  }
+
+  if (["installing", "updating", "uninstalling"].includes(doc.status)) {
+    throw new Error(
+      `Cannot reinstall while module is in "${doc.status}" state`,
+    );
+  }
+
+  const manifest = doc.manifest as unknown as ModuleManifest;
+  const existingPort = doc.assignedPort;
+
+  doc.status = "updating";
+  await doc.save();
+
+  try {
+    // Stop and remove the old container. Guard against containers that are
+    // already gone (e.g. module is in "error" state because container died).
+    if (doc.containerId) {
+      const docker = await getDockerClient();
+      try {
+        await stopContainer(docker, doc.containerId, 30);
+      } catch {
+        /* already stopped or gone */
+      }
+      try {
+        await removeContainer(docker, doc.containerId);
+      } catch {
+        /* already removed */
+      }
+    }
+
+    // Clear all stale container metadata before redeploying so health checks
+    // and the detail page cannot reference the dead container on failure.
+    doc.containerId = undefined;
+    doc.containerName = undefined;
+    doc.internalUrl = undefined;
+
+    // Redeploy: config is untouched, port is reused for public modules.
+    await deployDockerModule(doc, manifest, existingPort);
+
+    doc.status = "running";
+    doc.errorMessage = undefined;
+    await doc.save();
+  } catch (err) {
+    doc.status = "error";
+    doc.errorMessage =
+      err instanceof Error ? err.message : "Reinstall failed";
+    await doc.save();
+    throw err;
+  }
+
+  return toResponse(doc);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Update config                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -497,6 +571,7 @@ function scheduleApiKeyProvisioning(moduleId: string): void {
 async function deployDockerModule(
   doc: IInstalledModule,
   manifest: ModuleManifest,
+  existingPort?: number,
 ): Promise<void> {
   if (!manifest.docker) {
     throw new Error("Docker config missing in manifest");
@@ -528,7 +603,7 @@ async function deployDockerModule(
   const ports: Array<{ container: number; protocol: "tcp" | "udp"; host?: number }> = [];
 
   if (exposure === "public") {
-    hostPort = await allocateHostPort();
+    hostPort = existingPort ?? await allocateHostPort();
     ports.push({ host: hostPort, container: containerPort, protocol: "tcp" as const });
     console.log(`[module-manager] Public module: allocated host port ${hostPort} for ${manifest.id}`);
   } else {

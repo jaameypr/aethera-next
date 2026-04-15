@@ -53,6 +53,14 @@ export async function stopModuleAction(moduleId: string) {
   return JSON.parse(JSON.stringify(result));
 }
 
+export async function reinstallModuleAction(moduleId: string) {
+  await requirePermission("module.manage");
+  const result = await moduleManager.reinstallModule(moduleId);
+  revalidatePath("/admin/modules");
+  revalidatePath(`/admin/modules/${moduleId}`);
+  return JSON.parse(JSON.stringify(result));
+}
+
 export async function updateModuleAction(payload: {
   moduleId: string;
   version: string;
