@@ -34,9 +34,11 @@ export async function startEventListener(): Promise<void> {
         const containerId = event.actor.id;
         const exitCode = event.actor.attributes["exitCode"];
 
-        // Get pre-update state to distinguish crashes from intentional stops
+        // Only mark as error if not already in an intentional stop state.
+        // container.die can arrive *after* container.stop on clean shutdowns,
+        // so we must not overwrite "stopped"/"stopping" with "error".
         const oldDoc = await ServerModel.findOneAndUpdate(
-          { containerId },
+          { containerId, status: { $nin: ["stopped", "stopping"] } },
           {
             status: "error",
             containerStatus: `died (exit ${exitCode ?? "?"})`,
