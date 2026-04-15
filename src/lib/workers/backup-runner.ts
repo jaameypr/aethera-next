@@ -8,6 +8,7 @@ import { BackupModel } from "@/lib/db/models/backup";
 import { logAction } from "@/lib/services/project.service";
 import { ServerModel } from "@/lib/db/models/server";
 import { sendServerEventToDiscordModule } from "@/lib/services/discord-module.service";
+import { issueMinecraftSaveOn } from "@/lib/services/minecraft-saves";
 
 // ---------------------------------------------------------------------------
 // Worker script resolution
@@ -64,7 +65,8 @@ export async function dispatchBackupJob(
       ).catch(() => {});
     }
 
-    // For backup:create jobs, send a Discord notification on completion or failure.
+    // For backup:create jobs, re-enable Minecraft saves (if they were disabled)
+    // and send a Discord notification on completion or failure.
     // Look up the backup by jobId (set when the backup record is created) to get the
     // server context without relying on the payload (which is overwritten by workerPayload).
     if (type === "backup:create") {
@@ -72,6 +74,12 @@ export async function dispatchBackupJob(
         if (!backup) return;
         const server = await ServerModel.findById(backup.serverId);
         if (!server) return;
+
+        // Re-enable auto-save if save-off was issued before the worker started.
+        if (backup.saveOffIssued) {
+          await issueMinecraftSaveOn(server._id.toString());
+          await BackupModel.findByIdAndUpdate(backup._id, { saveOffIssued: false });
+        }
 
         const details = err
           ? `Backup failed: ${err.message}`
@@ -82,7 +90,7 @@ export async function dispatchBackupJob(
           server.name,
           details,
         );
-      }).catch((e) => console.warn("[backup-runner] Discord notify failed:", e));
+      }).catch((e) => console.warn("[backup-runner] Post-worker cleanup failed:", e));
     }
   });
 }
@@ -152,6 +160,34 @@ export async function resetStuckJobs(): Promise<void> {
   );
   if (result.modifiedCount > 0) {
     console.warn(`[backup-runner] Reset ${result.modifiedCount} stuck job(s) to error status`);
+  }
+
+  // Re-enable Minecraft saves for any backup where save-off was issued but
+  // Aethera crashed before save-on could be sent.
+  //
+  // Worker-path (strategy:"sync") backups: the worker process is guaranteed dead
+  // after a restart, so we mark these failed and restore saves.
+  //
+  // Async-path (strategy:"async") backups: the Java module may still be running
+  // and will call back when done. We re-enable saves immediately (safest for the
+  // running server) and clear the flag; the callback will complete the record.
+  const stuckWithSaveOff = await BackupModel.find({
+    saveOffIssued: true,
+    status: { $in: ["pending", "in_progress"] },
+  });
+
+  for (const backup of stuckWithSaveOff) {
+    await issueMinecraftSaveOn(backup.serverId.toString());
+    const update: Record<string, unknown> = { saveOffIssued: false };
+    if (backup.strategy === "sync") {
+      update.status = "failed";
+      update.errorMessage = "Server restarted while backup was in progress";
+    }
+    await BackupModel.findByIdAndUpdate(backup._id, update);
+    console.warn(
+      `[backup-runner] Restored saves for server ${backup.serverId} ` +
+        `(backup ${backup._id}, strategy:${backup.strategy})`,
+    );
   }
 }
 

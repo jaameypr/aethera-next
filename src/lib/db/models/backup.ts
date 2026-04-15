@@ -18,6 +18,12 @@ export interface IBackup extends Document {
   shareUrl?: string;
   shareId?: string;
   errorMessage?: string;
+  /**
+   * Set to true immediately after "save-off" is sent to the Minecraft server.
+   * Cleared once "save-on" has been successfully re-issued. Used as the
+   * recovery signal on startup so saves are never permanently disabled.
+   */
+  saveOffIssued?: boolean;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
 }
@@ -35,12 +41,24 @@ const BackupSchema = new Schema<IBackup>({
   shareUrl: { type: String },
   shareId: { type: String },
   errorMessage: { type: String },
+  saveOffIssued: { type: Boolean, default: false },
   createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   createdAt: { type: Date, default: Date.now },
 });
 
 BackupSchema.index({ serverId: 1, createdAt: -1 });
 BackupSchema.index({ jobId: 1 }, { sparse: true });
+// Enforce one active backup per server at the DB level. Attempting to insert a
+// second "pending" or "in_progress" backup for the same server yields E11000,
+// which the service converts to a 409 Conflict response.
+BackupSchema.index(
+  { serverId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ["pending", "in_progress"] } },
+    name: "unique_active_backup_per_server",
+  },
+);
 
 export const BackupModel: Model<IBackup> =
   mongoose.models.Backup || mongoose.model<IBackup>("Backup", BackupSchema);

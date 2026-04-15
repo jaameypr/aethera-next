@@ -13,8 +13,9 @@ import { uploadBackupToShare, isPaperviewReady } from "@/lib/services/paperview.
 import { getBackupDir, getServerDataPath, resolveServerDataPath } from "@/lib/docker/storage";
 import { logAction } from "@/lib/services/project.service";
 import { dispatchBackupJob } from "@/lib/workers/backup-runner";
-import { badRequest } from "@/lib/api/errors";
+import { badRequest, conflict } from "@/lib/api/errors";
 import { sendServerEventToDiscordModule } from "@/lib/services/discord-module.service";
+import { issueMinecraftSaveOff, issueMinecraftSaveOn } from "@/lib/services/minecraft-saves";
 
 /* ------------------------------------------------------------------ */
 /*  Capabilities — what the system can do based on installed modules   */
@@ -75,9 +76,16 @@ async function createAsyncBackup(
 
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
-  if (server.status !== "stopped") {
-    throw badRequest("Server must be stopped to create a backup");
+
+  // Only allow backup from stable states — reject transitional ones.
+  if (server.status !== "stopped" && server.status !== "running") {
+    throw badRequest(
+      `Cannot start a backup while the server is ${server.status}. ` +
+        "Wait for the server to finish before triggering a backup.",
+    );
   }
+
+  const serverWasRunning = server.status === "running";
 
   // Resolve actual data directory (handles legacy identifier-only dir naming)
   const dataPath = await resolveServerDataPath(server.projectKey, server.identifier);
@@ -119,67 +127,102 @@ async function createAsyncBackup(
   const safeName = server.name.replace(/[^a-zA-Z0-9_-]/g, "_");
   const filename = `${ts}-${safeName}.tar.gz`;
 
-  // Create a pending backup record
-  const backup = await BackupModel.create({
-    serverId: server._id,
-    name: server.name,
-    filename,
-    path: `${getBackupDir()}/${serverId}/${filename}`,
-    size: 0,
-    components,
-    status: "pending",
-    strategy: "async",
-    createdBy: actorId,
-  });
-
-  // Determine callback URL
-  const baseUrl = process.env.AETHERA_INTERNAL_URL || "http://aethera-app:3000";
-  const callbackUrl = `${baseUrl}/api/backups/callback`;
-
-  // Send request to async module
-  const res = await fetch(`${asyncMod.internalUrl}/api/backups/create`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      serverId: server._id.toString(),
-      serverIdentifier: serverDataIdentifier,
-      serverName: server.name,
+  // Atomically claim the per-server backup slot.
+  // The unique partial index on {serverId} (status in [pending, in_progress])
+  // ensures only one active backup per server. An E11000 error becomes 409.
+  let backup: IBackup;
+  try {
+    backup = await BackupModel.create({
+      serverId: server._id,
+      name: server.name,
+      filename,
+      path: `${getBackupDir()}/${serverId}/${filename}`,
+      size: 0,
       components,
-      callbackUrl,
-      backupId: backup._id.toString(),
-      actorId,
-      ...(paperviewUrl && paperviewApiKey
-        ? { paperviewUrl, paperviewApiKey }
-        : {}),
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    await BackupModel.findByIdAndUpdate(backup._id, {
-      status: "failed",
-      errorMessage: `Async module responded ${res.status}: ${body}`,
+      status: "pending",
+      strategy: "async",
+      saveOffIssued: false,
+      createdBy: actorId,
     });
-    throw new Error(`Async backup request failed (${res.status}): ${body}`);
+  } catch (err: unknown) {
+    if ((err as { code?: number }).code === 11000) {
+      throw conflict(
+        "A backup is already in progress for this server. " +
+          "Wait for it to complete or cancel it before starting a new one.",
+      );
+    }
+    throw err;
   }
 
-  const data = await res.json();
+  // Disable auto-save and flush world data to disk before the backup reads files.
+  // saveOffIssued is persisted immediately so startup recovery can re-enable
+  // saves if Aethera crashes before the backup completes.
+  let saveOffIssued = false;
+  let dispatched = false;
+  try {
+    if (serverWasRunning) {
+      await issueMinecraftSaveOff(serverId);
+      saveOffIssued = true;
+      await BackupModel.findByIdAndUpdate(backup._id, { saveOffIssued: true });
+    }
 
-  // Store the job ID from the async module
-  await BackupModel.findByIdAndUpdate(backup._id, {
-    status: "in_progress",
-    jobId: data.jobId,
-  });
+    // Determine callback URL
+    const baseUrl = process.env.AETHERA_INTERNAL_URL || "http://aethera-app:3000";
+    const callbackUrl = `${baseUrl}/api/backups/callback`;
 
-  await logAction(server.projectKey, "BACKUP_STARTED", actorId, {
-    backupId: backup._id.toString(),
-    serverId,
-    strategy: "async",
-    jobId: data.jobId,
-  });
+    // Send request to async module
+    const res = await fetch(`${asyncMod.internalUrl}/api/backups/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        serverId: server._id.toString(),
+        serverIdentifier: serverDataIdentifier,
+        serverName: server.name,
+        components,
+        callbackUrl,
+        backupId: backup._id.toString(),
+        actorId,
+        ...(paperviewUrl && paperviewApiKey
+          ? { paperviewUrl, paperviewApiKey }
+          : {}),
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
 
-  return (await BackupModel.findById(backup._id).lean()) as IBackup;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Async backup request failed (${res.status}): ${body}`);
+    }
+
+    dispatched = true;
+    const data = await res.json();
+
+    // Store the job ID from the async module
+    await BackupModel.findByIdAndUpdate(backup._id, {
+      status: "in_progress",
+      jobId: data.jobId,
+    });
+
+    await logAction(server.projectKey, "BACKUP_STARTED", actorId, {
+      backupId: backup._id.toString(),
+      serverId,
+      strategy: "async",
+      jobId: data.jobId,
+    });
+
+    return (await BackupModel.findById(backup._id).lean()) as IBackup;
+  } catch (err) {
+    // Re-enable saves if we disabled them but the backup was never dispatched.
+    if (saveOffIssued && !dispatched) {
+      await issueMinecraftSaveOn(serverId);
+      await BackupModel.findByIdAndUpdate(backup._id, { saveOffIssued: false });
+    }
+    await BackupModel.findByIdAndUpdate(backup._id, {
+      status: "failed",
+      errorMessage: err instanceof Error ? err.message : "Unknown error",
+    });
+    throw err;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -226,6 +269,13 @@ export async function completeAsyncBackup(payload: {
   }
 
   await backup.save();
+
+  // Re-enable auto-save now that the backup outcome is persisted.
+  // This runs for both success and failure so saves are never left disabled.
+  if (backup.saveOffIssued) {
+    await issueMinecraftSaveOn(backup.serverId.toString());
+    await BackupModel.findByIdAndUpdate(backup._id, { saveOffIssued: false });
+  }
 
   const server = await ServerModel.findById(backup.serverId);
   if (server) {
@@ -307,9 +357,16 @@ async function createBackupViaWorker(
 
   const server = await ServerModel.findById(serverId);
   if (!server) throw new Error("Server not found");
-  if (server.status !== "stopped") {
-    throw badRequest("Server must be stopped to create a backup");
+
+  // Only allow backup from stable states — reject transitional ones.
+  if (server.status !== "stopped" && server.status !== "running") {
+    throw badRequest(
+      `Cannot start a backup while the server is ${server.status}. ` +
+        "Wait for the server to finish before triggering a backup.",
+    );
   }
+
+  const serverWasRunning = server.status === "running";
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const safeName = server.name.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -317,51 +374,86 @@ async function createBackupViaWorker(
   const destDir = path.join(getBackupDir(), serverId);
   const filePath = path.join(destDir, filename);
 
-  const backup = await BackupModel.create({
-    serverId: server._id,
-    name: server.name,
-    filename,
-    path: filePath,
-    size: 0,
-    components,
-    status: "in_progress",
-    strategy: "sync",
-    createdBy: actorId,
-  });
+  // Atomically claim the per-server backup slot (see unique partial index on BackupModel).
+  let backup: IBackup;
+  try {
+    backup = await BackupModel.create({
+      serverId: server._id,
+      name: server.name,
+      filename,
+      path: filePath,
+      size: 0,
+      components,
+      status: "in_progress",
+      strategy: "sync",
+      saveOffIssued: false,
+      createdBy: actorId,
+    });
+  } catch (err: unknown) {
+    if ((err as { code?: number }).code === 11000) {
+      throw conflict(
+        "A backup is already in progress for this server. " +
+          "Wait for it to complete or cancel it before starting a new one.",
+      );
+    }
+    throw err;
+  }
 
-  const job = await AsyncJobModel.create({
-    type: "backup:create",
-    status: "pending",
-    progress: 0,
-    message: "Queued",
-    payload: {
+  let saveOffIssued = false;
+  let dispatched = false;
+  try {
+    if (serverWasRunning) {
+      await issueMinecraftSaveOff(serverId);
+      saveOffIssued = true;
+      await BackupModel.findByIdAndUpdate(backup._id, { saveOffIssued: true });
+    }
+
+    const job = await AsyncJobModel.create({
+      type: "backup:create",
+      status: "pending",
+      progress: 0,
+      message: "Queued",
+      payload: {
+        backupId: backup._id.toString(),
+        serverId,
+        actorId,
+        components,
+        sharingAvailable,
+        serverWasRunning,
+      },
+    });
+
+    await BackupModel.findByIdAndUpdate(backup._id, { jobId: job._id.toString() });
+
+    await logAction(server.projectKey, "BACKUP_STARTED", actorId, {
       backupId: backup._id.toString(),
       serverId,
-      actorId,
+      strategy: "worker",
+    });
+
+    const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
+    dispatchBackupJob(job._id.toString(), "backup:create", {
+      serverDir,
+      destDir,
+      filename,
       components,
-      sharingAvailable,
-    },
-  });
+    }).catch((err) => {
+      console.error(`[backup-strategy] Failed to dispatch backup:create job ${job._id}:`, err);
+    });
 
-  await BackupModel.findByIdAndUpdate(backup._id, { jobId: job._id.toString() });
-
-  await logAction(server.projectKey, "BACKUP_STARTED", actorId, {
-    backupId: backup._id.toString(),
-    serverId,
-    strategy: "worker",
-  });
-
-  const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
-  dispatchBackupJob(job._id.toString(), "backup:create", {
-    serverDir,
-    destDir,
-    filename,
-    components,
-  }).catch((err) => {
-    console.error(`[backup-strategy] Failed to dispatch backup:create job ${job._id}:`, err);
-  });
-
-  return (await BackupModel.findById(backup._id).lean()) as IBackup;
+    dispatched = true;
+    return (await BackupModel.findById(backup._id).lean()) as IBackup;
+  } catch (err) {
+    if (saveOffIssued && !dispatched) {
+      await issueMinecraftSaveOn(serverId);
+      await BackupModel.findByIdAndUpdate(backup._id, { saveOffIssued: false });
+    }
+    await BackupModel.findByIdAndUpdate(backup._id, {
+      status: "failed",
+      errorMessage: err instanceof Error ? err.message : "Unknown error",
+    });
+    throw err;
+  }
 }
 
 /**

@@ -7,6 +7,7 @@ import { connectDB } from "@/lib/db/connection";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
 import { BlueprintModel } from "@/lib/db/models/blueprint";
 import { ProjectModel } from "@/lib/db/models/project";
+import { BackupModel } from "@/lib/db/models/backup";
 import {
   logAction,
   ROLE_SERVER_PERMISSIONS,
@@ -458,6 +459,8 @@ export async function beginStartServer(
 ): Promise<void> {
   await connectDB();
 
+  await assertNoActiveBackupForServer(serverId);
+
   const server = await ServerModel.findOneAndUpdate(
     { _id: serverId, status: { $in: ["stopped", "error"] } },
     { $set: { status: "starting" } },
@@ -472,6 +475,23 @@ export async function beginStartServer(
   void _executeStartServer(serverId, server, actorId).catch((err) =>
     console.error(`[server] Background start failed for ${serverId}:`, err),
   );
+}
+
+/**
+ * Returns if no active backup exists for the given server.
+ * Throws a descriptive error otherwise.
+ */
+async function assertNoActiveBackupForServer(serverId: string): Promise<void> {
+  const active = await BackupModel.findOne({
+    serverId,
+    status: { $in: ["pending", "in_progress"] },
+  }).lean();
+  if (active) {
+    throw new Error(
+      "Cannot start the server while a backup is in progress. " +
+        "Wait for the backup to complete before starting.",
+    );
+  }
 }
 
 /**
@@ -541,6 +561,9 @@ export async function beginRecreateServer(
 ): Promise<void> {
   await connectDB();
 
+  // Prevent recreate while a backup is in progress (recreate will start the server in Phase 2).
+  await assertNoActiveBackupForServer(serverId);
+
   const server = await ServerModel.findOneAndUpdate(
     { _id: serverId, status: "running" },
     { $set: { status: "stopping" } },
@@ -560,7 +583,19 @@ export async function beginRecreateServer(
     const stopped = await ServerModel.findById(serverId);
     if (!stopped || stopped.status !== "stopped") return;
 
-    // Phase 2: atomically claim "starting"
+    // Phase 2: check for a backup that may have started during the stop phase,
+    // then atomically claim "starting".
+    const activeBackup = await BackupModel.findOne({
+      serverId,
+      status: { $in: ["pending", "in_progress"] },
+    }).lean();
+    if (activeBackup) {
+      console.warn(
+        `[server] Recreate Phase 2 aborted for ${serverId}: a backup started during the stop phase.`,
+      );
+      return;
+    }
+
     const claimed = await ServerModel.findOneAndUpdate(
       { _id: serverId, status: "stopped" },
       { $set: { status: "starting" } },
