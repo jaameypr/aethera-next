@@ -137,7 +137,7 @@ export async function initializeBlueprint(
   }
 
   const role = await resolveProjectRole(blueprint.projectKey, actorId);
-  if (!role) throw forbidden();
+  if (role !== "owner" && role !== "admin") throw forbidden();
 
   if (serverData.memory > blueprint.maxRam) {
     throw new Error(

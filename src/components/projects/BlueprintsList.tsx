@@ -115,7 +115,7 @@ export function BlueprintsList({
                 </div>
               </CardHeader>
               <CardContent className="flex items-center gap-2">
-                {bp.status === "available" && (
+                {isAdmin && bp.status === "available" && (
                   <Button
                     size="sm"
                     className="flex-1"
