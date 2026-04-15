@@ -46,3 +46,6 @@ next-env.d.ts
 
 # aethera local data
 .aethera/
+
+# claude ai
+.claude/
