@@ -190,6 +190,7 @@ export function deployConfigFromDoc(
     resources: {
       // JVM needs headroom beyond -Xmx for metaspace, native memory, GC, etc.
       memory: { limit: `${server.memory + 1024}m` },
+      ...(server.cpus != null ? { cpu: { nanoCpus: server.cpus } } : {}),
     },
     stopTimeout: 30,
     interactive: true,

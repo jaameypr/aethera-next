@@ -8,7 +8,7 @@ import { InstalledModuleModel } from "@/lib/db/models/installed-module";
 import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models/backup";
 import { AsyncJobModel, type IAsyncJob } from "@/lib/db/models/async-job";
 import { ServerModel } from "@/lib/db/models/server";
-import { createBackup as createSyncBackup } from "@/lib/services/backup.service";
+import { createBackup as createSyncBackup, assertBackupQuota } from "@/lib/services/backup.service";
 import { uploadBackupToShare, isPaperviewReady } from "@/lib/services/paperview.service";
 import { getBackupDir, getServerDataPath, resolveServerDataPath } from "@/lib/docker/storage";
 import { logAction } from "@/lib/services/project.service";
@@ -84,6 +84,8 @@ async function createAsyncBackup(
         "Wait for the server to finish before triggering a backup.",
     );
   }
+
+  await assertBackupQuota(server);
 
   const serverWasRunning = server.status === "running";
 
@@ -365,6 +367,8 @@ async function createBackupViaWorker(
         "Wait for the server to finish before triggering a backup.",
     );
   }
+
+  await assertBackupQuota(server);
 
   const serverWasRunning = server.status === "running";
 

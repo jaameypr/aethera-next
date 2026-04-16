@@ -17,10 +17,10 @@ export const GET = withAuth(async (_req: NextRequest, { session, params }) => {
 
 export const POST = withAuth(async (req: NextRequest, { session, params }) => {
   try {
-    const { name, maxRam } = await req.json();
+    const { name, maxRam, maxCpus, maxBackupStorageGb } = await req.json();
     const blueprint = await createBlueprint(
       params.key,
-      { name, maxRam },
+      { name, maxRam, maxCpus, maxBackupStorageGb },
       session.userId,
     );
     return Response.json(blueprint, { status: 201 });
