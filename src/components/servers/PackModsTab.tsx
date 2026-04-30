@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { lookupPackModAction, type PackModInfo } from "@/app/(app)/actions/servers";
+import { useLocale } from "@/context/locale-context";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,7 @@ function AddAdditionalModPanel({
   onAdded: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLocale();
   const [query, setQuery] = useState("");
   const [versionPin, setVersionPin] = useState("");
   const [found, setFound] = useState<PackModInfo | null>(null);
@@ -88,10 +90,10 @@ function AddAdditionalModPanel({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Fehler beim Hinzufügen");
+        toast.error(data.error ?? t("servers.mods.addFailed"));
         return;
       }
-      toast.success(`${found.displayName} hinzugefügt`);
+      toast.success(t("servers.mods.added", { name: found.displayName }));
       onAdded();
     });
   }
@@ -104,7 +106,7 @@ function AddAdditionalModPanel({
 
       <div className="flex gap-2">
         <Input
-          placeholder={source === "modrinth" ? "sodium, fabric-api, …" : "Slug oder Projekt-ID"}
+          placeholder={source === "modrinth" ? t("servers.mods.modrinthSlugPlaceholder") : t("servers.mods.modrinthProjectIdPlaceholder")}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setFound(null); setLookupError(""); }}
           onKeyDown={(e) => e.key === "Enter" && handleLookup()}
@@ -174,6 +176,7 @@ function AddExclusionPanel({
   onAdded: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLocale();
   const [displayName, setDisplayName] = useState("");
   const [token, setToken] = useState("");
   const [isOverride, setIsOverride] = useState(false);
@@ -194,10 +197,10 @@ function AddExclusionPanel({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Fehler beim Ausschließen");
+        toast.error(data.error ?? t("servers.mods.excludeFailed"));
         return;
       }
-      toast.success(`${displayName} ausgeschlossen`);
+      toast.success(t("servers.mods.excluded", { name: displayName }));
       onAdded();
     });
   }
@@ -211,7 +214,7 @@ function AddExclusionPanel({
         <Input
           id="excl-name"
           className="h-8 text-xs"
-          placeholder="Just Enough Items"
+          placeholder={t("servers.mods.curseforgeSlugPlaceholder")}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
@@ -226,7 +229,7 @@ function AddExclusionPanel({
         <Input
           id="excl-token"
           className="h-8 font-mono text-xs"
-          placeholder={packType === "curseforge" ? "jei oder 238222" : "jei- oder jei-1.20.1"}
+          placeholder={packType === "curseforge" ? t("servers.mods.curseforgeProjectIdPlaceholder") : "jei- oder jei-1.20.1"}
           value={token}
           onChange={(e) => setToken(e.target.value)}
         />
@@ -269,6 +272,7 @@ export function PackModsTab({
   serverId: string;
   packType: "curseforge" | "modrinth";
 }) {
+  const { t } = useLocale();
   const [additionalMods, setAdditionalMods] = useState<AdditionalMod[]>([]);
   const [excludedMods, setExcludedMods] = useState<ExcludedMod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -289,7 +293,7 @@ export function PackModsTab({
       setAdditionalMods(data.additionalMods ?? []);
       setExcludedMods(data.excludedPackMods ?? []);
     } catch {
-      toast.error("Mod-Konfiguration konnte nicht geladen werden");
+      toast.error(t("servers.mods.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -298,8 +302,8 @@ export function PackModsTab({
   function removeAdditionalMod(modId: string, name: string) {
     startTransition(async () => {
       const res = await fetch(`/api/servers/${serverId}/pack-mods/additional/${modId}`, { method: "DELETE" });
-      if (!res.ok) { toast.error("Fehler beim Entfernen"); return; }
-      toast.success(`${name} entfernt`);
+      if (!res.ok) { toast.error(t("servers.mods.removeFailed")); return; }
+      toast.success(t("servers.mods.removed", { name }));
       fetchData();
     });
   }
@@ -307,8 +311,8 @@ export function PackModsTab({
   function removeExclusion(modId: string, name: string) {
     startTransition(async () => {
       const res = await fetch(`/api/servers/${serverId}/pack-mods/excluded/${modId}`, { method: "DELETE" });
-      if (!res.ok) { toast.error("Fehler beim Entfernen des Ausschlusses"); return; }
-      toast.success(`Ausschluss für ${name} aufgehoben`);
+      if (!res.ok) { toast.error(t("servers.mods.excludeRemoveFailed")); return; }
+      toast.success(t("servers.mods.excludeRemoved", { name }));
       fetchData();
     });
   }
@@ -381,7 +385,7 @@ export function PackModsTab({
                         size="icon"
                         disabled={isPending}
                         onClick={() => removeExclusion(mod._id, mod.displayName)}
-                        title="Ausschluss aufheben"
+                        title={t("servers.mods.removeExclusionTooltip")}
                       >
                         <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
                       </Button>

@@ -32,6 +32,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useLocale } from "@/context/locale-context";
 
 interface FileTreeNode {
   name: string;
@@ -54,6 +55,7 @@ function encodePath(p: string): string {
 }
 
 export function ServerFilesTab({ serverId }: { serverId: string }) {
+  const { t } = useLocale();
   const [tree, setTree] = useState<FileTreeNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string>("");
@@ -321,7 +323,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
       >
         <div className="flex items-center justify-between border-b border-zinc-200 p-2 dark:border-zinc-800">
           <span className="text-xs font-medium text-zinc-500">Dateien</span>
-          <label title="In Root hochladen">
+          <label title={t("servers.files.uploadToRoot")}>
             <input
               type="file"
               multiple
@@ -343,7 +345,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Suchen…"
+              placeholder={t("servers.files.searchPlaceholder")}
               className="h-7 pl-7 pr-6 text-xs"
             />
             {search && (

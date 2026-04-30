@@ -6,6 +6,7 @@ import { Upload, Trash2, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 interface AddonEntry {
   name: string;
@@ -34,6 +35,7 @@ function AddonSection({
   label: string;
   supportsToggle: boolean;
 }) {
+  const { t } = useLocale();
   const [items, setItems] = useState<AddonEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -193,7 +195,7 @@ function AddonSection({
                       size="icon"
                       disabled={isPending}
                       onClick={() => handleToggle(item.filename, !item.enabled)}
-                      title={item.enabled ? "Deaktivieren" : "Aktivieren"}
+                      title={item.enabled ? t("servers.addons.disableTooltip") : t("servers.addons.enableTooltip")}
                     >
                       {item.enabled ? (
                         <ToggleRight className="h-4 w-4 text-emerald-500" />

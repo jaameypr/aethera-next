@@ -13,10 +13,12 @@ import { BackupModel } from "@/lib/db/models/backup";
 import { ServerModel } from "@/lib/db/models/server";
 import { AllBackupsList } from "@/components/backups/all-backups-list";
 import { requireSession } from "@/lib/auth/guards";
+import { getServerT } from "@/lib/i18n/server";
 
 export default async function BackupsPage() {
   const session = await requireSession();
   await connectDB();
+  const { t } = await getServerT();
 
   const backups = await BackupModel.find()
     .sort({ createdAt: -1 })
@@ -34,7 +36,7 @@ export default async function BackupsPage() {
   const serialized = backups.map((b) => ({
     _id: b._id.toString(),
     serverId: b.serverId.toString(),
-    serverName: serverMap[b.serverId.toString()] ?? (b.strategy === "import" ? "Import" : "Unbekannt"),
+    serverName: serverMap[b.serverId.toString()] ?? (b.strategy === "import" ? t("verzeichnis.backups.importFallback") : t("common.unknown")),
     name: b.name,
     filename: b.filename,
     size: b.size,
@@ -56,9 +58,9 @@ export default async function BackupsPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Backups</h1>
+          <h1 className="text-2xl font-bold">{t("verzeichnis.backups.title")}</h1>
           <p className="text-sm text-zinc-500">
-            Alle Server-Sicherungen — {serialized.length} Backups
+            {t("verzeichnis.backups.allBackups", { count: serialized.length })}
           </p>
         </div>
       </div>
@@ -69,15 +71,14 @@ export default async function BackupsPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
               <HardDrive className="h-5 w-5 text-zinc-500" />
             </div>
-            <CardTitle className="text-base">Keine Backups vorhanden</CardTitle>
+            <CardTitle className="text-base">{t("verzeichnis.backups.noBackupsTitle")}</CardTitle>
             <CardDescription>
-              Navigiere zu einem Server und wechsle zum Backups-Tab um
-              Sicherungen zu erstellen.
+              {t("verzeichnis.backups.noBackupsDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline" size="sm">
-              <Link href="/projects">Zu den Projekten</Link>
+              <Link href="/projects">{t("verzeichnis.backups.toProjects")}</Link>
             </Button>
           </CardContent>
         </Card>

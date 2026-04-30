@@ -61,6 +61,7 @@ import {
 import { uploadChunked, type UploadProgress } from "@/lib/utils/upload-chunked";
 import { inferJavaVersion, JAVA_VERSIONS } from "@/lib/utils/java-version";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -271,7 +272,7 @@ const stepSchemas = [
   // Step 3 — Resources
   z.object({
     memory: z.number().min(512, "Mindestens 512 MB"),
-    port: z.number().min(1024).max(65535, "Port muss zwischen 1024-65535 sein"),
+    port: z.number().min(1024).max(65535),
   }),
   // Step 4 — Einstellungen
   z.object({}),
@@ -284,11 +285,12 @@ const stepSchemas = [
 // ---------------------------------------------------------------------------
 
 function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
+  const { t } = useLocale();
   const typeConfig = SERVER_TYPE_MAP[state.serverType];
   const groups = [
-    { label: "Vanilla & Plugins", types: ["vanilla", "paper", "spigot", "purpur"] as ServerType[] },
-    { label: "Mods", types: ["forge", "fabric"] as ServerType[] },
-    { label: "Modpacks", types: ["curseforge", "modrinth"] as ServerType[] },
+    { label: t("servers.create.groupVanilla"), types: ["vanilla", "paper", "spigot", "purpur"] as ServerType[] },
+    { label: t("servers.create.groupMods"), types: ["forge", "fabric"] as ServerType[] },
+    { label: t("servers.create.groupModpacks"), types: ["curseforge", "modrinth"] as ServerType[] },
   ];
 
   async function handleResolve() {
@@ -343,12 +345,12 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
             <div className="space-y-2">
               <div className="space-y-1.5">
                 <Label htmlFor="d-cf-slug">Slug oder Projekt-ID</Label>
-                <Input id="d-cf-slug" placeholder="all-the-mods-9" value={state.packReference.slug ?? ""}
+                <Input id="d-cf-slug" placeholder={t("servers.create.modrinthSlugPlaceholder")} value={state.packReference.slug ?? ""}
                   onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "slug", value: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="d-cf-file">Datei-ID <span className="text-zinc-400 font-normal">(optional)</span></Label>
-                <Input id="d-cf-file" placeholder="12345678" value={state.packReference.fileId ?? ""}
+                <Input id="d-cf-file" placeholder={t("servers.create.modrinthIdPlaceholder")} value={state.packReference.fileId ?? ""}
                   onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "fileId", value: e.target.value })} />
               </div>
             </div>
@@ -358,16 +360,16 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
             <div className="space-y-2">
               <div className="space-y-1.5">
                 <Label htmlFor="d-mr-id">Projekt-ID oder Slug</Label>
-                <Input id="d-mr-id" placeholder="fabulously-optimized" value={state.packReference.projectId ?? ""}
+                <Input id="d-mr-id" placeholder={t("servers.create.curseforgeSlugPlaceholder")} value={state.packReference.projectId ?? ""}
                   onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "projectId", value: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="d-mr-ver">Version-ID <span className="text-zinc-400 font-normal">(optional)</span></Label>
-                <Input id="d-mr-ver" placeholder="IIJJKKLL" value={state.packReference.versionId ?? ""}
+                <Input id="d-mr-ver" placeholder={t("servers.create.curseforgeIdPlaceholder")} value={state.packReference.versionId ?? ""}
                   onChange={(e) => dispatch({ type: "SET_PACK_REF", field: "versionId", value: e.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label>Oder .mrpack-Datei hochladen</Label>
+                <Label>{t("servers.create.mrpackUploadLabel")}</Label>
                 <input
                   type="file"
                   accept=".mrpack"
@@ -451,16 +453,17 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
 }
 
 function StepBasis({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
+  const { t } = useLocale();
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="w-name">Servername</Label>
-        <Input id="w-name" value={state.name} onChange={(e) => dispatch({ type: "SET_NAME", value: e.target.value })} placeholder="Mein Minecraft Server" autoFocus />
+        <Input id="w-name" value={state.name} onChange={(e) => dispatch({ type: "SET_NAME", value: e.target.value })} placeholder={t("servers.create.namePlaceholder")} autoFocus />
         {state.errors.name && <p className="text-xs text-red-500">{state.errors.name}</p>}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="w-id">Identifier</Label>
-        <Input id="w-id" value={state.identifier} onChange={(e) => dispatch({ type: "SET_IDENTIFIER", value: e.target.value })} placeholder="mein-minecraft-server" className="font-mono" />
+        <Input id="w-id" value={state.identifier} onChange={(e) => dispatch({ type: "SET_IDENTIFIER", value: e.target.value })} placeholder={t("servers.create.identifierPlaceholder")} className="font-mono" />
         <p className="text-xs text-zinc-500">Wird als Container-Name und Verzeichnis verwendet</p>
         {state.errors.identifier && <p className="text-xs text-red-500">{state.errors.identifier}</p>}
       </div>
@@ -472,6 +475,7 @@ function StepBasis({ state, dispatch }: { state: WizardState; dispatch: React.Di
 }
 
 function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
+  const { t } = useLocale();
   const typeConfig = SERVER_TYPE_MAP[state.serverType];
   const isPack = typeConfig.isPack;
   const isMinecraft = getRuntimeFromType(state.serverType) === "minecraft";
@@ -487,7 +491,7 @@ function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.
       ) : (
         <div className="space-y-1.5">
           <Label htmlFor="w-version">{isMinecraft ? "Minecraft-Version" : "Version"}</Label>
-          <Input id="w-version" value={state.version} onChange={(e) => dispatch({ type: "SET_FIELD", field: "version", value: e.target.value })} placeholder="latest" />
+          <Input id="w-version" value={state.version} onChange={(e) => dispatch({ type: "SET_FIELD", field: "version", value: e.target.value })} placeholder={t("servers.create.versionPlaceholder")} />
           <p className="text-xs text-zinc-500">Leer lassen für die neueste Version</p>
         </div>
       )}
@@ -520,7 +524,7 @@ function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.
       )}
       {isMinecraft && (
         <div className="space-y-1.5">
-          <Label>JVM Flags</Label>
+          <Label>{t("servers.create.jvmFlagsLabel")}</Label>
           <JvmPresetSelector
             memory={state.memory}
             selectedPresetId={state.jvmPresetId}
@@ -541,6 +545,7 @@ function StepResources({
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
 }) {
+  const { t } = useLocale();
   const memoryLabel =
     state.memory >= 1024
       ? `${(state.memory / 1024).toFixed(1)} GB`
@@ -606,7 +611,7 @@ function StepResources({
                   <AlertCircle className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 cursor-default text-red-500" />
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  Dieser Port ist bereits belegt. Wähle einen anderen Port.
+                  {t("servers.create.portTaken")}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -614,7 +619,7 @@ function StepResources({
         </div>
         {state.portStatus === "taken" && (
           <p className="text-xs text-red-500">
-            Port ist bereits belegt
+            {t("servers.create.portTakenShort")}
           </p>
         )}
         {state.errors.port && (
@@ -632,6 +637,7 @@ function StepEinstellungen({
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
 }) {
+  const { t } = useLocale();
   const isMinecraft = getRuntimeFromType(state.serverType) === "minecraft";
   const showWorld =
     isMinecraft &&
@@ -647,7 +653,7 @@ function StepEinstellungen({
               id="w-motd"
               value={state.motd}
               onChange={(e) => dispatch({ type: "SET_FIELD", field: "motd", value: e.target.value })}
-              placeholder="A Aethera Server"
+              placeholder={t("servers.create.motdPlaceholder")}
             />
           </div>
 
@@ -694,7 +700,7 @@ function StepEinstellungen({
               }
             />
             <div>
-              <span className="text-sm font-medium">Whitelist aktivieren</span>
+              <span className="text-sm font-medium">{t("servers.create.whitelistLabel")}</span>
               <p className="text-xs text-zinc-500">Nur eingeladene Spieler können beitreten</p>
             </div>
           </label>
@@ -727,10 +733,10 @@ function StepEinstellungen({
 
           {state.worldSource === "generate" && (
             <div className="space-y-1.5">
-              <Label htmlFor="w-seed">Seed <span className="text-zinc-400 font-normal">(optional)</span></Label>
+              <Label htmlFor="w-seed">{t("servers.create.seedLabel")} <span className="text-zinc-400 font-normal">{t("servers.create.seedOptional")}</span></Label>
               <Input
                 id="w-seed"
-                placeholder="Zufällig"
+                placeholder={t("servers.create.seedPlaceholder")}
                 value={state.worldSeed}
                 onChange={(e) => dispatch({ type: "SET_FIELD", field: "worldSeed", value: e.target.value })}
               />
@@ -773,6 +779,7 @@ function StepEinstellungen({
 }
 
 function StepConfirmation({ state }: { state: WizardState }) {
+  const { t } = useLocale();
   const memoryLabel =
     state.memory >= 1024
       ? `${(state.memory / 1024).toFixed(1)} GB`
@@ -786,7 +793,7 @@ function StepConfirmation({ state }: { state: WizardState }) {
 
   const worldDesc =
     state.worldSource === "generate"
-      ? state.worldSeed ? `Generiert (Seed: ${state.worldSeed})` : "Generiert (zufällig)"
+      ? state.worldSeed ? t("servers.create.worldSeedDisplay", { seed: state.worldSeed }) : t("servers.create.worldRandomDisplay")
       : state.worldSource === "import"
         ? state.worldImportFile ? `Import: ${state.worldImportFile.name}` : "Import (keine Datei)"
         : state.worldBackupSelection
@@ -794,26 +801,26 @@ function StepConfirmation({ state }: { state: WizardState }) {
           : "Backup (nicht gewählt)";
 
   const rows = [
-    { label: "Name", value: state.name },
-    { label: "Identifier", value: state.identifier },
-    { label: "Servertyp", value: typeConfig.label },
+    { label: t("servers.create.summaryName"), value: state.name },
+    { label: t("servers.create.summaryIdentifier"), value: state.identifier },
+    { label: t("servers.create.summaryServerType"), value: typeConfig.label },
     ...(state.packMeta
       ? [
-          { label: "MC-Version", value: state.packMeta.mcVersion },
-          { label: "Loader", value: `${state.packMeta.loader}${state.packMeta.loaderVersion ? ` ${state.packMeta.loaderVersion}` : ""}` },
+          { label: t("servers.create.summaryMcVersion"), value: state.packMeta.mcVersion },
+          { label: t("servers.create.summaryLoader"), value: `${state.packMeta.loader}${state.packMeta.loaderVersion ? ` ${state.packMeta.loaderVersion}` : ""}` },
         ]
-      : [{ label: "Version", value: state.version || "latest" }]),
-    { label: "RAM", value: memoryLabel },
-    { label: "Port", value: String(state.port) },
+      : [{ label: t("servers.create.summaryVersion"), value: state.version || "latest" }]),
+    { label: t("servers.create.summaryRam"), value: memoryLabel },
+    { label: t("servers.create.summaryPort"), value: String(state.port) },
     ...(isMinecraft ? [
-      { label: "MOTD", value: state.motd },
-      { label: "Max. Spieler", value: String(state.maxPlayers) },
-      { label: "Schwierigkeit", value: state.difficulty },
-      { label: "Whitelist", value: state.whitelist ? "Ja" : "Nein" },
+      { label: t("servers.create.summaryMotd"), value: state.motd },
+      { label: t("servers.create.summaryMaxPlayers"), value: String(state.maxPlayers) },
+      { label: t("servers.create.summaryDifficulty"), value: state.difficulty },
+      { label: t("servers.create.summaryWhitelist"), value: state.whitelist ? "Ja" : "Nein" },
     ] : []),
-    ...(showWorldInfo ? [{ label: "Welt", value: worldDesc }] : []),
+    ...(showWorldInfo ? [{ label: t("servers.create.summaryWorld"), value: worldDesc }] : []),
     ...(state.backupSelection
-      ? [{ label: "Backup", value: `${state.backupSelection.backupName} (${state.backupSelection.components.join(", ")})` }]
+      ? [{ label: t("servers.create.summaryBackup"), value: `${state.backupSelection.backupName} (${state.backupSelection.components.join(", ")})` }]
       : []),
   ];
 
@@ -883,6 +890,7 @@ export function CreateServerWizard({
   blueprintId,
   maxRam,
 }: CreateServerWizardProps) {
+  const { t } = useLocale();
   const router = useRouter();
   const [state, dispatch] = useReducer(reducer, {
     ...INITIAL_STATE,
@@ -1028,12 +1036,12 @@ export function CreateServerWizard({
             );
             if (!res.ok) {
               const data = await res.json().catch(() => ({}));
-              toast.error(`Backup-Wiederherstellung fehlgeschlagen: ${data.error || "Unbekannter Fehler"}`);
+              toast.error(`${t("servers.create.backupRestoreFailed")}: ${data.error || "Unbekannter Fehler"}`);
             } else {
-              toast.success("Backup wiederhergestellt!");
+              toast.success(t("servers.create.backupRestored"));
             }
           } catch {
-            toast.error("Backup-Wiederherstellung fehlgeschlagen");
+            toast.error(t("servers.create.backupRestoreFailed"));
           }
         }
 
@@ -1046,7 +1054,7 @@ export function CreateServerWizard({
               method: "POST",
               body: fd,
             });
-            toast.success("Welt hochgeladen!");
+            toast.success(t("servers.create.worldUploaded"));
           } catch {
             toast.error("Welt-Upload fehlgeschlagen");
           }
@@ -1073,7 +1081,7 @@ export function CreateServerWizard({
           }
         }
 
-        toast.success("Server erstellt!");
+        toast.success(t("servers.create.serverCreated"));
         onOpenChange(false);
         router.push(`/projects/${projectKey}/servers/${result.serverId}`);
       } catch (err) {
@@ -1183,7 +1191,7 @@ export function CreateServerWizard({
               ) : (
                 <Rocket className="mr-1.5 h-4 w-4" />
               )}
-              {isPending ? "Erstelle…" : "Server erstellen"}
+              {isPending ? t("servers.create.creating") : t("servers.create.createBtn")}
             </Button>
           ) : (
             <Button onClick={handleNext}>

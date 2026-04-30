@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import {
   MessageCircle,
@@ -109,6 +110,7 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 export function DiscordTab({ serverId }: Props) {
+  const { t } = useLocale();
   const [moduleAvailable, setModuleAvailable] = useState<boolean | null>(null);
   const [config, setConfig]       = useState<ServerDiscordConfig>(EMPTY_CONFIG);
   const [guilds, setGuilds]       = useState<Guild[]>([]);
@@ -374,7 +376,7 @@ export function DiscordTab({ serverId }: Props) {
                 onValueChange={selectGuild}
               >
                 <SelectTrigger className="w-full max-w-sm">
-                  <SelectValue placeholder="Select a Discord server…" />
+                  <SelectValue placeholder={t("servers.discord.selectGuildPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {guilds.map((g) => (
@@ -401,8 +403,8 @@ export function DiscordTab({ serverId }: Props) {
         <>
           {/* Player Chat */}
           <ChannelConfigCard
-            title="Player Chat"
-            description="Relay vanilla Minecraft chat messages to a Discord channel."
+            title={t("servers.discord.playerChatTitle")}
+            description={t("servers.discord.playerChatDesc")}
             icon={<MessageCircle className="h-4 w-4" />}
             config={config.playerChat}
             channels={channels}
@@ -422,8 +424,8 @@ export function DiscordTab({ serverId }: Props) {
 
           {/* Player Join/Leave */}
           <ChannelConfigCard
-            title="Player Join / Leave"
-            description="Post join and leave notifications to a Discord channel."
+            title={t("servers.discord.playerEventsTitle")}
+            description={t("servers.discord.playerEventsDesc")}
             icon={<Users className="h-4 w-4" />}
             config={config.playerEvents}
             channels={channels}
@@ -443,8 +445,8 @@ export function DiscordTab({ serverId }: Props) {
 
           {/* Whitelist Requests */}
           <ChannelConfigCard
-            title="Whitelist Requests"
-            description="When a player tries to join but isn't whitelisted, post a request with an approval button."
+            title={t("servers.discord.whitelistRequestsTitle")}
+            description={t("servers.discord.whitelistRequestsDesc")}
             icon={<ShieldCheck className="h-4 w-4" />}
             config={config.whitelistRequests}
             channels={channels}
@@ -464,8 +466,8 @@ export function DiscordTab({ serverId }: Props) {
 
           {/* Server Events */}
           <ChannelConfigCard
-            title="Server Events"
-            description="Post notifications when the server starts, stops, crashes, or a backup completes."
+            title={t("servers.discord.serverEventsTitle")}
+            description={t("servers.discord.serverEventsDesc")}
             icon={<Activity className="h-4 w-4" />}
             config={config.serverEvents}
             channels={channels}
@@ -580,6 +582,7 @@ function ChannelConfigCard({
   warning,
   showRoleField,
 }: ChannelConfigCardProps) {
+  const { t } = useLocale();
   return (
     <Card className="border-zinc-800">
       <CardHeader>
@@ -620,7 +623,7 @@ function ChannelConfigCard({
                 onValueChange={(v) => onChange({ channelId: v || null })}
               >
                 <SelectTrigger className="w-full max-w-sm">
-                  <SelectValue placeholder="Select a channel…" />
+                  <SelectValue placeholder={t("servers.discord.selectChannelPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {channels.map((c) => (
@@ -642,7 +645,7 @@ function ChannelConfigCard({
               <input
                 type="text"
                 className="flex h-8 w-full max-w-sm rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm"
-                placeholder="e.g. 123456789012345678"
+                placeholder={t("servers.discord.roleIdPlaceholder")}
                 value={config.requiredRoleId ?? ""}
                 onChange={(e) => onChange({ requiredRoleId: e.target.value || null })}
               />

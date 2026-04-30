@@ -28,6 +28,7 @@ import {
   readPropertiesAction,
   writePropertiesAction,
 } from "@/app/(app)/actions/servers";
+import { useLocale } from "@/context/locale-context";
 
 const configSchema = z.object({
   motd: z.string().max(59, "Maximal 59 Zeichen"),
@@ -50,6 +51,7 @@ interface ConfigurationTabProps {
 }
 
 export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabProps) {
+  const { t } = useLocale();
   const [rawProperties, setRawProperties] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -163,7 +165,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
               <Label htmlFor="cfg-motd">MOTD</Label>
               <Input
                 id="cfg-motd"
-                placeholder="A Minecraft Server"
+                placeholder={t("servers.config.motdPlaceholder")}
                 disabled={!editable}
                 {...register("motd")}
               />
@@ -232,7 +234,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
               <Label htmlFor="cfg-seed">World-Seed</Label>
               <Input
                 id="cfg-seed"
-                placeholder="Leer = zufällig"
+                placeholder={t("servers.config.seedPlaceholder")}
                 className="font-mono"
                 disabled={!editable}
                 {...register("level-seed")}
@@ -243,7 +245,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
             <div className="space-y-3 sm:col-span-2">
               {(
                 [
-                  { name: "white-list", label: "Whitelist aktivieren" },
+                  { name: "white-list", label: t("servers.config.whitelistLabel") },
                   { name: "pvp", label: "PvP aktivieren" },
                   { name: "online-mode", label: "Online-Modus (Authentifizierung)" },
                   { name: "enable-command-blocks", label: "Command Blocks aktivieren" },

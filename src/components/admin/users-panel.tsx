@@ -107,7 +107,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       resetCreateForm();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create user",
+        err instanceof Error ? err.message : t("admin.users.createFailed"),
       );
     } finally {
       setCreateLoading(false);
@@ -139,7 +139,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       setEditUser(null);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update user",
+        err instanceof Error ? err.message : t("admin.users.updateFailed"),
       );
     } finally {
       setEditLoading(false);
@@ -164,7 +164,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
           : t("admin.users.userEnabled", { name: user.username }),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
+      toast.error(err instanceof Error ? err.message : t("admin.users.failed"));
     }
   };
 
@@ -178,7 +178,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       });
       toast.success(t("admin.users.passwordReset"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
+      toast.error(err instanceof Error ? err.message : t("admin.users.failed"));
     }
   };
 
@@ -190,7 +190,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
       toast.success(t("admin.users.userDeleted", { name: deleteConfirm.username }));
       setDeleteConfirm(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
+      toast.error(err instanceof Error ? err.message : t("admin.users.failed"));
     }
   };
 
@@ -288,7 +288,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
               <Input
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
-                placeholder="username"
+                placeholder={t("admin.users.usernamePlaceholder")}
               />
             </div>
             <div className="space-y-2">
@@ -297,7 +297,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                 type="email"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="user@example.com"
+                placeholder={t("admin.users.emailPlaceholder")}
               />
             </div>
             <div className="space-y-2">
