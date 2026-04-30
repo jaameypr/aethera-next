@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale } from "@/context/locale-context";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ConsoleTab } from "./tabs/ConsoleTab";
@@ -45,19 +46,20 @@ interface Props {
 }
 
 export function ServerDetailTabs({ server, projectKey, isOwner, userPermissions }: Props) {
+  const { t } = useLocale();
   const can = (perm: string) => isOwner || userPermissions.includes(perm);
 
   const tabs = [
-    { value: "overview",  label: "Übersicht",    show: true },
-    { value: "console",   label: "Konsole",       show: can("server.console") },
-    { value: "logs",      label: "Logs",          show: true },
-    { value: "files",     label: "Dateien",       show: can("server.files") },
-    { value: "addons",    label: "Mods/Plugins",  show: can("server.files") },
-    { value: "backups",   label: "Backups",       show: can("server.backups") },
-    { value: "config",    label: "Konfiguration", show: can("server.settings") },
-    { value: "discord",   label: "Discord",       show: can("server.settings") },
-    { value: "access",    label: "Zugriff",       show: can("server.settings") },
-    { value: "settings",  label: "Einstellungen", show: can("server.settings") },
+    { value: "overview",  label: t("servers.tabs.overview"),  show: true },
+    { value: "console",   label: t("servers.tabs.console"),   show: can("server.console") },
+    { value: "logs",      label: t("servers.tabs.logs"),      show: true },
+    { value: "files",     label: t("servers.tabs.files"),     show: can("server.files") },
+    { value: "addons",    label: t("servers.tabs.addons"),    show: can("server.files") },
+    { value: "backups",   label: t("servers.tabs.backups"),   show: can("server.backups") },
+    { value: "config",    label: t("servers.tabs.config"),    show: can("server.settings") },
+    { value: "discord",   label: t("servers.tabs.discord"),   show: can("server.settings") },
+    { value: "access",    label: t("servers.tabs.access"),    show: can("server.settings") },
+    { value: "settings",  label: t("servers.tabs.settings"),  show: can("server.settings") },
   ].filter((t) => t.show);
 
   const visibleValues = new Set(tabs.map((t) => t.value));

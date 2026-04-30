@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Zap, MemoryStick } from "lucide-react";
+import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -48,6 +49,7 @@ export function BlueprintsList({
   const [deleteTarget, setDeleteTarget] = useState<Blueprint | null>(null);
   const [initTarget, setInitTarget] = useState<Blueprint | null>(null);
   const [isDeleting, startDelete] = useTransition();
+  const { t } = useLocale();
 
   function handleDelete() {
     if (!deleteTarget) return;
@@ -57,9 +59,9 @@ export function BlueprintsList({
           blueprintId: deleteTarget._id,
           projectKey,
         });
-        toast.success("Blueprint gelöscht");
+        toast.success(t("projects.servers.blueprintDeleted"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler beim Löschen");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       } finally {
         setDeleteTarget(null);
       }
@@ -72,11 +74,11 @@ export function BlueprintsList({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Blueprints</h2>
+        <h2 className="text-lg font-semibold">{t("projects.servers.blueprints")}</h2>
         {isAdmin && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
-            Blueprint erstellen
+            {t("projects.servers.createBlueprint")}
           </Button>
         )}
       </div>
@@ -112,7 +114,7 @@ export function BlueprintsList({
                         : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
-                    {bp.status === "available" ? "Verfügbar" : "Belegt"}
+                    {bp.status === "available" ? t("projects.blueprints.available") : t("projects.blueprints.claimed")}
                   </span>
                 </div>
               </CardHeader>
@@ -124,7 +126,7 @@ export function BlueprintsList({
                     onClick={() => setInitTarget(bp)}
                   >
                     <Zap className="mr-1.5 h-3.5 w-3.5" />
-                    Initialisieren
+                    {t("projects.servers.initialize")}
                   </Button>
                 )}
                 {isAdmin && bp.status === "available" && (
@@ -165,22 +167,21 @@ export function BlueprintsList({
       <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Blueprint löschen?</DialogTitle>
+            <DialogTitle>{t("projects.servers.confirmDeleteBlueprintTitle")}</DialogTitle>
             <DialogDescription>
-              Der Blueprint <strong>{deleteTarget?.name}</strong> wird dauerhaft gelöscht.
-              Diese Aktion kann nicht rückgängig gemacht werden.
+              {t("projects.servers.confirmDeleteBlueprintDesc", { name: deleteTarget?.name ?? "" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
-              Abbrechen
+              {t("projects.servers.cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? "Löschen…" : "Löschen"}
+              {isDeleting ? t("projects.servers.deleting") : t("projects.servers.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/guards";
 import { listUserFiles } from "@/lib/services/user-file.service";
 import { Button } from "@/components/ui/button";
 import { FileDeleteButton } from "./FileDeleteButton";
+import { getServerT } from "@/lib/i18n/server";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -24,6 +25,7 @@ function formatDate(date: Date | string): string {
 export default async function DateienPage() {
   const session = await requireSession();
   const files = await listUserFiles(session.userId);
+  const { t } = await getServerT();
 
   return (
     <div className="space-y-6">
@@ -35,22 +37,24 @@ export default async function DateienPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Dateien</h1>
+            <h1 className="text-2xl font-bold">{t("verzeichnis.files.title")}</h1>
             <p className="text-sm text-zinc-500">
               {files.length === 0
-                ? "Keine Dateien vorhanden"
-                : `${files.length} Datei${files.length !== 1 ? "en" : ""}`}
+                ? t("verzeichnis.files.noFiles")
+                : files.length === 1
+                  ? t("verzeichnis.files.fileCount1", { count: 1 })
+                  : t("verzeichnis.files.filesCount", { count: files.length })}
             </p>
           </div>
         </div>
         <Button asChild size="sm">
-          <Link href="/verzeichnis/upload">Hochladen</Link>
+          <Link href="/verzeichnis/upload">{t("verzeichnis.files.uploadLink")}</Link>
         </Button>
       </div>
 
       {files.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 py-16 text-center text-sm text-zinc-500 dark:border-zinc-700">
-          Noch keine Dateien hochgeladen.
+          {t("verzeichnis.files.noFilesYet")}
         </div>
       ) : (
         <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
@@ -58,22 +62,22 @@ export default async function DateienPage() {
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
                 <th className="px-4 py-2.5 text-left font-medium text-zinc-500">
-                  Name
+                  {t("verzeichnis.files.colName")}
                 </th>
                 <th className="px-4 py-2.5 text-left font-medium text-zinc-500">
-                  Identifier
+                  {t("verzeichnis.files.colIdentifier")}
                 </th>
                 <th className="px-4 py-2.5 text-right font-medium text-zinc-500">
-                  Größe
+                  {t("verzeichnis.files.colSize")}
                 </th>
                 <th className="px-4 py-2.5 text-left font-medium text-zinc-500">
-                  Erstellt
+                  {t("verzeichnis.files.colCreated")}
                 </th>
                 <th className="px-4 py-2.5 text-left font-medium text-zinc-500">
-                  Ablauf
+                  {t("verzeichnis.files.colExpiry")}
                 </th>
                 <th className="px-4 py-2.5 text-right font-medium text-zinc-500">
-                  Aktionen
+                  {t("verzeichnis.files.colActions")}
                 </th>
               </tr>
             </thead>
@@ -105,7 +109,7 @@ export default async function DateienPage() {
                           href={`/api/files/${file._id.toString()}`}
                           download={file.originalFilename}
                         >
-                          Download
+                          {t("verzeichnis.files.download")}
                         </a>
                       </Button>
                       <FileDeleteButton fileId={file._id.toString()} />

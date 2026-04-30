@@ -26,6 +26,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { InstalledModuleResponse, ModuleManifestEnvDef } from "@/lib/api/types";
+import { useLocale } from "@/context/locale-context";
 import {
   startModuleAction,
   stopModuleAction,
@@ -50,6 +51,7 @@ interface ModuleDetailPanelProps {
 
 export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const router = useRouter();
+  const { t } = useLocale();
   const [mod, setMod] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
@@ -66,9 +68,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     try {
       const result = await startModuleAction(mod.moduleId);
       setMod(result);
-      toast.success("Modul gestartet");
+      toast.success(t("admin.modules.moduleStarted"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -79,9 +81,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     try {
       const result = await stopModuleAction(mod.moduleId);
       setMod(result);
-      toast.success("Modul gestoppt");
+      toast.success(t("admin.modules.moduleStopped"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -97,16 +99,16 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
         Object.entries(configValues).filter(([k, v]) => !(secretKeys.has(k) && v === "")),
       );
       if (Object.keys(payload).length === 0) {
-        toast.info("Keine Änderungen zum Speichern");
+        toast.info(t("admin.moduleDetail.noChanges"));
         setLoading(false);
         return;
       }
       const result = await updateModuleConfigAction(mod.moduleId, payload);
       setMod(result);
       setConfigValues({});
-      toast.success("Konfiguration gespeichert");
+      toast.success(t("admin.moduleDetail.configSaved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -117,9 +119,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     try {
       const result = await updateModulePublicUrlAction(mod.moduleId, publicUrl.trim() || undefined);
       setMod(result);
-      toast.success("Öffentliche URL gespeichert");
+      toast.success(t("admin.moduleDetail.publicUrlSaved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -138,10 +140,10 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     setLoading(true);
     try {
       await uninstallModuleAction(mod.moduleId);
-      toast.success("Modul deinstalliert");
+      toast.success(t("admin.modules.moduleUninstalled"));
       router.push("/admin/modules");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
       setLoading(false);
     }
   };
@@ -152,9 +154,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     try {
       const result = await reinstallModuleAction(mod.moduleId);
       setMod(result);
-      toast.success("Modul neu installiert");
+      toast.success(t("admin.modules.moduleInstalled", { name: mod.name }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -173,7 +175,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Zurück
+          {t("common.back")}
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -198,7 +200,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       {/* Actions */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Aktionen</CardTitle>
+          <CardTitle className="text-base">{t("admin.moduleDetail.actions")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {mod.status === "stopped" && (
@@ -208,14 +210,14 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               ) : (
                 <Play className="mr-1 h-4 w-4" />
               )}
-              Starten
+              {t("admin.modules.start")}
             </Button>
           )}
           {mod.status === "running" && (
             <>
               <Button variant="outline" onClick={handleStop} disabled={loading}>
                 <Square className="mr-1 h-4 w-4" />
-                Stoppen
+                {t("admin.modules.stop")}
               </Button>
               {mod.exposure === "public" && (
                 <Button variant="outline" asChild>
@@ -225,7 +227,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
                     rel="noopener noreferrer"
                   >
                     <ExternalLink className="mr-1 h-4 w-4" />
-                    Öffnen
+                    {t("admin.modules.open")}
                   </a>
                 </Button>
               )}
@@ -233,7 +235,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           )}
           <Button variant="outline" onClick={handleHealthCheck}>
             <Heart className="mr-1 h-4 w-4" />
-            Health Check
+            {t("admin.moduleDetail.healthCheck")}
           </Button>
           <Button
             variant="outline"
@@ -241,13 +243,13 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               try {
                 const res = await fetch(`/api/modules/${mod.moduleId}/provision-key`, { method: "POST" });
                 if (!res.ok) throw new Error((await res.json()).error);
-                toast.success("API Key provisioniert");
+                toast.success(t("admin.moduleDetail.apiKeyProvisioned"));
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Fehler");
+                toast.error(err instanceof Error ? err.message : t("common.error"));
               }
             }}
           >
-            🔑 API Key
+            🔑 {t("admin.moduleDetail.apiKey")}
           </Button>
           {healthStatus && (
             <span className="flex items-center text-sm text-zinc-500">
@@ -262,7 +264,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               disabled={loading}
             >
               <RotateCcw className="mr-1 h-4 w-4" />
-              Neu installieren
+              {t("admin.moduleDetail.reinstall")}
             </Button>
           )}
           <Button
@@ -271,7 +273,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
             disabled={loading}
           >
             <Trash2 className="mr-1 h-4 w-4" />
-            Deinstallieren
+            {t("admin.modules.uninstall")}
           </Button>
         </CardContent>
       </Card>
@@ -280,17 +282,14 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       <Dialog open={showReinstallConfirm} onOpenChange={setShowReinstallConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modul neu installieren?</DialogTitle>
+            <DialogTitle>{t("admin.moduleDetail.reinstallTitle")}</DialogTitle>
             <DialogDescription>
-              Der Container von <strong>{mod.name}</strong> wird gestoppt,
-              entfernt und neu erstellt. Alle Konfigurationen und Umgebungsvariablen
-              bleiben erhalten. Die Datenbank und Volumes des Moduls werden nicht
-              gelöscht.
+              {t("admin.moduleDetail.reinstallDesc", { name: mod.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowReinstallConfirm(false)}>
-              Abbrechen
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleReinstall} disabled={loading}>
               {loading ? (
@@ -298,7 +297,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               ) : (
                 <RotateCcw className="mr-1 h-4 w-4" />
               )}
-              Neu installieren
+              {t("admin.moduleDetail.reinstall")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -307,17 +306,17 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       {/* Info */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Details</CardTitle>
+          <CardTitle className="text-base">{t("admin.moduleDetail.details")}</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-zinc-500">Typ</dt>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.labelType")}</dt>
             <dd>{mod.type}</dd>
-            <dt className="text-zinc-500">Version</dt>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.labelVersion")}</dt>
             <dd>{mod.version}</dd>
             {mod.internalUrl && (
               <>
-                <dt className="text-zinc-500">Interne URL</dt>
+                <dt className="text-zinc-500">{t("admin.moduleDetail.labelInternalUrl")}</dt>
                 <dd className="truncate font-mono text-xs">
                   {mod.internalUrl}
                 </dd>
@@ -325,13 +324,13 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
             )}
             {mod.assignedPort && (
               <>
-                <dt className="text-zinc-500">Port</dt>
+                <dt className="text-zinc-500">{t("admin.moduleDetail.labelPort")}</dt>
                 <dd>{mod.assignedPort}</dd>
               </>
             )}
-            <dt className="text-zinc-500">Installiert</dt>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.labelInstalled")}</dt>
             <dd>{new Date(mod.createdAt).toLocaleString("de-DE")}</dd>
-            <dt className="text-zinc-500">Aktualisiert</dt>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.labelUpdated")}</dt>
             <dd>{new Date(mod.updatedAt).toLocaleString("de-DE")}</dd>
           </dl>
         </CardContent>
@@ -341,15 +340,14 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       {mod.exposure === "public" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Öffentliche URL</CardTitle>
+            <CardTitle className="text-base">{t("admin.moduleDetail.publicUrl")}</CardTitle>
             <CardDescription>
-              Externe URL unter der das Modul erreichbar ist. Leer lassen für
-              automatische Erkennung (Host + Port {mod.assignedPort}).
+              {t("admin.moduleDetail.publicUrlDesc", { port: mod.assignedPort ?? "" })}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input
-              placeholder={`z.B. https://paperview.example.com oder http://1.2.3.4:${mod.assignedPort}`}
+              placeholder={t("admin.moduleDetail.publicUrlPlaceholder", { port: String(mod.assignedPort ?? "") })}
               value={publicUrl}
               onChange={(e) => setPublicUrl(e.target.value)}
             />
@@ -363,7 +361,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               ) : (
                 <Save className="mr-1 h-4 w-4" />
               )}
-              Speichern
+              {t("common.save")}
             </Button>
           </CardContent>
         </Card>
@@ -373,9 +371,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       {mod.permissions.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Permissions</CardTitle>
+            <CardTitle className="text-base">{t("admin.moduleDetail.permissions")}</CardTitle>
             <CardDescription>
-              Diese Permissions werden vom Modul registriert
+              {t("admin.moduleDetail.permissionsDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -397,10 +395,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       {configurableDefs.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Konfiguration</CardTitle>
+            <CardTitle className="text-base">{t("admin.moduleDetail.configuration")}</CardTitle>
             <CardDescription>
-              Modul-spezifische Umgebungsvariablen. Änderungen erfordern einen
-              Neustart des Moduls.
+              {t("admin.moduleDetail.configurationDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -443,7 +440,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               ) : (
                 <Save className="mr-1 h-4 w-4" />
               )}
-              Speichern
+              {t("common.save")}
             </Button>
           </CardContent>
         </Card>

@@ -30,6 +30,7 @@ import {
   updateServerAction,
   deleteServerAction,
 } from "@/app/(app)/actions/servers";
+import { useLocale } from "@/context/locale-context";
 
 const settingsSchema = z.object({
   memory: z.number().min(512, "Mindestens 512 MB").max(32768),
@@ -62,6 +63,7 @@ export function ServerSettingsTab({
   serverName,
   defaults,
 }: ServerSettingsTabProps) {
+  const { t } = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -144,7 +146,7 @@ export function ServerSettingsTab({
             </div>
             <div className="space-y-1">
               <Label htmlFor="version">Version</Label>
-              <Input id="version" placeholder="latest" {...register("version")} />
+              <Input id="version" placeholder={t("servers.settings.versionPlaceholder")} {...register("version")} />
             </div>
             <div className="space-y-1">
               <Label>Java-Version</Label>
@@ -180,7 +182,7 @@ export function ServerSettingsTab({
               <Label htmlFor="javaArgs">Java Argumente</Label>
               <Input
                 id="javaArgs"
-                placeholder="-XX:+UseG1GC"
+                placeholder={t("servers.settings.jvmFlagsPlaceholder")}
                 className="font-mono"
                 {...register("javaArgs")}
               />

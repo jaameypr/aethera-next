@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLocale } from "@/context/locale-context";
 
 const IDENTIFIER_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -19,6 +20,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function UploadPage() {
+  const { t } = useLocale();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -27,7 +29,7 @@ export default function UploadPage() {
 
   const identifierError =
     identifier && !IDENTIFIER_RE.test(identifier)
-      ? "Nur Kleinbuchstaben, Zahlen und Bindestriche (z.B. my-world)"
+      ? t("verzeichnis.upload.identifierError")
       : null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -47,13 +49,13 @@ export default function UploadPage() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Upload fehlgeschlagen");
+        throw new Error(body.error ?? t("verzeichnis.upload.uploadFailed"));
       }
 
-      toast.success("Datei erfolgreich hochgeladen");
+      toast.success(t("verzeichnis.upload.uploadSuccess"));
       router.push("/verzeichnis/dateien");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload fehlgeschlagen");
+      toast.error(err instanceof Error ? err.message : t("verzeichnis.upload.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -68,25 +70,25 @@ export default function UploadPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Upload</h1>
+          <h1 className="text-2xl font-bold">{t("verzeichnis.upload.title")}</h1>
           <p className="text-sm text-zinc-500">
-            Dateien werden nach 48 Stunden automatisch gelöscht
+            {t("verzeichnis.upload.autoDelete")}
           </p>
         </div>
       </div>
 
       <Card className="max-w-lg">
         <CardHeader>
-          <CardTitle className="text-base">Datei hochladen</CardTitle>
+          <CardTitle className="text-base">{t("verzeichnis.upload.uploadCard")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Identifier */}
             <div className="space-y-1">
-              <Label htmlFor="identifier">Identifier</Label>
+              <Label htmlFor="identifier">{t("verzeichnis.upload.identifierLabel")}</Label>
               <Input
                 id="identifier"
-                placeholder="my-world"
+                placeholder={t("verzeichnis.upload.identifierPlaceholder")}
                 className="font-mono"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value.toLowerCase())}
@@ -95,14 +97,13 @@ export default function UploadPage() {
                 <p className="text-xs text-red-500">{identifierError}</p>
               )}
               <p className="text-xs text-zinc-500">
-                Eindeutiger Name zur Referenzierung der Datei (z.B. beim
-                Server-Deploy)
+                {t("verzeichnis.upload.identifierHint")}
               </p>
             </div>
 
             {/* File picker */}
             <div className="space-y-1">
-              <Label>Datei</Label>
+              <Label>{t("verzeichnis.upload.fileLabel")}</Label>
               <div
                 className="cursor-pointer rounded-md border-2 border-dashed border-zinc-200 p-6 text-center transition-colors hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-500"
                 onClick={() => inputRef.current?.click()}
@@ -121,7 +122,7 @@ export default function UploadPage() {
                   <div className="space-y-1">
                     <Upload className="mx-auto h-8 w-8 text-zinc-400" />
                     <p className="text-sm text-zinc-500">
-                      Klicken zum Auswählen
+                      {t("verzeichnis.upload.clickToSelect")}
                     </p>
                   </div>
                 )}
@@ -140,7 +141,7 @@ export default function UploadPage() {
               className="w-full"
             >
               <Upload className="mr-1.5 h-4 w-4" />
-              {uploading ? "Wird hochgeladen…" : "Hochladen"}
+              {uploading ? t("verzeichnis.upload.uploading") : t("verzeichnis.upload.uploadBtn")}
             </Button>
           </form>
         </CardContent>

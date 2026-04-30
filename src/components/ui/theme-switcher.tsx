@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "@/context/theme-context";
+import { useLocale } from "@/context/locale-context";
 
 // Minecraft-style pixelated day/night toggle
 // off = moon/night icon (dark mode)  |  on = sun/day icon (light mode)
@@ -12,13 +13,14 @@ const SUN_SRC =
 
 export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme } = useTheme();
+  const { t } = useLocale();
   const isDark = theme === "dark";
 
   const sliderPos = isDark ? "translateX(2em)" : "translateX(0)";
 
   return (
     <label
-      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? t("common.switchToLight") : t("common.switchToDark")}
       style={{
         fontSize: 17,
         position: "relative",
@@ -33,7 +35,7 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
         type="checkbox"
         checked={isDark}
         onChange={() => setTheme(isDark ? "light" : "dark")}
-        aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        aria-label={isDark ? t("common.switchToLight") : t("common.switchToDark")}
         style={{ opacity: 0, width: 0, height: 0, position: "absolute" }}
       />
       {/* track */}

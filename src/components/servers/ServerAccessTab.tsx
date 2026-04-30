@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import { Plus, Trash2, Loader2, Search, Shield, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,16 +31,18 @@ interface ServerAccessTabProps {
   access: AccessEntry[];
 }
 
-const PERMISSION_OPTIONS = [
-  { value: "server.start", label: "Starten" },
-  { value: "server.stop", label: "Stoppen" },
-  { value: "server.console", label: "Konsole" },
-  { value: "server.files", label: "Dateien" },
-  { value: "server.backups", label: "Backups" },
-  { value: "server.settings", label: "Einstellungen" },
-];
-
 export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
+  const { t } = useLocale();
+
+  const PERMISSION_OPTIONS = [
+    { value: "server.start", label: t("servers.access.permStart") },
+    { value: "server.stop", label: t("servers.access.permStop") },
+    { value: "server.console", label: t("servers.access.permConsole") },
+    { value: "server.files", label: t("servers.access.permFiles") },
+    { value: "server.backups", label: t("servers.access.permBackups") },
+    { value: "server.settings", label: t("servers.access.permSettings") },
+  ];
+
   const [entries, setEntries] = useState<AccessEntry[]>(access);
   const [isPending, startTransition] = useTransition();
 
@@ -96,13 +99,13 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
           await grantServerAccessAction({ serverId, userId: selected._id, permissions: selectedPerms });
           setEntries((prev) => [...prev, { userId: selected._id, username: selected.username, permissions: selectedPerms }]);
         }
-        toast.success(`${selected.username} hat Zugriff erhalten`);
+        toast.success(t("servers.access.accessGranted", { username: selected.username }));
         setQuery("");
         setSelected(null);
         setResults([]);
         setSelectedPerms(["server.console"]);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("servers.access.failed"));
       }
     });
   }
@@ -112,9 +115,9 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
       try {
         await removeServerMemberAction({ serverId, userId });
         setEntries((prev) => prev.filter((e) => e.userId !== userId));
-        toast.success("Zugriff entfernt");
+        toast.success(t("servers.access.accessRemoved"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("servers.access.failed"));
       }
     });
   }
@@ -137,7 +140,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
           ),
         );
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("servers.access.failed"));
       }
     });
   }
@@ -149,10 +152,10 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base text-blue-700 dark:text-blue-400">
             <Shield className="h-4 w-4" />
-            Teilzugriff konfigurieren
+            {t("servers.access.configureTitle")}
           </CardTitle>
           <CardDescription>
-            Benutzer suchen und individuellen Server-Zugriff vergeben.
+            {t("servers.access.configureDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -161,7 +164,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <Input
               className="pl-9"
-              placeholder="Benutzername suchen…"
+              placeholder={t("servers.access.searchPlaceholder")}
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onFocus={() => query && setShowDropdown(true)}
