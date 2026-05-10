@@ -342,7 +342,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           <CardHeader>
             <CardTitle className="text-base">{t("admin.moduleDetail.publicUrl")}</CardTitle>
             <CardDescription>
-              {t("admin.moduleDetail.publicUrlDesc", { port: mod.assignedPort })}
+              {t("admin.moduleDetail.publicUrlDesc", { port: mod.assignedPort ?? "" })}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
