@@ -26,16 +26,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useLocale } from "@/context/locale-context";
 
-const COMPONENT_META = [
-  { id: "world" as const, label: "Welten", description: "Weltdaten und Dimensionen", icon: Globe },
-  { id: "config" as const, label: "Konfiguration", description: "server.properties und Configs", icon: FileText },
-  { id: "mods" as const, label: "Mods", description: "Installierte Modifikationen", icon: Package },
-  { id: "plugins" as const, label: "Plugins", description: "Server-Plugins", icon: Puzzle },
-  { id: "datapacks" as const, label: "Datapacks", description: "Benutzerdefinierte Datenpakete", icon: Database },
-] as const;
-
-type ComponentId = (typeof COMPONENT_META)[number]["id"];
+type ComponentId = "world" | "config" | "mods" | "plugins" | "datapacks";
 
 interface BackupAnalysis {
   components: Record<string, string[]>;
@@ -65,6 +58,16 @@ export function RestoreBackupDialog({
   availableComponents,
   onRestored,
 }: RestoreBackupDialogProps) {
+  const { t } = useLocale();
+
+  const COMPONENT_META = [
+    { id: "world" as const,      label: t("backupDialogs.components.world"),      description: t("backupDialogs.components.worldDescShort"),   icon: Globe },
+    { id: "config" as const,     label: t("backupDialogs.components.config"),     description: t("backupDialogs.components.configDescShort"),  icon: FileText },
+    { id: "mods" as const,       label: t("backupDialogs.components.mods"),       description: t("backupDialogs.components.modsDesc"),         icon: Package },
+    { id: "plugins" as const,    label: t("backupDialogs.components.plugins"),    description: t("backupDialogs.components.pluginsDescShort"), icon: Puzzle },
+    { id: "datapacks" as const,  label: t("backupDialogs.components.datapacks"),  description: t("backupDialogs.components.datapacksDesc"),    icon: Database },
+  ];
+
   const [analysis, setAnalysis] = useState<BackupAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -94,7 +97,7 @@ export function RestoreBackupDialog({
           .map(([comp]) => comp as ComponentId);
         setSelectedComponents(detected);
       })
-      .catch(() => toast.error("Backup-Analyse fehlgeschlagen"))
+      .catch(() => toast.error(t("backupDialogs.restore.analysisFailed")))
       .finally(() => setAnalyzing(false));
   }, [open, backupId, availableComponents]);
 
@@ -120,7 +123,7 @@ export function RestoreBackupDialog({
 
   async function handleRestore() {
     if (selectedComponents.length === 0) {
-      toast.error("Wähle mindestens eine Komponente");
+      toast.error(t("backupDialogs.restore.selectMinOne"));
       return;
     }
     setRestoring(true);
@@ -135,14 +138,14 @@ export function RestoreBackupDialog({
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Wiederherstellung fehlgeschlagen");
+        throw new Error(data.error || t("backupDialogs.restore.failed"));
       }
-      toast.success("Backup wiederhergestellt");
+      toast.success(t("backupDialogs.restore.success"));
       onOpenChange(false);
       onRestored?.();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Fehler bei Wiederherstellung",
+        err instanceof Error ? err.message : t("backupDialogs.restore.errorRestore"),
       );
     } finally {
       setRestoring(false);
@@ -161,27 +164,24 @@ export function RestoreBackupDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RotateCcw className="h-5 w-5" />
-            Backup wiederherstellen
+            {t("backupDialogs.restore.title")}
           </DialogTitle>
           <DialogDescription>
-            Wähle welche Komponenten aus{" "}
-            <span className="font-medium">{backupName}</span> auf{" "}
-            <span className="font-medium">{serverName}</span> wiederhergestellt
-            werden sollen.
+            {t("backupDialogs.restore.desc", { backup: backupName, server: serverName })}
           </DialogDescription>
         </DialogHeader>
 
         {analyzing ? (
           <div className="flex items-center justify-center py-8 gap-2 text-zinc-500">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Backup wird analysiert…</span>
+            <span className="text-sm">{t("backupDialogs.restore.analyzing")}</span>
           </div>
         ) : (
           <div className="space-y-1 py-2">
             <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-3 py-2 mb-3">
               <Info className="h-4 w-4 text-amber-600 shrink-0" />
               <p className="text-xs text-amber-700 dark:text-amber-400">
-                Server muss gestoppt sein. Bestehende Dateien werden überschrieben.
+                {t("backupDialogs.restore.warning")}
               </p>
             </div>
 
@@ -191,7 +191,7 @@ export function RestoreBackupDialog({
                   className="text-sm font-medium cursor-pointer"
                   onClick={toggleAll}
                 >
-                  Alle auswählen
+                  {t("backupDialogs.restore.selectAll")}
                 </Label>
                 <Checkbox
                   checked={selectedComponents.length === detectedComponents.length}
@@ -234,12 +234,12 @@ export function RestoreBackupDialog({
                       <p className="text-sm font-medium">{comp.label}</p>
                       {!isAvailable && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          nicht im Backup
+                          {t("backupDialogs.restore.notInBackup")}
                         </Badge>
                       )}
                       {isAvailable && fileCount > 0 && (
                         <span className="text-[10px] text-zinc-500">
-                          {fileCount} {fileCount === 1 ? "Datei" : "Dateien"}
+                          {t("backupDialogs.restore.fileCount", { count: fileCount })}
                         </span>
                       )}
                     </div>
@@ -258,7 +258,7 @@ export function RestoreBackupDialog({
 
             {analysis && (
               <p className="text-xs text-zinc-500 pt-2">
-                {analysis.totalFiles} Dateien · {formatSize(analysis.totalSize)}
+                {t("backupDialogs.restore.filesSummary", { files: analysis.totalFiles, size: formatSize(analysis.totalSize) })}
               </p>
             )}
           </div>
@@ -266,7 +266,7 @@ export function RestoreBackupDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={restoring}>
-            Abbrechen
+            {t("backupDialogs.restore.cancel")}
           </Button>
           <Button
             onClick={handleRestore}
@@ -275,14 +275,14 @@ export function RestoreBackupDialog({
             {restoring ? (
               <>
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                Wird wiederhergestellt…
+                {t("backupDialogs.restore.restoring")}
               </>
             ) : (
               <>
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                 {selectedComponents.length === detectedComponents.length
-                  ? "Alles wiederherstellen"
-                  : `${selectedComponents.length} ${selectedComponents.length === 1 ? "Komponente" : "Komponenten"} wiederherstellen`}
+                  ? t("backupDialogs.restore.restoreAll")
+                  : t("backupDialogs.restore.restoreN", { count: selectedComponents.length })}
               </>
             )}
           </Button>

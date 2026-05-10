@@ -28,14 +28,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-
-const COMPONENT_META: Record<string, { label: string; icon: typeof Globe }> = {
-  world: { label: "Welten", icon: Globe },
-  config: { label: "Konfiguration", icon: FileText },
-  mods: { label: "Mods", icon: Package },
-  plugins: { label: "Plugins", icon: Puzzle },
-  datapacks: { label: "Datapacks", icon: Database },
-};
+import { useLocale } from "@/context/locale-context";
 
 interface ImportResult {
   _id: string;
@@ -131,6 +124,16 @@ export function ImportBackupDialog({
   onOpenChange,
   onImported,
 }: ImportBackupDialogProps) {
+  const { t } = useLocale();
+
+  const COMPONENT_META: Record<string, { label: string; icon: typeof Globe }> = {
+    world:      { label: t("backupDialogs.components.world"),     icon: Globe },
+    config:     { label: t("backupDialogs.components.config"),    icon: FileText },
+    mods:       { label: t("backupDialogs.components.mods"),      icon: Package },
+    plugins:    { label: t("backupDialogs.components.plugins"),   icon: Puzzle },
+    datapacks:  { label: t("backupDialogs.components.datapacks"), icon: Database },
+  };
+
   const [tab, setTab] = useState<"upload" | "url">("upload");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -162,9 +165,9 @@ export function ImportBackupDialog({
     if (f && (f.name.endsWith(".tar.gz") || f.name.endsWith(".tgz") || f.name.endsWith(".zip"))) {
       setFile(f);
     } else {
-      toast.error("Nur .tar.gz und .zip Dateien werden unterstützt");
+      toast.error(t("backupDialogs.import.unsupportedFile"));
     }
-  }, []);
+  }, [t]);
 
   async function pollJobUntilDone(jobId: string): Promise<ImportResult> {
     const MAX_POLLS = 120; // 2 minutes at 1s intervals
@@ -209,7 +212,7 @@ export function ImportBackupDialog({
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || `Import fehlgeschlagen (${res.status})`);
+          throw new Error(data.error || t("backupDialogs.import.importFailed"));
         }
 
         ({ jobId } = await res.json());
@@ -223,7 +226,7 @@ export function ImportBackupDialog({
         setProgress(null);
 
         if (status < 200 || status >= 300) {
-          let errMsg = "Import fehlgeschlagen";
+          let errMsg = t("backupDialogs.import.importFailed");
           try { errMsg = JSON.parse(body).error || errMsg; } catch {}
           throw new Error(errMsg);
         }
@@ -233,11 +236,11 @@ export function ImportBackupDialog({
 
       const backup = await pollJobUntilDone(jobId);
       setResult(backup);
-      toast.success("Backup erfolgreich importiert");
+      toast.success(t("backupDialogs.import.success"));
       onImported?.(backup);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Fehler beim Importieren",
+        err instanceof Error ? err.message : t("backupDialogs.import.importFailed"),
       );
     } finally {
       setLoading(false);
@@ -252,10 +255,10 @@ export function ImportBackupDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Backup importiert
+              {t("backupDialogs.import.resultTitle")}
             </DialogTitle>
             <DialogDescription>
-              Die Sicherung wurde erfolgreich analysiert und gespeichert.
+              {t("backupDialogs.import.resultDesc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -272,12 +275,12 @@ export function ImportBackupDialog({
               </div>
 
               <div>
-                <p className="text-xs text-zinc-500 mb-2">Erkannte Inhalte:</p>
+                <p className="text-xs text-zinc-500 mb-2">{t("backupDialogs.import.detectedContents")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {result.components.length === 0 ? (
                     <div className="flex items-center gap-1 text-xs text-amber-600">
                       <AlertCircle className="h-3 w-3" />
-                      Keine bekannten Komponenten erkannt
+                      {t("backupDialogs.import.noComponents")}
                     </div>
                   ) : (
                     result.components.map((comp) => {
@@ -302,7 +305,7 @@ export function ImportBackupDialog({
           </div>
 
           <DialogFooter>
-            <Button onClick={() => handleOpenChange(false)}>Schließen</Button>
+            <Button onClick={() => handleOpenChange(false)}>{t("backupDialogs.import.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -313,10 +316,9 @@ export function ImportBackupDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Backup importieren</DialogTitle>
+          <DialogTitle>{t("backupDialogs.import.title")}</DialogTitle>
           <DialogDescription>
-            Importiere ein bestehendes Backup per Datei-Upload oder
-            Paperview-Link.
+            {t("backupDialogs.import.desc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -327,11 +329,11 @@ export function ImportBackupDialog({
           <TabsList className="w-full">
             <TabsTrigger value="upload" className="flex-1">
               <Upload className="mr-1.5 h-3.5 w-3.5" />
-              Datei hochladen
+              {t("backupDialogs.import.tabUpload")}
             </TabsTrigger>
             <TabsTrigger value="url" className="flex-1">
               <Link2 className="mr-1.5 h-3.5 w-3.5" />
-              Paperview-Link
+              {t("backupDialogs.import.tabUrl")}
             </TabsTrigger>
           </TabsList>
 
@@ -379,17 +381,17 @@ export function ImportBackupDialog({
                       if (fileRef.current) fileRef.current.value = "";
                     }}
                   >
-                    Andere Datei wählen
+                    {t("backupDialogs.import.changeFile")}
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <Upload className="mx-auto h-8 w-8 text-zinc-400" />
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                    Datei hierher ziehen oder klicken
+                    {t("backupDialogs.import.dropZone")}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    Nur .tar.gz und .zip Dateien
+                    {t("backupDialogs.import.fileTypes")}
                   </p>
                 </div>
               )}
@@ -399,16 +401,15 @@ export function ImportBackupDialog({
           <TabsContent value="url">
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="pv-url">Paperview Share-URL</Label>
+                <Label htmlFor="pv-url">{t("backupDialogs.import.urlLabel")}</Label>
                 <Input
                   id="pv-url"
-                  placeholder="https://paperview.example.com/shares/abc123"
+                  placeholder={t("backupDialogs.import.urlPlaceholder")}
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                 />
                 <p className="text-xs text-zinc-500">
-                  Gib die URL eines Paperview-Shares ein, der ein
-                  Backup enthält.
+                  {t("backupDialogs.import.urlHelper")}
                 </p>
               </div>
             </div>
@@ -435,7 +436,7 @@ export function ImportBackupDialog({
             onClick={() => handleOpenChange(false)}
             disabled={loading}
           >
-            Abbrechen
+            {t("backupDialogs.import.cancel")}
           </Button>
           <Button
             onClick={handleImport}
@@ -444,17 +445,17 @@ export function ImportBackupDialog({
             {loading && progress ? (
               <>
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                {progress.percent}% hochgeladen…
+                {t("backupDialogs.import.uploading", { percent: progress.percent })}
               </>
             ) : loading ? (
               <>
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                Verarbeite… (bitte warten)
+                {t("backupDialogs.import.processing")}
               </>
             ) : (
               <>
                 <Upload className="mr-1.5 h-3.5 w-3.5" />
-                Importieren
+                {t("backupDialogs.import.import")}
               </>
             )}
           </Button>
