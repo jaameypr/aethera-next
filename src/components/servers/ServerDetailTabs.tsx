@@ -1,7 +1,7 @@
 "use client";
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useLocale } from "@/context/locale-context";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ConsoleTab } from "./tabs/ConsoleTab";
 import { ServerLogsTab } from "./ServerLogsTab";

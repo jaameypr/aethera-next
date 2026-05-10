@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import {
   MessageCircle,
@@ -45,7 +46,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { copyToClipboard } from "@/lib/utils";
-import { useLocale } from "@/context/locale-context";
 
 // ---------------------------------------------------------------------------
 // Types

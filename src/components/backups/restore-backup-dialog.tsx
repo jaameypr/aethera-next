@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useLocale } from "@/context/locale-context";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useLocale } from "@/context/locale-context";
 
 type ComponentId = "world" | "config" | "mods" | "plugins" | "datapacks";
 

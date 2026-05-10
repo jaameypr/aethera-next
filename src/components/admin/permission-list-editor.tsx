@@ -15,6 +15,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { PERMISSION_DEFINITIONS, PERMISSION_QUICK_PRESETS } from "@/lib/permission-presets";
 import type { PermissionEntry } from "@/lib/api/types";
+import { useLocale } from "@/context/locale-context";
 
 interface PermissionListEditorProps {
   permissions: PermissionEntry[];
@@ -25,6 +26,7 @@ export function PermissionListEditor({
   permissions,
   onChange,
 }: PermissionListEditorProps) {
+  const { t } = useLocale();
   const [newPermName, setNewPermName] = useState("");
 
   const addPermission = (name: string) => {
@@ -54,7 +56,7 @@ export function PermissionListEditor({
     <div className="space-y-4">
       {/* Quick presets */}
       <div>
-        <Label className="mb-2 block text-xs text-zinc-500">Quick Presets</Label>
+        <Label className="mb-2 block text-xs text-zinc-500">{t("admin.permEditor.quickPresets")}</Label>
         <div className="flex flex-wrap gap-2">
           {PERMISSION_QUICK_PRESETS.map((preset) => (
             <Button
@@ -73,9 +75,9 @@ export function PermissionListEditor({
 
       {/* Current permissions */}
       <div className="space-y-2">
-        <Label className="text-xs text-zinc-500">Permissions</Label>
+        <Label className="text-xs text-zinc-500">{t("admin.permEditor.permissions")}</Label>
         {permissions.length === 0 && (
-          <p className="text-sm text-zinc-400">No permissions added</p>
+          <p className="text-sm text-zinc-400">{t("admin.permEditor.noPermissions")}</p>
         )}
         {permissions.map((perm, index) => {
           const def = PERMISSION_DEFINITIONS.find((d) => d.name === perm.name);
@@ -115,7 +117,7 @@ export function PermissionListEditor({
           onValueChange={(val) => setNewPermName(val)}
         >
           <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Select permission..." />
+            <SelectValue placeholder={t("admin.permEditor.selectPermission")} />
           </SelectTrigger>
           <SelectContent>
             {PERMISSION_DEFINITIONS.filter(
@@ -140,7 +142,7 @@ export function PermissionListEditor({
       {/* Custom permission */}
       <div className="flex gap-2">
         <Input
-          placeholder="Custom permission name..."
+          placeholder={t("admin.permEditor.customPermPlaceholder")}
           value={newPermName}
           onChange={(e) => setNewPermName(e.target.value)}
           onKeyDown={(e) => {
@@ -157,7 +159,7 @@ export function PermissionListEditor({
           onClick={() => addPermission(newPermName)}
           disabled={!newPermName}
         >
-          Add Custom
+          {t("admin.permEditor.addCustom")}
         </Button>
       </div>
     </div>

@@ -39,7 +39,7 @@ export function LanguageSwitcher({
   side = "right",
   align = "start",
 }: LanguageSwitcherProps) {
-  const { locale, setLocale, isPending } = useLocale();
+  const { locale, setLocale, isPending, t } = useLocale();
 
   return (
     <DropdownMenu>
@@ -53,12 +53,12 @@ export function LanguageSwitcher({
             compact ? "h-8 w-8 p-0 justify-center" : "px-2",
             className,
           )}
-          aria-label="Select language"
+          aria-label={t("common.switchLanguage")}
         >
           <Globe className="h-4 w-4 shrink-0" />
           {!compact && (
             <>
-              <span className="font-medium">Language</span>
+              <span className="font-medium">{t("common.language")}</span>
               <span className="font-mono font-bold text-zinc-400 dark:text-zinc-500">
                 {LOCALE_CODES[locale]}
               </span>

@@ -70,7 +70,7 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
       resetCreateForm();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to create role",
+        err instanceof Error ? err.message : t("admin.roles.createFailed"),
       );
     } finally {
       setCreateLoading(false);
@@ -100,7 +100,7 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
       setEditRole(null);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to update role",
+        err instanceof Error ? err.message : t("admin.roles.updateFailed"),
       );
     } finally {
       setEditLoading(false);
@@ -115,7 +115,7 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
       toast.success(t("admin.roles.roleDeleted", { name: deleteConfirm.name }));
       setDeleteConfirm(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
+      toast.error(err instanceof Error ? err.message : t("admin.roles.failed"));
     }
   };
 
@@ -197,7 +197,7 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="role-name"
+                placeholder={t("admin.roles.namePlaceholder")}
               />
             </div>
             <div className="space-y-2">

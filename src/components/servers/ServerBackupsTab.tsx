@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, useRef, useCallback } from "react";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import {
   Plus,
@@ -51,7 +52,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ImportBackupDialog } from "@/components/backups/import-backup-dialog";
 import { RestoreBackupDialog } from "@/components/backups/restore-backup-dialog";
-import { useLocale } from "@/context/locale-context";
 
 interface Backup {
   _id: string;
@@ -148,7 +148,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
     } finally {
       setLoading(false);
     }
-  }, [serverId]);
+  }, [serverId, t]);
 
   useEffect(() => {
     fetchBackups();
@@ -277,10 +277,10 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
         <div className="flex items-center gap-2">
           <p className="text-sm text-zinc-500">{t("servers.backups.count", { count: backups.length })}</p>
           {capabilities?.async && (
-            <Badge variant="secondary" className="text-xs">Async</Badge>
+            <Badge variant="secondary" className="text-xs">{t("servers.backups.asyncBadge")}</Badge>
           )}
           {capabilities?.sharing && (
-            <Badge variant="secondary" className="text-xs">Sharing</Badge>
+            <Badge variant="secondary" className="text-xs">{t("servers.backups.sharingBadge")}</Badge>
           )}
         </div>
         <div className="flex items-center">
@@ -347,7 +347,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                     {backup.size > 0 && `${formatSize(backup.size)} · `}
                     {new Date(backup.createdAt).toLocaleString()} ·{" "}
                     {backup.components.join(", ")}
-                    {backup.strategy === "async" && " · async"}
+                    {backup.strategy === "async" && ` · ${t("servers.backups.asyncLabel")}`}
                   </p>
                   {backup.errorMessage && (
                     <p className="text-xs text-red-500 mt-0.5">{backup.errorMessage}</p>

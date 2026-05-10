@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import { Plus, Trash2, Loader2, Search, Shield, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,6 @@ import {
   updateServerAccessAction,
 } from "@/app/(app)/actions/servers";
 import { searchUsersAction } from "@/app/(app)/actions/projects";
-import { useLocale } from "@/context/locale-context";
 
 interface AccessEntry {
   userId: string;

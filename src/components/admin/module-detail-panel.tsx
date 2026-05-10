@@ -347,7 +347,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           </CardHeader>
           <CardContent className="space-y-3">
             <Input
-              placeholder={t("admin.moduleDetail.publicUrlPlaceholder", { port: String(mod.assignedPort) })}
+              placeholder={t("admin.moduleDetail.publicUrlPlaceholder", { port: String(mod.assignedPort ?? "") })}
               value={publicUrl}
               onChange={(e) => setPublicUrl(e.target.value)}
             />

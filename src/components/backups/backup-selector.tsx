@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ExternalLink,
   FileArchive,
@@ -18,16 +18,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useLocale } from "@/context/locale-context";
 
-const COMPONENT_META = [
-  { id: "world" as const, label: "Welten", icon: Globe },
-  { id: "config" as const, label: "Konfiguration", icon: FileText },
-  { id: "mods" as const, label: "Mods", icon: Package },
-  { id: "plugins" as const, label: "Plugins", icon: Puzzle },
-  { id: "datapacks" as const, label: "Datapacks", icon: Database },
-] as const;
-
-type ComponentId = (typeof COMPONENT_META)[number]["id"];
+type ComponentId = "world" | "config" | "mods" | "plugins" | "datapacks";
 
 interface Backup {
   _id: string;
@@ -66,6 +59,15 @@ export function BackupSelector({
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [search, setSearch] = useState("");
+  const { t } = useLocale();
+
+  const COMPONENT_META = useMemo(() => [
+    { id: "world" as const, label: t("backupsShared.componentWorlds"), icon: Globe },
+    { id: "config" as const, label: t("backupsShared.componentConfig"), icon: FileText },
+    { id: "mods" as const, label: t("backupsShared.componentMods"), icon: Package },
+    { id: "plugins" as const, label: t("backupsShared.componentPlugins"), icon: Puzzle },
+    { id: "datapacks" as const, label: t("backupsShared.componentDatapacks"), icon: Database },
+  ], [t]);
 
   useEffect(() => {
     if (mode === "existing" && backups.length === 0) {
@@ -100,7 +102,7 @@ export function BackupSelector({
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Backup zum Laden</Label>
+          <Label className="text-sm font-medium">{t("backupsShared.selector.backupToLoad")}</Label>
           <Button
             variant="ghost"
             size="sm"
@@ -110,7 +112,7 @@ export function BackupSelector({
             }}
           >
             <X className="mr-1 h-3 w-3" />
-            Entfernen
+            {t("backupsShared.selector.remove")}
           </Button>
         </div>
 
@@ -123,7 +125,7 @@ export function BackupSelector({
           </div>
 
           <p className="text-xs text-zinc-500 mb-2">
-            Komponenten zum Laden auswählen:
+            {t("backupsShared.selector.selectComponents")}
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {COMPONENT_META.map((comp) => {
@@ -165,7 +167,7 @@ export function BackupSelector({
     return (
       <div className="space-y-3">
         <Label className="text-sm font-medium">
-          Von Backup laden (optional)
+          {t("backupsShared.selector.loadFromBackup")}
         </Label>
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -174,7 +176,7 @@ export function BackupSelector({
             className="flex flex-col items-center gap-2 rounded-lg border border-zinc-200 p-4 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
           >
             <HardDrive className="h-6 w-6 text-zinc-400" />
-            <span className="text-xs font-medium">Bestehendes Backup</span>
+            <span className="text-xs font-medium">{t("backupsShared.selector.existingBackup")}</span>
           </button>
           <a
             href="/verzeichnis/backups"
@@ -183,11 +185,11 @@ export function BackupSelector({
             className="flex flex-col items-center gap-2 rounded-lg border border-zinc-200 p-4 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
           >
             <ExternalLink className="h-6 w-6 text-zinc-400" />
-            <span className="text-xs font-medium">Backup importieren</span>
+            <span className="text-xs font-medium">{t("backupsShared.selector.importBackup")}</span>
           </a>
         </div>
         <p className="text-xs text-zinc-500">
-          Backup zuerst auf der Backup-Seite importieren, dann hier auswählen.
+          {t("backupsShared.selector.importHint")}
         </p>
       </div>
     );
@@ -204,9 +206,9 @@ export function BackupSelector({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Backup auswählen</Label>
+        <Label className="text-sm font-medium">{t("backupsShared.selector.selectBackup")}</Label>
         <Button variant="ghost" size="sm" onClick={() => setMode("none")}>
-          Zurück
+          {t("common.back")}
         </Button>
       </div>
 
@@ -214,7 +216,7 @@ export function BackupSelector({
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
           <Input
-            placeholder="Backup suchen…"
+            placeholder={t("backupsShared.selector.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 h-9 text-sm"
@@ -226,13 +228,13 @@ export function BackupSelector({
         {loadingBackups ? (
           <div className="flex items-center justify-center py-6 text-zinc-500">
             <HardDrive className="h-4 w-4 mr-2 animate-pulse" />
-            <span className="text-xs">Lade Backups...</span>
+            <span className="text-xs">{t("backupsShared.selector.loading")}</span>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-6">
             <HardDrive className="mx-auto h-6 w-6 text-zinc-300 mb-1" />
             <p className="text-xs text-zinc-500">
-              {backups.length === 0 ? "Keine Backups vorhanden" : "Keine Ergebnisse"}
+              {backups.length === 0 ? t("backupsShared.selector.noBackupsFound") : t("backupsShared.selector.noResults")}
             </p>
           </div>
         ) : (

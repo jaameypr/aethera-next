@@ -177,7 +177,7 @@ function MemberRow({
               <p className="truncate font-medium text-sm">{member.username}</p>
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${meta.badge}`}>
                 <Icon className="h-3 w-3" />
-                {meta.label}
+                {member.role === "admin" ? t("projects.members.roles.admin") : member.role === "viewer" ? t("projects.members.roles.viewer") : t("projects.members.roles.editor")}
               </span>
             </div>
 
@@ -193,7 +193,7 @@ function MemberRow({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">{t("projects.members.roles.admin")}</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="manager">{t("projects.members.roles.editor")}</SelectItem>
                     <SelectItem value="viewer">{t("projects.members.roles.viewer")}</SelectItem>
                   </SelectContent>
                 </Select>

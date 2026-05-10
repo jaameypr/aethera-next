@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Zap, MemoryStick } from "lucide-react";
+import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,7 +23,6 @@ import {
 import { CreateBlueprintDialog } from "@/components/projects/CreateBlueprintDialog";
 import { CreateServerWizard } from "@/components/servers/create-server-wizard";
 import { deleteBlueprintAction } from "@/app/(app)/actions/servers";
-import { useLocale } from "@/context/locale-context";
 
 interface Blueprint {
   _id: string;

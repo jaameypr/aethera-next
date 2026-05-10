@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
+import { useLocale } from "@/context/locale-context";
 import {
   Upload,
   Link2,
@@ -28,7 +29,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useLocale } from "@/context/locale-context";
 
 interface ImportResult {
   _id: string;
