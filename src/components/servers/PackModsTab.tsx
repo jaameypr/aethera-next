@@ -245,7 +245,7 @@ function AddExclusionPanel({
           checked={isOverride}
           onCheckedChange={(v) => setIsOverride(!!v)}
         />
-        <span>Override-Datei ausschließen ({packType === "curseforge" ? "CF_OVERRIDES_EXCLUSIONS" : "MODRINTH_OVERRIDES_EXCLUSIONS"})</span>
+        <span>{t("servers.packMods.overrideExcludeLabel", { env: packType === "curseforge" ? "CF_OVERRIDES_EXCLUSIONS" : "MODRINTH_OVERRIDES_EXCLUSIONS" })}</span>
       </label>
 
       <div className="flex gap-2">
@@ -372,7 +372,7 @@ export function PackModsTab({
                             {mod.displayName}
                           </p>
                           <Badge variant="secondary" className="shrink-0 text-xs">
-                            {mod.isOverride ? "Override" : "Ausgeschlossen"}
+                            {mod.isOverride ? "Override" : t("servers.packMods.excludedBadge")}
                           </Badge>
                         </div>
                         <p className="font-mono text-xs text-zinc-400">

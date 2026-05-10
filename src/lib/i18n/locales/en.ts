@@ -626,6 +626,8 @@ export const en = {
       removeExclusionFailed: "Failed to remove exclusion",
       exclusionLifted: "Exclusion for {name} lifted",
       modConfigFailed: "Could not load mod configuration",
+      excludedBadge: "Excluded",
+      overrideExcludeLabel: "Exclude override file ({env})",
     },
     discord: {
       loading: "Loading Discord configuration…",
