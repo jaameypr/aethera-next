@@ -51,7 +51,7 @@ interface ModuleDetailPanelProps {
 
 export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const router = useRouter();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [mod, setMod] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
@@ -329,9 +329,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               </>
             )}
             <dt className="text-zinc-500">{t("admin.moduleDetail.detailInstalled")}</dt>
-            <dd>{new Date(mod.createdAt).toLocaleString("de-DE")}</dd>
+            <dd>{new Date(mod.createdAt).toLocaleString(locale)}</dd>
             <dt className="text-zinc-500">{t("admin.moduleDetail.detailUpdated")}</dt>
-            <dd>{new Date(mod.updatedAt).toLocaleString("de-DE")}</dd>
+            <dd>{new Date(mod.updatedAt).toLocaleString(locale)}</dd>
           </dl>
         </CardContent>
       </Card>
