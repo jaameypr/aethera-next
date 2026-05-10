@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { lookupPackModAction, type PackModInfo } from "@/app/(app)/actions/servers";
+import { useLocale } from "@/context/locale-context";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,7 @@ function AddAdditionalModPanel({
   onAdded: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLocale();
   const [query, setQuery] = useState("");
   const [versionPin, setVersionPin] = useState("");
   const [found, setFound] = useState<PackModInfo | null>(null);
@@ -88,10 +90,10 @@ function AddAdditionalModPanel({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Fehler beim Hinzufügen");
+        toast.error(data.error ?? t("servers.packMods.addFailed"));
         return;
       }
-      toast.success(`${found.displayName} hinzugefügt`);
+      toast.success(t("servers.packMods.added", { name: found.displayName }));
       onAdded();
     });
   }
@@ -99,12 +101,12 @@ function AddAdditionalModPanel({
   return (
     <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
       <p className="text-sm font-medium">
-        {source === "modrinth" ? "Modrinth" : "CurseForge"}-Mod hinzufügen
+        {t("servers.packMods.addModTitle", { source: source === "modrinth" ? "Modrinth" : "CurseForge" })}
       </p>
 
       <div className="flex gap-2">
         <Input
-          placeholder={source === "modrinth" ? "sodium, fabric-api, …" : "Slug oder Projekt-ID"}
+          placeholder={source === "modrinth" ? t("servers.packMods.modrinthPlaceholder") : t("servers.packMods.curseforgePlaceholder")}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setFound(null); setLookupError(""); }}
           onKeyDown={(e) => e.key === "Enter" && handleLookup()}
@@ -132,13 +134,13 @@ function AddAdditionalModPanel({
 
           <div className="space-y-1">
             <Label htmlFor="version-pin" className="text-xs">
-              {source === "modrinth" ? "Version-ID pinnen" : "Datei-ID pinnen"}{" "}
-              <span className="font-normal text-zinc-400">(optional)</span>
+              {source === "modrinth" ? t("servers.packMods.pinVersion") : t("servers.packMods.pinFile")}{" "}
+              <span className="font-normal text-zinc-400">({t("servers.packMods.optional")})</span>
             </Label>
             <Input
               id="version-pin"
               className="h-8 text-xs"
-              placeholder={source === "modrinth" ? "IIJJKKLL" : "12345678"}
+              placeholder={source === "modrinth" ? t("servers.packMods.modrinthVersionPlaceholder") : t("servers.packMods.curseforgeFilePlaceholder")}
               value={versionPin}
               onChange={(e) => setVersionPin(e.target.value)}
             />
@@ -149,10 +151,10 @@ function AddAdditionalModPanel({
       <div className="flex gap-2">
         <Button type="button" size="sm" onClick={handleAdd} disabled={!found || isAdding}>
           {isAdding && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-          Hinzufügen
+          {t("servers.packMods.addBtn")}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-          Abbrechen
+          {t("servers.packMods.cancel")}
         </Button>
       </div>
     </div>
@@ -174,6 +176,7 @@ function AddExclusionPanel({
   onAdded: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLocale();
   const [displayName, setDisplayName] = useState("");
   const [token, setToken] = useState("");
   const [isOverride, setIsOverride] = useState(false);
@@ -194,24 +197,24 @@ function AddExclusionPanel({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Fehler beim Ausschließen");
+        toast.error(data.error ?? t("servers.packMods.excludeFailed"));
         return;
       }
-      toast.success(`${displayName} ausgeschlossen`);
+      toast.success(t("servers.packMods.excluded", { name: displayName }));
       onAdded();
     });
   }
 
   return (
     <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-      <p className="text-sm font-medium">Pack-Mod ausschließen</p>
+      <p className="text-sm font-medium">{t("servers.packMods.excludeTitle")}</p>
 
       <div className="space-y-1.5">
-        <Label htmlFor="excl-name" className="text-xs">Anzeigename</Label>
+        <Label htmlFor="excl-name" className="text-xs">{t("servers.packMods.displayName")}</Label>
         <Input
           id="excl-name"
           className="h-8 text-xs"
-          placeholder="Just Enough Items"
+          placeholder={t("servers.packMods.displayNamePlaceholder")}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
@@ -220,20 +223,20 @@ function AddExclusionPanel({
       <div className="space-y-1.5">
         <Label htmlFor="excl-token" className="text-xs">
           {packType === "curseforge"
-            ? "CurseForge-Slug oder Projekt-ID (CF_EXCLUDE_MODS)"
-            : "Dateiname-Token (MODRINTH_EXCLUDE_FILES)"}
+            ? t("servers.packMods.cfExcludeLabel")
+            : t("servers.packMods.modrinthExcludeLabel")}
         </Label>
         <Input
           id="excl-token"
           className="h-8 font-mono text-xs"
-          placeholder={packType === "curseforge" ? "jei oder 238222" : "jei- oder jei-1.20.1"}
+          placeholder={packType === "curseforge" ? t("servers.packMods.cfExcludePlaceholder") : t("servers.packMods.modrinthExcludePlaceholder")}
           value={token}
           onChange={(e) => setToken(e.target.value)}
         />
         <p className="text-xs text-zinc-400">
           {packType === "modrinth"
-            ? "Teilstring des Dateinamens aus /data/mods, z.B. \"jei-\" schließt alle JEI-Dateien aus"
-            : "Slug oder numerische ID des CurseForge-Projekts"}
+            ? t("servers.packMods.modrinthExcludeHelper")
+            : t("servers.packMods.cfExcludeHelper")}
         </p>
       </div>
 
@@ -248,10 +251,10 @@ function AddExclusionPanel({
       <div className="flex gap-2">
         <Button type="button" size="sm" onClick={handleSubmit} disabled={isPending || !displayName.trim() || !token.trim()}>
           {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-          Ausschließen
+          {t("servers.packMods.excludeBtn")}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-          Abbrechen
+          {t("servers.packMods.cancel")}
         </Button>
       </div>
     </div>
@@ -269,6 +272,7 @@ export function PackModsTab({
   serverId: string;
   packType: "curseforge" | "modrinth";
 }) {
+  const { t } = useLocale();
   const [additionalMods, setAdditionalMods] = useState<AdditionalMod[]>([]);
   const [excludedMods, setExcludedMods] = useState<ExcludedMod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -289,7 +293,7 @@ export function PackModsTab({
       setAdditionalMods(data.additionalMods ?? []);
       setExcludedMods(data.excludedPackMods ?? []);
     } catch {
-      toast.error("Mod-Konfiguration konnte nicht geladen werden");
+      toast.error(t("servers.packMods.modConfigFailed"));
     } finally {
       setLoading(false);
     }
@@ -298,8 +302,8 @@ export function PackModsTab({
   function removeAdditionalMod(modId: string, name: string) {
     startTransition(async () => {
       const res = await fetch(`/api/servers/${serverId}/pack-mods/additional/${modId}`, { method: "DELETE" });
-      if (!res.ok) { toast.error("Fehler beim Entfernen"); return; }
-      toast.success(`${name} entfernt`);
+      if (!res.ok) { toast.error(t("servers.packMods.removeFailed")); return; }
+      toast.success(t("servers.packMods.removedAdditional", { name }));
       fetchData();
     });
   }
@@ -307,8 +311,8 @@ export function PackModsTab({
   function removeExclusion(modId: string, name: string) {
     startTransition(async () => {
       const res = await fetch(`/api/servers/${serverId}/pack-mods/excluded/${modId}`, { method: "DELETE" });
-      if (!res.ok) { toast.error("Fehler beim Entfernen des Ausschlusses"); return; }
-      toast.success(`Ausschluss für ${name} aufgehoben`);
+      if (!res.ok) { toast.error(t("servers.packMods.removeExclusionFailed")); return; }
+      toast.success(t("servers.packMods.exclusionLifted", { name }));
       fetchData();
     });
   }
@@ -320,13 +324,12 @@ export function PackModsTab({
       {/* Info banner */}
       <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
         <p>
-          <span className="font-medium">{sourceLabel}-Pack</span> — Mods werden vom Pack bereitgestellt und bei jedem Start vom Image synchronisiert.
-          Die Konfiguration unten wird bei jedem Start neu in die Container-Umgebung gerendert.
+          {t("servers.packMods.packModsDesc", { source: sourceLabel })}
         </p>
       </div>
 
       {loading ? (
-        <p className="text-sm text-zinc-500">Lade…</p>
+        <p className="text-sm text-zinc-500">{t("servers.packMods.loading")}</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Preinstalled / Exclusions */}
@@ -334,18 +337,18 @@ export function PackModsTab({
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <PackageX className="h-4 w-4 text-zinc-500" />
-                Vorinstalliert (Pack)
+                {t("servers.packMods.preinstalled")}
               </CardTitle>
               {!showAddExcl && (
                 <Button variant="outline" size="sm" onClick={() => setShowAddExcl(true)}>
                   <Ban className="mr-1.5 h-3.5 w-3.5" />
-                  Ausschließen
+                  {t("servers.packMods.exclude")}
                 </Button>
               )}
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-zinc-400">
-                Pack-Mods werden vom {sourceLabel}-Image verwaltet. Ausschlüsse verhindern die Installation eines bestimmten Mods dauerhaft — auch nach Neustart oder Recreate.
+                {t("servers.packMods.packModsDesc", { source: sourceLabel })}
               </p>
 
               {showAddExcl && (
@@ -358,7 +361,7 @@ export function PackModsTab({
               )}
 
               {excludedMods.length === 0 ? (
-                <p className="text-sm text-zinc-500">Keine Ausschlüsse konfiguriert</p>
+                <p className="text-sm text-zinc-500">{t("servers.packMods.noExclusions")}</p>
               ) : (
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {excludedMods.map((mod) => (
@@ -381,7 +384,7 @@ export function PackModsTab({
                         size="icon"
                         disabled={isPending}
                         onClick={() => removeExclusion(mod._id, mod.displayName)}
-                        title="Ausschluss aufheben"
+                        title={t("servers.packMods.removeExclusionTitle")}
                       >
                         <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
                       </Button>
@@ -397,20 +400,18 @@ export function PackModsTab({
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Package className="h-4 w-4 text-zinc-500" />
-                Zusätzliche Mods
+                {t("servers.packMods.additional")}
               </CardTitle>
               {!showAddMod && (
                 <Button variant="outline" size="sm" onClick={() => setShowAddMod(true)}>
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Hinzufügen
+                  {t("servers.packMods.add")}
                 </Button>
               )}
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-zinc-400">
-                Diese Mods werden als{" "}
-                <span className="font-mono">{packType === "modrinth" ? "MODRINTH_PROJECTS" : "CURSEFORGE_FILES"}</span>{" "}
-                bei jedem Start automatisch installiert und sind vom Pack unabhängig.
+                {t("servers.packMods.additionalDesc", { env: packType === "modrinth" ? "MODRINTH_PROJECTS" : "CURSEFORGE_FILES" })}
               </p>
 
               {showAddMod && (
@@ -423,7 +424,7 @@ export function PackModsTab({
               )}
 
               {additionalMods.length === 0 ? (
-                <p className="text-sm text-zinc-500">Keine zusätzlichen Mods konfiguriert</p>
+                <p className="text-sm text-zinc-500">{t("servers.packMods.noAdditional")}</p>
               ) : (
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {additionalMods.map((mod) => (
@@ -432,7 +433,7 @@ export function PackModsTab({
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-medium">{mod.displayName}</p>
                           <Badge variant="outline" className="shrink-0 text-xs">
-                            Zusätzlich
+                            {t("servers.packMods.additionalBadge")}
                           </Badge>
                         </div>
                         <p className="font-mono text-xs text-zinc-400">
