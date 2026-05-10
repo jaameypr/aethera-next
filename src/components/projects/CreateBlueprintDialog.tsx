@@ -31,6 +31,8 @@ export function CreateBlueprintDialog({
 }: CreateBlueprintDialogProps) {
   const [name, setName] = useState("");
   const [maxRam, setMaxRam] = useState(2048);
+  const [maxCpus, setMaxCpus] = useState("");
+  const [maxBackupStorageGb, setMaxBackupStorageGb] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
   const { t } = useLocale();
@@ -43,6 +45,8 @@ export function CreateBlueprintDialog({
   function reset() {
     setName("");
     setMaxRam(2048);
+    setMaxCpus("");
+    setMaxBackupStorageGb("");
     setErrors({});
   }
 
@@ -65,7 +69,13 @@ export function CreateBlueprintDialog({
 
     startTransition(async () => {
       try {
-        await createBlueprintAction({ projectKey, name, maxRam });
+        await createBlueprintAction({
+          projectKey,
+          name,
+          maxRam,
+          maxCpus: maxCpus ? Number(maxCpus) : undefined,
+          maxBackupStorageGb: maxBackupStorageGb ? Number(maxBackupStorageGb) : undefined,
+        });
         toast.success(t("projects.blueprints.blueprintCreated"));
         handleClose(false);
       } catch (err) {
@@ -120,6 +130,30 @@ export function CreateBlueprintDialog({
             {errors.maxRam && (
               <p className="text-xs text-red-500">{errors.maxRam}</p>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="bp-cpus">{t("projects.blueprints.maxCpus")}</Label>
+            <Input
+              id="bp-cpus"
+              type="number"
+              value={maxCpus}
+              onChange={(e) => setMaxCpus(e.target.value)}
+              placeholder={t("projects.blueprints.cpusPlaceholder")}
+              min={1}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="bp-storage">{t("projects.blueprints.maxBackupStorage")}</Label>
+            <Input
+              id="bp-storage"
+              type="number"
+              value={maxBackupStorageGb}
+              onChange={(e) => setMaxBackupStorageGb(e.target.value)}
+              placeholder={t("projects.blueprints.storagePlaceholder")}
+              min={1}
+            />
           </div>
         </div>
 

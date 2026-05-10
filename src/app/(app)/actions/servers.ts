@@ -513,13 +513,15 @@ export async function createBlueprintAction(data: {
   projectKey: string;
   name: string;
   maxRam: number;
+  maxCpus?: number;
+  maxBackupStorageGb?: number;
 }): Promise<IBlueprint> {
   const session = await requireSession();
 
   try {
     const blueprint = await createBlueprint(
       data.projectKey,
-      { name: data.name, maxRam: data.maxRam },
+      { name: data.name, maxRam: data.maxRam, maxCpus: data.maxCpus, maxBackupStorageGb: data.maxBackupStorageGb },
       session.userId,
     );
     revalidatePath(`/projects/${data.projectKey}`);
@@ -552,13 +554,15 @@ export async function updateBlueprintAction(data: {
   projectKey: string;
   name?: string;
   maxRam?: number;
+  maxCpus?: number;
+  maxBackupStorageGb?: number;
 }): Promise<void> {
   const session = await requireSession();
 
   try {
     await updateBlueprint(
       data.blueprintId,
-      { name: data.name, maxRam: data.maxRam },
+      { name: data.name, maxRam: data.maxRam, maxCpus: data.maxCpus, maxBackupStorageGb: data.maxBackupStorageGb },
       session.userId,
     );
     revalidatePath(`/projects/${data.projectKey}`);
