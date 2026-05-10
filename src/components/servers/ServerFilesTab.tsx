@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, useMemo } from "react";
+import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import {
   Folder,
@@ -54,6 +55,7 @@ function encodePath(p: string): string {
 }
 
 export function ServerFilesTab({ serverId }: { serverId: string }) {
+  const { t } = useLocale();
   const [tree, setTree] = useState<FileTreeNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string>("");
@@ -93,7 +95,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
       if (!res.ok) throw new Error();
       setTree(await res.json());
     } catch {
-      toast.error("Dateien konnten nicht geladen werden");
+      toast.error(t("servers.files.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -107,7 +109,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
       const { content } = await res.json();
       setFileContent(content);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Datei konnte nicht gelesen werden");
+      toast.error(err instanceof Error ? err.message : t("servers.files.readFailed"));
       setFileContent("");
     }
   }
@@ -122,9 +124,9 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
           body: JSON.stringify({ content: fileContent }),
         });
         if (!res.ok) throw new Error((await res.json()).error);
-        toast.success("Datei gespeichert");
+        toast.success(t("servers.files.saved"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler beim Speichern");
+        toast.error(err instanceof Error ? err.message : t("servers.files.saveFailed"));
       }
     });
   }
@@ -138,14 +140,14 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
-      toast.success("Gelöscht");
+      toast.success(t("servers.files.deleted"));
       if (selectedFile === filepath) {
         setSelectedFile(null);
         setFileContent("");
       }
       fetchTree();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler beim Löschen");
+      toast.error(err instanceof Error ? err.message : t("servers.files.deleteFailed"));
     }
   }
 
@@ -167,14 +169,14 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
-      toast.success("Verschoben");
+      toast.success(t("servers.files.moved"));
       if (selectedFile === from) {
         setSelectedFile(null);
         setFileContent("");
       }
       fetchTree();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler beim Verschieben");
+      toast.error(err instanceof Error ? err.message : t("servers.files.moveFailed"));
     }
   }
 
@@ -225,10 +227,10 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
     });
     try {
       await Promise.all(uploads);
-      toast.success(count === 1 ? "Hochgeladen" : `${count} Dateien hochgeladen`);
+      toast.success(count === 1 ? t("servers.files.uploaded") : t("servers.files.uploadedCount", { count }));
       fetchTree();
     } catch (err) {
-      toast.error(`Upload fehlgeschlagen: ${err instanceof Error ? err.message : ""}`);
+      toast.error(t("servers.files.uploadFailed", { name: err instanceof Error ? err.message : "" }));
     }
   }
 
@@ -252,21 +254,21 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-500">Lade Dateien…</p>;
+    return <p className="text-sm text-zinc-500">{t("servers.files.loading")}</p>;
   }
 
   const dialogTitle =
     pendingAction?.type === "delete"
-      ? "Löschen bestätigen"
-      : "Verschieben bestätigen";
+      ? t("servers.files.confirmDelete")
+      : t("servers.files.confirmMove");
 
   const dialogDescription =
     pendingAction?.type === "delete"
       ? pendingAction.isDirectory
-        ? `Möchtest du den Ordner "${pendingAction.path}" und seinen gesamten Inhalt unwiderruflich löschen?`
-        : `Möchtest du "${pendingAction.path}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.`
+        ? t("servers.files.deleteFolder", { path: pendingAction.path })
+        : t("servers.files.deleteFile", { path: pendingAction.path })
       : pendingAction?.type === "move"
-        ? `Möchtest du "${pendingAction.from}" nach "${pendingAction.to}" verschieben?`
+        ? t("servers.files.moveFile", { from: pendingAction.from, to: pendingAction.to })
         : "";
 
   return (
@@ -283,14 +285,14 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPendingAction(null)} disabled={confirming}>
-              Abbrechen
+              {t("servers.files.cancel")}
             </Button>
             <Button
               variant={pendingAction?.type === "delete" ? "destructive" : "default"}
               onClick={handleConfirm}
               disabled={confirming}
             >
-              {confirming ? "…" : pendingAction?.type === "delete" ? "Löschen" : "Verschieben"}
+              {confirming ? "…" : pendingAction?.type === "delete" ? t("servers.files.delete") : t("servers.files.move")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -320,8 +322,8 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
         }}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 p-2 dark:border-zinc-800">
-          <span className="text-xs font-medium text-zinc-500">Dateien</span>
-          <label title="In Root hochladen">
+          <span className="text-xs font-medium text-zinc-500">{t("servers.files.header")}</span>
+          <label title={t("servers.files.uploadToRoot")}>
             <input
               type="file"
               multiple
@@ -343,7 +345,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Suchen…"
+              placeholder={t("servers.files.search")}
               className="h-7 pl-7 pr-6 text-xs"
             />
             {search && (
@@ -361,7 +363,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
           {searchResults ? (
             /* ── Search results (flat list) ── */
             searchResults.length === 0 ? (
-              <p className="px-2 py-4 text-center text-xs text-zinc-400">Keine Ergebnisse</p>
+              <p className="px-2 py-4 text-center text-xs text-zinc-400">{t("servers.files.noResults")}</p>
             ) : (
               searchResults.map((node) => (
                 <SearchResultRow
@@ -380,11 +382,11 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
             <>
               {dragOverPath === "" && (
                 <div className="pointer-events-none mb-1 rounded border-2 border-dashed border-blue-400 px-2 py-2 text-center text-xs text-blue-400">
-                  Hier ablegen
+                  {t("servers.files.dropHere")}
                 </div>
               )}
               {tree.length === 0 && dragOverPath !== "" && (
-                <p className="px-2 py-4 text-center text-xs text-zinc-400">Keine Dateien</p>
+                <p className="px-2 py-4 text-center text-xs text-zinc-400">{t("servers.files.noFiles")}</p>
               )}
               {tree.map((node) => (
                 <TreeNode
@@ -415,7 +417,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
                 {selectedFile}
               </span>
               <Button size="sm" onClick={handleSave} disabled={isPending}>
-                {isPending ? "Speichere…" : "Speichern"}
+                {isPending ? t("servers.files.saving") : t("servers.files.save")}
               </Button>
             </div>
             <textarea
@@ -427,7 +429,7 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
-            Datei auswählen
+            {t("servers.files.selectFile")}
           </div>
         )}
       </div>
@@ -464,6 +466,7 @@ function SearchResultRow({
   onDownload: (path: string) => void;
   search: string;
 }) {
+  const { t } = useLocale();
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -496,7 +499,7 @@ function SearchResultRow({
       <ContextMenuContent>
         <ContextMenuItem onClick={() => onDownload(node.path)}>
           <Download />
-          {node.isDirectory ? "Als ZIP herunterladen" : "Herunterladen"}
+          {node.isDirectory ? t("servers.files.downloadZip") : t("servers.files.download")}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -504,7 +507,7 @@ function SearchResultRow({
           onClick={() => onDelete(node.path, node.isDirectory)}
         >
           <Trash2 />
-          Löschen
+          {t("servers.files.delete")}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -534,6 +537,7 @@ function TreeNode({
   onDrop: (path: string, e: React.DragEvent) => void;
   onUploadInput: (e: React.ChangeEvent<HTMLInputElement>, targetPath?: string) => void;
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(depth < 1);
   const isDragTarget = dragOverPath === node.path;
 
@@ -579,7 +583,7 @@ function TreeNode({
                 )}
                 <span className="truncate text-zinc-700 dark:text-zinc-300">{node.name}</span>
                 {isDragTarget && (
-                  <span className="ml-auto shrink-0 text-xs text-blue-400">Ablegen</span>
+                  <span className="ml-auto shrink-0 text-xs text-blue-400">{t("servers.files.dropHere")}</span>
                 )}
               </button>
               <button
@@ -610,13 +614,13 @@ function TreeNode({
         <ContextMenuContent>
           <ContextMenuItem onClick={() => onDownload(node.path)}>
             <Download />
-            Als ZIP herunterladen
+            {t("servers.files.downloadZip")}
           </ContextMenuItem>
           <ContextMenuSeparator />
           {/* Custom label-based item so the file picker opens correctly */}
           <label className="flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800">
             <Upload className="h-4 w-4 shrink-0" />
-            Hier hochladen
+            {t("servers.files.uploadHere")}
             <input
               type="file"
               multiple
@@ -630,7 +634,7 @@ function TreeNode({
             onClick={() => onDelete(node.path, true)}
           >
             <Trash2 />
-            Löschen
+            {t("servers.files.delete")}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -668,7 +672,7 @@ function TreeNode({
       <ContextMenuContent>
         <ContextMenuItem onClick={() => onDownload(node.path)}>
           <Download />
-          Herunterladen
+          {t("servers.files.download")}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -676,7 +680,7 @@ function TreeNode({
           onClick={() => onDelete(node.path, false)}
         >
           <Trash2 />
-          Löschen
+          {t("servers.files.delete")}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
