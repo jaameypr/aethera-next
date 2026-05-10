@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import MetricsCharts from "@/components/servers/MetricsCharts";
+import { useLocale } from "@/context/locale-context";
 
 const STATUS_STYLES: Record<string, string> = {
   running:
@@ -28,13 +29,6 @@ const STATUS_STYLES: Record<string, string> = {
     "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  running: "Läuft",
-  stopped: "Gestoppt",
-  starting: "Startet…",
-  stopping: "Stoppt…",
-  error: "Fehler",
-};
 
 export interface ServerPlain {
   _id: string;
@@ -63,6 +57,7 @@ interface OverviewTabProps {
 
 export function OverviewTab({ server }: OverviewTabProps) {
   const router = useRouter();
+  const { t } = useLocale();
 
   // liveStatus tracks what we show the user — starts from SSR prop, then updated by polling.
   const [liveStatus, setLiveStatus] = useState(server.status);
@@ -101,7 +96,7 @@ export function OverviewTab({ server }: OverviewTabProps) {
         if (isDone) {
           isRecreating.current = false;
           if (status === "error") {
-            toast.error("Server-Operation fehlgeschlagen");
+            toast.error(t("servers.overview.opFailed"));
           }
           router.refresh();
         }
@@ -133,7 +128,7 @@ export function OverviewTab({ server }: OverviewTabProps) {
       const res = await fetch(`/api/servers/${server._id}/${path}`, { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Aktion fehlgeschlagen");
+        throw new Error((body as { error?: string }).error ?? t("servers.overview.actionFailed"));
       }
       toast.success(successMsg);
       // Polling (started above by the isTransitional effect) takes it from here.
@@ -182,29 +177,29 @@ export function OverviewTab({ server }: OverviewTabProps) {
           )}
         >
           {isTransitional && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-          {STATUS_LABELS[liveStatus] ?? liveStatus}
+          {t(`servers.status.${liveStatus}`) || liveStatus}
         </span>
 
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             className="bg-emerald-600 text-white hover:bg-emerald-700"
-            onClick={() => handleAction("start", "Server wird gestartet", "starting")}
+            onClick={() => handleAction("start", t("servers.overview.startToast"), "starting")}
             disabled={isTransitional || !isStopped}
           >
             {spinnerOrIcon(Play, "start")}
-            Starten
+            {t("servers.overview.start")}
           </Button>
           <div className="inline-flex items-center rounded-md">
             <Button
               size="sm"
               variant="destructive"
               className="rounded-r-none"
-              onClick={() => handleAction("soft-stop", "Server wird gestoppt", "stopping")}
+              onClick={() => handleAction("soft-stop", t("servers.overview.stopToast"), "stopping")}
               disabled={isTransitional || !isRunning}
             >
               {spinnerOrIcon(Square, "soft-stop")}
-              Stoppen
+              {t("servers.overview.stop")}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -219,10 +214,10 @@ export function OverviewTab({ server }: OverviewTabProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onClick={() => handleAction("stop", "Server wird entfernt", "stopping")}
+                  onClick={() => handleAction("stop", t("servers.overview.removeToast"), "stopping")}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Hardclose (Container löschen)
+                  {t("servers.overview.hardclose")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -230,11 +225,11 @@ export function OverviewTab({ server }: OverviewTabProps) {
           <Button
             size="sm"
             className="bg-amber-500 text-white hover:bg-amber-600"
-            onClick={() => handleAction("recreate", "Server wird neu gestartet", "stopping", { recreate: true })}
+            onClick={() => handleAction("recreate", t("servers.overview.restartToast"), "stopping", { recreate: true })}
             disabled={isTransitional || !isRunning}
           >
             {spinnerOrIcon(RotateCcw, "recreate")}
-            Neustarten
+            {t("servers.overview.restart")}
           </Button>
         </div>
       </div>
@@ -269,11 +264,11 @@ export function OverviewTab({ server }: OverviewTabProps) {
       {server.containerId && (
         <Card>
           <CardHeader className="pb-1 pt-3">
-            <CardTitle className="text-sm font-medium">Container</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("servers.overview.container")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 pb-3">
             <div className="flex items-center gap-2 text-xs">
-              <span className="w-28 shrink-0 text-zinc-500">Container ID</span>
+              <span className="w-28 shrink-0 text-zinc-500">{t("servers.overview.containerId")}</span>
               <span className="break-all font-mono text-zinc-800 dark:text-zinc-200">
                 {server.containerId.slice(0, 12)}
               </span>
@@ -281,7 +276,7 @@ export function OverviewTab({ server }: OverviewTabProps) {
             {server.containerStatus && (
               <div className="flex items-center gap-2 text-xs">
                 <span className="w-28 shrink-0 text-zinc-500">
-                  Container Status
+                  {t("servers.overview.containerStatus")}
                 </span>
                 <span className="font-mono text-zinc-800 dark:text-zinc-200">
                   {server.containerStatus}
