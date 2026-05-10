@@ -241,6 +241,8 @@ export const en = {
       stopped: "Module stopped",
       uninstalled: "Module uninstalled",
       reinstalled: "Module reinstalled",
+      publicUrlPlaceholder: "e.g. https://paperview.example.com or http://1.2.3.4:{port}",
+      secretSaved: "(saved — type to replace)",
     },
   },
   projects: {

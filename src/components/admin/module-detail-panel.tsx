@@ -70,7 +70,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       setMod(result);
       toast.success(t("admin.moduleDetail.started"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       setMod(result);
       toast.success(t("admin.moduleDetail.stopped"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -108,7 +108,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       setConfigValues({});
       toast.success(t("admin.moduleDetail.configSaved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -121,7 +121,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       setMod(result);
       toast.success(t("admin.moduleDetail.publicUrlSaved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -143,7 +143,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       toast.success(t("admin.moduleDetail.uninstalled"));
       router.push("/admin/modules");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
       setLoading(false);
     }
   };
@@ -156,7 +156,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       setMod(result);
       toast.success(t("admin.moduleDetail.reinstalled"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -245,7 +245,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
                 if (!res.ok) throw new Error((await res.json()).error);
                 toast.success(t("admin.moduleDetail.apiKeyProvisioned"));
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Fehler");
+                toast.error(err instanceof Error ? err.message : t("common.error"));
               }
             }}
           >
@@ -347,7 +347,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           </CardHeader>
           <CardContent className="space-y-3">
             <Input
-              placeholder={`z.B. https://paperview.example.com oder http://1.2.3.4:${mod.assignedPort}`}
+              placeholder={t("admin.moduleDetail.publicUrlPlaceholder", { port: String(mod.assignedPort) })}
               value={publicUrl}
               onChange={(e) => setPublicUrl(e.target.value)}
             />
@@ -406,7 +406,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
                 const savedValue = !def.secret ? (mod.savedConfig?.[def.key] ?? "") : "";
                 const displayValue = configValues[def.key] ?? savedValue;
                 const placeholder = def.secret
-                  ? (isSecretSet ? "••••••••  (saved — type to replace)" : (def.default || ""))
+                  ? (isSecretSet ? `•••••••• ${t("admin.moduleDetail.secretSaved")}` : (def.default || ""))
                   : (def.default || "");
                 return (
                   <div key={def.key} className="space-y-1">
