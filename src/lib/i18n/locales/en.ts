@@ -735,6 +735,8 @@ export const en = {
       detectedContents: "Detected contents:",
       noComponents: "No known components detected",
       unsupportedFile: "Only .tar.gz and .zip files are supported",
+      urlRequired: "Please enter a URL",
+      fileRequired: "Please select a file",
     },
     restore: {
       title: "Restore Backup",

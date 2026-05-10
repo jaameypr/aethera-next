@@ -88,11 +88,11 @@ function uploadChunked(
           completedBytes += chunkSize;
           resolve();
         } else {
-          reject(new Error(`Chunk ${index} fehlgeschlagen (${xhr.status})`));
+          reject(new Error(`Chunk ${index} failed (${xhr.status})`));
         }
       };
 
-      xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
+      xhr.onerror = () => reject(new Error("Upload failed"));
       xhr.send(chunk);
     });
   }
@@ -174,22 +174,22 @@ export function ImportBackupDialog({
     for (let i = 0; i < MAX_POLLS; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       const res = await fetch(`/api/jobs/${jobId}`);
-      if (!res.ok) throw new Error("Job-Status konnte nicht abgerufen werden");
+      if (!res.ok) throw new Error("Could not fetch job status");
       const job = await res.json();
 
       if (job.status === "done") {
         const backupId = job.result?.backupId;
-        if (!backupId) throw new Error("Import abgeschlossen, aber kein Backup gefunden");
+        if (!backupId) throw new Error("Import completed but no backup found");
         const br = await fetch(`/api/backups/${backupId}`);
-        if (!br.ok) throw new Error("Backup konnte nicht geladen werden");
+        if (!br.ok) throw new Error("Could not load backup");
         return br.json();
       }
 
       if (job.status === "error") {
-        throw new Error(job.error || "Import fehlgeschlagen");
+        throw new Error(job.error || "Import failed");
       }
     }
-    throw new Error("Import-Timeout: Vorgang hat zu lange gedauert");
+    throw new Error("Import timed out");
   }
 
   async function handleImport() {
@@ -200,7 +200,7 @@ export function ImportBackupDialog({
 
       if (tab === "url") {
         if (!url.trim()) {
-          toast.error("Bitte eine URL eingeben");
+          toast.error(t("backupDialogs.import.urlRequired"));
           return;
         }
 
@@ -218,7 +218,7 @@ export function ImportBackupDialog({
         ({ jobId } = await res.json());
       } else {
         if (!file) {
-          toast.error("Bitte eine Datei auswählen");
+          toast.error(t("backupDialogs.import.fileRequired"));
           return;
         }
 
