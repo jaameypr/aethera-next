@@ -105,7 +105,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
         setResults([]);
         setSelectedPerms(["server.console"]);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -117,7 +117,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
         setEntries((prev) => prev.filter((e) => e.userId !== userId));
         toast.success(t("servers.access.accessRemoved"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -140,7 +140,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
           ),
         );
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler");
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
