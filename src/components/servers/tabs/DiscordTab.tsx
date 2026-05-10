@@ -319,9 +319,6 @@ export function DiscordTab({ serverId }: Props) {
   // Main UI
   // -------------------------------------------------------------------------
 
-  const selectedGuild = guilds.find((g) => g.id === config.guildId);
-  void selectedGuild;
-
   return (
     <div className="space-y-6">
 
