@@ -591,29 +591,27 @@ function StepResources({
         )}
       </div>
 
-      {state.maxCpus != null && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label>{t("servers.wizard.cpuCores")}</Label>
-            <span className="text-sm font-semibold">
-              {state.cpus != null ? `${state.cpus} vCPU` : t("servers.wizard.cpuCoresNoCap")}
-            </span>
-          </div>
-          <Slider
-            value={[state.cpus ?? 1]}
-            onValueChange={([v]) =>
-              dispatch({ type: "SET_FIELD", field: "cpus", value: v })
-            }
-            min={1}
-            max={state.maxCpus}
-            step={1}
-          />
-          <div className="flex justify-between text-xs text-zinc-500">
-            <span>1 vCPU</span>
-            <span>{state.maxCpus} vCPU</span>
-          </div>
-        </div>
-      )}
+      <div className="space-y-1.5">
+        <Label htmlFor="w-cpus">{t("servers.wizard.cpuCores")}</Label>
+        <Input
+          id="w-cpus"
+          type="number"
+          value={state.cpus ?? ""}
+          onChange={(e) =>
+            dispatch({
+              type: "SET_FIELD",
+              field: "cpus",
+              value: e.target.value ? Math.min(Number(e.target.value), state.maxCpus ?? Infinity) : null,
+            })
+          }
+          placeholder={t("servers.wizard.cpuCoresNoCap")}
+          min={1}
+          max={state.maxCpus ?? undefined}
+        />
+        {state.maxCpus != null && (
+          <p className="text-xs text-zinc-500">{t("servers.wizard.cpuCoresMax", { max: state.maxCpus })}</p>
+        )}
+      </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="w-port">Port</Label>

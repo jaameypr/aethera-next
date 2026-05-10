@@ -493,6 +493,7 @@ export const de = {
     wizard: {
       cpuCores: "CPU-Kerne",
       cpuCoresNoCap: "Kein Limit",
+      cpuCoresMax: "Max: {max} vCPU (Blueprint-Limit)",
       portTaken: "Dieser Port ist bereits belegt. Wähle einen anderen Port.",
       portTakenShort: "Port bereits belegt",
     },
