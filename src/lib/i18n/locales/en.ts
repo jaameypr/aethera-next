@@ -490,6 +490,7 @@ export const en = {
     wizard: {
       cpuCores: "CPU Cores",
       cpuCoresNoCap: "No limit",
+      cpuCoresMax: "Max: {max} vCPU (blueprint cap)",
       portTaken: "This port is already in use. Choose a different port.",
       portTakenShort: "Port already in use",
     },
