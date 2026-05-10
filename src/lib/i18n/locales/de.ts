@@ -516,6 +516,7 @@ export const de = {
       linkCopied: "Link in Zwischenablage kopiert",
       linkCopiedShort: "Link kopiert",
       shareFailed: "Fehler beim Teilen",
+      loadFailed: "Backups konnten nicht geladen werden",
       statusPending: "Wartend",
       statusInProgress: "Läuft…",
       statusFailed: "Fehlgeschlagen",

@@ -513,6 +513,7 @@ export const en = {
       linkCopied: "Link copied to clipboard",
       linkCopiedShort: "Link copied",
       shareFailed: "Failed to share",
+      loadFailed: "Could not load backups",
       statusPending: "Pending",
       statusInProgress: "Running…",
       statusFailed: "Failed",

@@ -144,7 +144,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
       if (!res.ok) throw new Error();
       setBackups(await res.json());
     } catch {
-      toast.error("Backups konnten nicht geladen werden");
+      toast.error(t("servers.backups.loadFailed"));
     } finally {
       setLoading(false);
     }
