@@ -4,10 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import { useServerLogs } from "@/lib/hooks/use-server-logs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 type StreamFilter = "all" | "stdout" | "stderr";
 
 export function ServerLogsTab({ serverId }: { serverId: string }) {
+  const { t } = useLocale();
   const { logs, connected, error, clear } = useServerLogs(serverId);
   const [filter, setFilter] = useState<StreamFilter>("all");
   const [autoScroll, setAutoScroll] = useState(true);
@@ -29,7 +31,7 @@ export function ServerLogsTab({ serverId }: { serverId: string }) {
   }
 
   const filters: { label: string; value: StreamFilter }[] = [
-    { label: "Alle", value: "all" },
+    { label: t("servers.logs.filterAll"), value: "all" },
     { label: "stdout", value: "stdout" },
     { label: "stderr", value: "stderr" },
   ];
@@ -46,7 +48,7 @@ export function ServerLogsTab({ serverId }: { serverId: string }) {
             )}
           />
           <span className="text-sm text-zinc-500">
-            {filtered.length} Zeilen
+            {t("servers.logs.lines", { count: filtered.length })}
           </span>
           {error && <span className="text-sm text-red-500">— {error}</span>}
         </div>
@@ -62,7 +64,7 @@ export function ServerLogsTab({ serverId }: { serverId: string }) {
             </Button>
           ))}
           <Button variant="ghost" size="sm" onClick={clear}>
-            Leeren
+            {t("servers.logs.clear")}
           </Button>
         </div>
       </div>
@@ -98,7 +100,7 @@ export function ServerLogsTab({ serverId }: { serverId: string }) {
             scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
           }}
         >
-          ↓ Zum Ende scrollen
+          {t("servers.logs.scrollToBottom")}
         </button>
       )}
     </div>
