@@ -49,12 +49,12 @@ const MOD_LOADERS = [
 type ModLoader = (typeof MOD_LOADERS)[number];
 
 const settingsSchema = z.object({
-  name: z.string().min(1, "Name ist erforderlich").max(64, "Maximal 64 Zeichen"),
+  name: z.string().min(1, "Name is required").max(64, "Max 64 characters"),
   memory: z
     .number()
-    .min(512, "Mindestens 512 MB")
-    .max(65536, "Maximal 65536 MB"),
-  port: z.number().min(1024, "Mindestens 1024").max(65535, "Maximal 65535"),
+    .min(512, "Min 512 MB")
+    .max(65536, "Max 65536 MB"),
+  port: z.number().min(1024, "Min 1024").max(65535, "Max 65535"),
   version: z.string().optional(),
   modLoader: z.enum(MOD_LOADERS),
   javaArgs: z.string().optional(),
@@ -135,7 +135,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Fehler beim Speichern");
+        throw new Error(body.error ?? t("servers.settings.saveFailed"));
       }
       toast.success(t("servers.settings.saved"));
       router.refresh();
