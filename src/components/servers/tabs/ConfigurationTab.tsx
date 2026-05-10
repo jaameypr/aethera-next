@@ -31,8 +31,8 @@ import {
 import { useLocale } from "@/context/locale-context";
 
 const configSchema = z.object({
-  motd: z.string().max(59, "Maximal 59 Zeichen"),
-  "max-players": z.number().min(1, "Mindestens 1").max(1000, "Maximal 1000"),
+  motd: z.string().max(59, "Max 59 characters"),
+  "max-players": z.number().min(1, "Min 1").max(1000, "Max 1000"),
   difficulty: z.enum(["peaceful", "easy", "normal", "hard"]),
   "white-list": z.boolean(),
   pvp: z.boolean(),
