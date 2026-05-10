@@ -5,6 +5,8 @@ export interface IBlueprint extends Document {
   projectKey: string;
   name: string;
   maxRam: number; // MB
+  maxCpus?: number; // decimal cores, e.g. 2.0
+  maxBackupStorageGb?: number; // total backup storage cap in GB
   status: "available" | "claimed";
   serverId?: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
@@ -17,6 +19,8 @@ const BlueprintSchema = new Schema<IBlueprint>(
     projectKey: { type: String, required: true, index: true },
     name: { type: String, required: true, trim: true },
     maxRam: { type: Number, required: true, min: 512 },
+    maxCpus: { type: Number, min: 0.1 },
+    maxBackupStorageGb: { type: Number, min: 1 },
     status: {
       type: String,
       enum: ["available", "claimed"],

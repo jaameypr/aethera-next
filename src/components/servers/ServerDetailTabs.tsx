@@ -50,19 +50,19 @@ export function ServerDetailTabs({ server, projectKey, isOwner, userPermissions 
   const can = (perm: string) => isOwner || userPermissions.includes(perm);
 
   const tabs = [
-    { value: "overview",  label: t("servers.tabs.overview"),  show: true },
-    { value: "console",   label: t("servers.tabs.console"),   show: can("server.console") },
-    { value: "logs",      label: t("servers.tabs.logs"),      show: true },
-    { value: "files",     label: t("servers.tabs.files"),     show: can("server.files") },
-    { value: "addons",    label: t("servers.tabs.addons"),    show: can("server.files") },
-    { value: "backups",   label: t("servers.tabs.backups"),   show: can("server.backups") },
-    { value: "config",    label: t("servers.tabs.config"),    show: can("server.settings") },
-    { value: "discord",   label: t("servers.tabs.discord"),   show: can("server.settings") },
-    { value: "access",    label: t("servers.tabs.access"),    show: can("server.settings") },
-    { value: "settings",  label: t("servers.tabs.settings"),  show: can("server.settings") },
-  ].filter((t) => t.show);
+    { value: "overview",  label: t("servers.tabs.overview"),   show: true },
+    { value: "console",   label: t("servers.tabs.console"),    show: can("server.console") },
+    { value: "logs",      label: t("servers.tabs.logs"),       show: true },
+    { value: "files",     label: t("servers.tabs.files"),      show: can("server.files") },
+    { value: "addons",    label: t("servers.tabs.addons"),     show: can("server.files") },
+    { value: "backups",   label: t("servers.tabs.backups"),    show: can("server.backups") },
+    { value: "config",    label: t("servers.tabs.config"),     show: can("server.settings") },
+    { value: "discord",   label: t("servers.tabs.discord"),    show: can("server.settings") },
+    { value: "access",    label: t("servers.tabs.access"),     show: can("server.settings") },
+    { value: "settings",  label: t("servers.tabs.settings"),   show: can("server.settings") },
+  ].filter((tab) => tab.show);
 
-  const visibleValues = new Set(tabs.map((t) => t.value));
+  const visibleValues = new Set(tabs.map((tab) => tab.value));
   const defaultTab = tabs[0]?.value ?? "overview";
 
   return (

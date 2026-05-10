@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +27,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { InstalledModuleResponse, ModuleManifestEnvDef } from "@/lib/api/types";
-import { useLocale } from "@/context/locale-context";
 import {
   startModuleAction,
   stopModuleAction,
@@ -51,7 +51,7 @@ interface ModuleDetailPanelProps {
 
 export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const router = useRouter();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [mod, setMod] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
@@ -68,7 +68,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     try {
       const result = await startModuleAction(mod.moduleId);
       setMod(result);
-      toast.success(t("admin.modules.moduleStarted"));
+      toast.success(t("admin.moduleDetail.started"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -81,7 +81,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     try {
       const result = await stopModuleAction(mod.moduleId);
       setMod(result);
-      toast.success(t("admin.modules.moduleStopped"));
+      toast.success(t("admin.moduleDetail.stopped"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -140,7 +140,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     setLoading(true);
     try {
       await uninstallModuleAction(mod.moduleId);
-      toast.success(t("admin.modules.moduleUninstalled"));
+      toast.success(t("admin.moduleDetail.uninstalled"));
       router.push("/admin/modules");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("common.error"));
@@ -154,7 +154,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
     try {
       const result = await reinstallModuleAction(mod.moduleId);
       setMod(result);
-      toast.success(t("admin.modules.moduleInstalled", { name: mod.name }));
+      toast.success(t("admin.moduleDetail.reinstalled"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -175,7 +175,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
           <ArrowLeft className="mr-1 h-4 w-4" />
-          {t("common.back")}
+          {t("admin.moduleDetail.back")}
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -210,14 +210,14 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               ) : (
                 <Play className="mr-1 h-4 w-4" />
               )}
-              {t("admin.modules.start")}
+              {t("admin.moduleDetail.start")}
             </Button>
           )}
           {mod.status === "running" && (
             <>
               <Button variant="outline" onClick={handleStop} disabled={loading}>
                 <Square className="mr-1 h-4 w-4" />
-                {t("admin.modules.stop")}
+                {t("admin.moduleDetail.stop")}
               </Button>
               {mod.exposure === "public" && (
                 <Button variant="outline" asChild>
@@ -227,7 +227,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
                     rel="noopener noreferrer"
                   >
                     <ExternalLink className="mr-1 h-4 w-4" />
-                    {t("admin.modules.open")}
+                    {t("admin.moduleDetail.open")}
                   </a>
                 </Button>
               )}
@@ -273,7 +273,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
             disabled={loading}
           >
             <Trash2 className="mr-1 h-4 w-4" />
-            {t("admin.modules.uninstall")}
+            {t("admin.moduleDetail.uninstall")}
           </Button>
         </CardContent>
       </Card>
@@ -289,7 +289,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowReinstallConfirm(false)}>
-              {t("common.cancel")}
+              {t("admin.moduleDetail.cancel")}
             </Button>
             <Button onClick={handleReinstall} disabled={loading}>
               {loading ? (
@@ -310,13 +310,13 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-zinc-500">{t("admin.moduleDetail.labelType")}</dt>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.detailType")}</dt>
             <dd>{mod.type}</dd>
-            <dt className="text-zinc-500">{t("admin.moduleDetail.labelVersion")}</dt>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.detailVersion")}</dt>
             <dd>{mod.version}</dd>
             {mod.internalUrl && (
               <>
-                <dt className="text-zinc-500">{t("admin.moduleDetail.labelInternalUrl")}</dt>
+                <dt className="text-zinc-500">{t("admin.moduleDetail.detailInternalUrl")}</dt>
                 <dd className="truncate font-mono text-xs">
                   {mod.internalUrl}
                 </dd>
@@ -324,14 +324,14 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
             )}
             {mod.assignedPort && (
               <>
-                <dt className="text-zinc-500">{t("admin.moduleDetail.labelPort")}</dt>
+                <dt className="text-zinc-500">{t("admin.moduleDetail.detailPort")}</dt>
                 <dd>{mod.assignedPort}</dd>
               </>
             )}
-            <dt className="text-zinc-500">{t("admin.moduleDetail.labelInstalled")}</dt>
-            <dd>{new Date(mod.createdAt).toLocaleString("de-DE")}</dd>
-            <dt className="text-zinc-500">{t("admin.moduleDetail.labelUpdated")}</dt>
-            <dd>{new Date(mod.updatedAt).toLocaleString("de-DE")}</dd>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.detailInstalled")}</dt>
+            <dd>{new Date(mod.createdAt).toLocaleString(locale)}</dd>
+            <dt className="text-zinc-500">{t("admin.moduleDetail.detailUpdated")}</dt>
+            <dd>{new Date(mod.updatedAt).toLocaleString(locale)}</dd>
           </dl>
         </CardContent>
       </Card>
@@ -361,7 +361,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               ) : (
                 <Save className="mr-1 h-4 w-4" />
               )}
-              {t("common.save")}
+              {t("admin.moduleDetail.save")}
             </Button>
           </CardContent>
         </Card>
@@ -406,7 +406,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
                 const savedValue = !def.secret ? (mod.savedConfig?.[def.key] ?? "") : "";
                 const displayValue = configValues[def.key] ?? savedValue;
                 const placeholder = def.secret
-                  ? (isSecretSet ? "••••••••  (saved — type to replace)" : (def.default || ""))
+                  ? (isSecretSet ? `•••••••• ${t("admin.moduleDetail.secretSaved")}` : (def.default || ""))
                   : (def.default || "");
                 return (
                   <div key={def.key} className="space-y-1">
@@ -440,7 +440,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
               ) : (
                 <Save className="mr-1 h-4 w-4" />
               )}
-              {t("common.save")}
+              {t("admin.moduleDetail.save")}
             </Button>
           </CardContent>
         </Card>

@@ -35,11 +35,11 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
   const { t } = useLocale();
 
   const PERMISSION_OPTIONS = [
-    { value: "server.start", label: t("servers.access.permStart") },
-    { value: "server.stop", label: t("servers.access.permStop") },
-    { value: "server.console", label: t("servers.access.permConsole") },
-    { value: "server.files", label: t("servers.access.permFiles") },
-    { value: "server.backups", label: t("servers.access.permBackups") },
+    { value: "server.start",    label: t("servers.access.permStart") },
+    { value: "server.stop",     label: t("servers.access.permStop") },
+    { value: "server.console",  label: t("servers.access.permConsole") },
+    { value: "server.files",    label: t("servers.access.permFiles") },
+    { value: "server.backups",  label: t("servers.access.permBackups") },
     { value: "server.settings", label: t("servers.access.permSettings") },
   ];
 
@@ -105,7 +105,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
         setResults([]);
         setSelectedPerms(["server.console"]);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t("servers.access.failed"));
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -117,7 +117,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
         setEntries((prev) => prev.filter((e) => e.userId !== userId));
         toast.success(t("servers.access.accessRemoved"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t("servers.access.failed"));
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -140,7 +140,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
           ),
         );
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t("servers.access.failed"));
+        toast.error(err instanceof Error ? err.message : t("common.error"));
       }
     });
   }
@@ -152,10 +152,10 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base text-blue-700 dark:text-blue-400">
             <Shield className="h-4 w-4" />
-            {t("servers.access.configureTitle")}
+            {t("servers.access.cardTitle")}
           </CardTitle>
           <CardDescription>
-            {t("servers.access.configureDesc")}
+            {t("servers.access.cardDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -194,7 +194,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
 
           {/* Permission toggles */}
           <div>
-            <p className="mb-2 text-xs font-medium text-zinc-500 uppercase tracking-wide">Berechtigungen</p>
+            <p className="mb-2 text-xs font-medium text-zinc-500 uppercase tracking-wide">{t("servers.access.permissionsLabel")}</p>
             <div className="flex flex-wrap gap-2">
               {PERMISSION_OPTIONS.map((opt) => {
                 const active = selectedPerms.includes(opt.value);
@@ -223,7 +223,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
             size="sm"
           >
             <Plus className="mr-1.5 h-4 w-4" />
-            Zugriff vergeben
+            {t("servers.access.grantAccess")}
           </Button>
         </CardContent>
       </Card>
@@ -231,7 +231,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
       {/* Members list */}
       {entries.length === 0 ? (
         <p className="text-sm text-zinc-500">
-          Keine zusätzlichen Berechtigungen vergeben
+          {t("servers.access.noAccess")}
         </p>
       ) : (
         <div className="space-y-2">

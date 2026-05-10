@@ -83,6 +83,10 @@ export interface IServer extends Document {
   port: number;
   rconPort?: number;
   memory: number;
+  cpus?: number; // decimal CPU cores allocated to the container (e.g. 2.0)
+  maxRamMb?: number; // RAM cap enforced on updates (copied from blueprint on claim)
+  maxCpus?: number; // CPU cap enforced on updates (copied from blueprint on claim)
+  maxBackupStorageGb?: number; // backup storage quota in GB (copied from blueprint on claim)
   javaArgs?: string;
   env: Record<string, string>;
   properties: Record<string, string>;
@@ -189,6 +193,10 @@ const ServerSchema = new Schema<IServer>(
     port: { type: Number, required: true },
     rconPort: { type: Number },
     memory: { type: Number, required: true },
+    cpus: { type: Number, min: 0.1 },
+    maxRamMb: { type: Number, min: 512 },
+    maxCpus: { type: Number, min: 0.1 },
+    maxBackupStorageGb: { type: Number, min: 1 },
     javaArgs: { type: String },
     env: { type: Map, of: String, default: {} },
     properties: { type: Map, of: String, default: {} },

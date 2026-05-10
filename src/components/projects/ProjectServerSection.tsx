@@ -49,6 +49,8 @@ interface Blueprint {
   _id: string;
   name: string;
   maxRam: number;
+  maxCpus?: number;
+  maxBackupStorageGb?: number;
   status: "available" | "claimed";
   serverId?: string;
 }
@@ -85,6 +87,8 @@ export function ProjectServerSection({
   const [editTarget, setEditTarget] = useState<Blueprint | null>(null);
   const [editName, setEditName] = useState("");
   const [editMaxRam, setEditMaxRam] = useState(2048);
+  const [editMaxCpus, setEditMaxCpus] = useState("");
+  const [editMaxBackupStorageGb, setEditMaxBackupStorageGb] = useState("");
   const [isDeleting, startDelete] = useTransition();
   const [isEditing, startEdit] = useTransition();
   const { t } = useLocale();
@@ -107,6 +111,8 @@ export function ProjectServerSection({
     setEditTarget(bp);
     setEditName(bp.name);
     setEditMaxRam(bp.maxRam);
+    setEditMaxCpus(bp.maxCpus != null ? String(bp.maxCpus) : "");
+    setEditMaxBackupStorageGb(bp.maxBackupStorageGb != null ? String(bp.maxBackupStorageGb) : "");
   }
 
   function handleEdit() {
@@ -118,6 +124,8 @@ export function ProjectServerSection({
           projectKey,
           name: editName,
           maxRam: editMaxRam,
+          maxCpus: editMaxCpus ? Number(editMaxCpus) : undefined,
+          maxBackupStorageGb: editMaxBackupStorageGb ? Number(editMaxBackupStorageGb) : undefined,
         });
         toast.success(t("projects.servers.blueprintUpdated"));
       } catch (err) {
@@ -291,6 +299,7 @@ export function ProjectServerSection({
           onOpenChange={(o) => { if (!o) setInitTarget(null); }}
           blueprintId={initTarget._id}
           maxRam={initTarget.maxRam}
+          maxCpus={initTarget.maxCpus}
         />
       )}
 
@@ -346,6 +355,30 @@ export function ProjectServerSection({
                 <span>512 MB</span>
                 <span>32 GB</span>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-bp-cpus">{t("projects.servers.maxCpusLabel")}</Label>
+              <Input
+                id="edit-bp-cpus"
+                type="number"
+                value={editMaxCpus}
+                onChange={(e) => setEditMaxCpus(e.target.value)}
+                placeholder={t("projects.servers.noCpuLimit")}
+                min={1}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-bp-storage">{t("projects.servers.maxBackupStorageLabel")}</Label>
+              <Input
+                id="edit-bp-storage"
+                type="number"
+                value={editMaxBackupStorageGb}
+                onChange={(e) => setEditMaxBackupStorageGb(e.target.value)}
+                placeholder={t("projects.servers.noStorageLimit")}
+                min={1}
+              />
             </div>
           </div>
           <DialogFooter>

@@ -101,7 +101,7 @@ function StatusBadge({ status }: { status?: string }) {
     default:
       return (
         <Badge variant="outline" className="gap-1 text-green-600 border-green-300">
-          <CheckCircle2 className="h-3 w-3" /> {t("servers.backups.statusCompleted")}
+          <CheckCircle2 className="h-3 w-3" /> {t("servers.backups.statusDone")}
         </Badge>
       );
   }
@@ -114,12 +114,17 @@ const ALL_COMPONENT_IDS: BackupComponentId[] = ["world", "config", "mods", "plug
 export function ServerBackupsTab({ serverId, serverName }: { serverId: string; serverName: string }) {
   const { t } = useLocale();
 
-  const BACKUP_COMPONENTS = [
-    { id: "world" as BackupComponentId, label: t("servers.backups.componentWorlds"), description: t("servers.backups.componentWorldsDesc"), icon: Globe },
-    { id: "config" as BackupComponentId, label: t("servers.backups.componentConfig"), description: t("servers.backups.componentConfigDesc"), icon: FileText },
-    { id: "mods" as BackupComponentId, label: t("servers.backups.componentMods"), description: t("servers.backups.componentModsDesc"), icon: Package },
-    { id: "plugins" as BackupComponentId, label: t("servers.backups.componentPlugins"), description: t("servers.backups.componentPluginsDesc"), icon: Puzzle },
-    { id: "datapacks" as BackupComponentId, label: t("servers.backups.componentDatapacks"), description: t("servers.backups.componentDatapacksDesc"), icon: Database },
+  const BACKUP_COMPONENTS: {
+    id: BackupComponentId;
+    label: string;
+    description: string;
+    icon: React.ElementType;
+  }[] = [
+    { id: "world",      label: t("backupDialogs.components.world"),      description: t("backupDialogs.components.worldDesc"),      icon: Globe },
+    { id: "config",     label: t("backupDialogs.components.config"),     description: t("backupDialogs.components.configDesc"),     icon: FileText },
+    { id: "mods",       label: t("backupDialogs.components.mods"),       description: t("backupDialogs.components.modsDesc"),       icon: Package },
+    { id: "plugins",    label: t("backupDialogs.components.plugins"),    description: t("backupDialogs.components.pluginsDesc"),    icon: Puzzle },
+    { id: "datapacks",  label: t("backupDialogs.components.datapacks"),  description: t("backupDialogs.components.datapacksDesc"),  icon: Database },
   ];
 
   const [backups, setBackups] = useState<Backup[]>([]);
@@ -139,7 +144,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
       if (!res.ok) throw new Error();
       setBackups(await res.json());
     } catch {
-      toast.error(t("servers.backups.loadError"));
+      toast.error(t("servers.backups.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -185,20 +190,20 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
         if (!res.ok) throw new Error((await res.json()).error);
         const data = await res.json();
         if (data.strategy === "async") {
-          toast.success(t("servers.backups.createdAsync"));
+          toast.success(t("servers.backups.started"));
         } else {
           toast.success(t("servers.backups.created"));
         }
         fetchBackups();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t("servers.backups.createError"));
+        toast.error(err instanceof Error ? err.message : t("servers.backups.createFailed"));
       }
     });
   }
 
   function handleCustomBackup() {
     if (selectedComponents.length === 0) {
-      toast.error("Wähle mindestens eine Komponente aus");
+      toast.error(t("servers.backups.selectMinOne"));
       return;
     }
     setCustomDialogOpen(false);
@@ -229,10 +234,10 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
           { method: "DELETE" },
         );
         if (!res.ok) throw new Error();
-        toast.success("Backup gelöscht");
+        toast.success(t("servers.backups.deleted"));
         fetchBackups();
       } catch {
-        toast.error("Fehler beim Löschen");
+        toast.error(t("servers.backups.deleteFailed"));
       }
     });
   }
@@ -246,14 +251,14 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
       const res = await fetch(url, { method: "POST" });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
-      toast.success(force ? t("servers.backups.reshared") : t("servers.backups.shareLinkCreated"));
+      toast.success(force ? t("servers.backups.reshared") : t("servers.backups.shareCreated"));
       fetchBackups();
       if (data.shareUrl) {
         await copyToClipboard(data.shareUrl);
         toast.info(t("servers.backups.linkCopied"));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("servers.backups.shareError"));
+      toast.error(err instanceof Error ? err.message : t("servers.backups.shareFailed"));
     } finally {
       setSharingId(null);
     }
@@ -261,7 +266,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
 
   function copyShareUrl(url: string) {
     copyToClipboard(url);
-    toast.info(t("servers.backups.linkCopied2"));
+    toast.info(t("servers.backups.linkCopiedShort"));
   }
 
   const isCompleted = (b: Backup) => !b.status || b.status === "completed";
@@ -270,7 +275,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <p className="text-sm text-zinc-500">{t("servers.backups.countLabel", { count: backups.length })}</p>
+          <p className="text-sm text-zinc-500">{t("servers.backups.count", { count: backups.length })}</p>
           {capabilities?.async && (
             <Badge variant="secondary" className="text-xs">{t("servers.backups.asyncBadge")}</Badge>
           )}
@@ -286,7 +291,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
             className="rounded-r-none"
           >
             <Plus className="mr-1.5 h-3.5 w-3.5" />
-            {isPending ? "Erstelle…" : "Backup erstellen"}
+            {isPending ? t("servers.backups.creating") : t("servers.backups.create")}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -306,11 +311,11 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                 }}
               >
                 <Settings2 className="mr-2 h-4 w-4" />
-                Benutzerdefiniertes Backup
+                {t("servers.backups.customBackup")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setImportDialogOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
-                Backup importieren
+                {t("servers.backups.importBackup")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -323,7 +328,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
         <Card>
           <CardContent className="py-8 text-center">
             <HardDrive className="mx-auto mb-2 h-8 w-8 text-zinc-400" />
-            <p className="text-sm text-zinc-500">{t("servers.backups.noBackups")}</p>
+            <p className="text-sm text-zinc-500">{t("servers.backups.empty")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -376,7 +381,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                       size="icon"
                       disabled={sharingId === backup._id}
                       onClick={() => handleShare(backup._id)}
-                      title={t("servers.backups.shareTooltip")}
+                      title={t("servers.backups.shareTitle")}
                     >
                       {sharingId === backup._id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -391,7 +396,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                       size="icon"
                       disabled={sharingId === backup._id}
                       onClick={() => handleShare(backup._id, true)}
-                      title={t("servers.backups.reshareTooltip")}
+                      title={t("servers.backups.reshareTitle")}
                     >
                       {sharingId === backup._id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -406,7 +411,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                       size="icon"
                       disabled={isPending}
                       onClick={() => handleRestore(backup)}
-                      title={t("servers.backups.restoreTooltip")}
+                      title={t("servers.backups.restoreTitle")}
                     >
                       <RotateCcw className="h-4 w-4" />
                     </Button>
@@ -416,7 +421,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                     size="icon"
                     disabled={isPending}
                     onClick={() => handleDelete(backup._id)}
-                    title={t("servers.backups.deleteTooltip")}
+                    title={t("servers.backups.deleteTitle")}
                   >
                     <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
                   </Button>
@@ -431,16 +436,16 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
       <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Benutzerdefiniertes Backup</DialogTitle>
+            <DialogTitle>{t("servers.backups.customDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Wähle aus, welche Komponenten gesichert werden sollen.
+              {t("servers.backups.customDialogDesc")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-1 py-2">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-200 dark:border-zinc-800">
               <Label className="text-sm font-medium cursor-pointer" onClick={toggleAll}>
-                Alle auswählen
+                {t("servers.backups.selectAll")}
               </Label>
               <Checkbox
                 checked={selectedComponents.length === ALL_COMPONENT_IDS.length}
@@ -484,7 +489,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setCustomDialogOpen(false)}>
-              Abbrechen
+              {t("servers.backups.cancel")}
             </Button>
             <Button
               onClick={handleCustomBackup}
@@ -493,14 +498,14 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
               {isPending ? (
                 <>
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  Erstelle…
+                  {t("servers.backups.creating")}
                 </>
               ) : (
                 <>
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
                   {selectedComponents.length === ALL_COMPONENT_IDS.length
-                    ? "Vollständiges Backup"
-                    : `${selectedComponents.length} ${selectedComponents.length === 1 ? "Komponente" : "Komponenten"} sichern`}
+                    ? t("servers.backups.fullBackup")
+                    : t("servers.backups.backupNComponents", { count: selectedComponents.length })}
                 </>
               )}
             </Button>

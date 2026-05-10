@@ -51,7 +51,7 @@ function AddonSection({
       if (!res.ok) throw new Error();
       setItems(await res.json());
     } catch {
-      toast.error(`${label} konnten nicht geladen werden`);
+      toast.error(t("servers.addons.loadFailed", { label }));
     } finally {
       setLoading(false);
     }
@@ -82,20 +82,20 @@ function AddonSection({
             resolve();
           } else {
             try {
-              reject(new Error(JSON.parse(xhr.responseText).error ?? "Upload fehlgeschlagen"));
+              reject(new Error(JSON.parse(xhr.responseText).error ?? t("servers.addons.uploadFailed")));
             } catch {
-              reject(new Error("Upload fehlgeschlagen"));
+              reject(new Error(t("servers.addons.uploadFailed")));
             }
           }
         };
-        xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
+        xhr.onerror = () => reject(new Error(t("servers.addons.uploadFailed")));
         xhr.send(formData);
       });
 
-      toast.success(`${file.name} hochgeladen`);
+      toast.success(t("servers.addons.uploaded", { name: file.name }));
       fetchItems();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload fehlgeschlagen");
+      toast.error(err instanceof Error ? err.message : t("servers.addons.uploadFailed"));
     } finally {
       setUploadProgress(null);
     }
@@ -109,10 +109,10 @@ function AddonSection({
           { method: "DELETE" },
         );
         if (!res.ok) throw new Error();
-        toast.success("Gelöscht");
+        toast.success(t("servers.addons.deleted"));
         fetchItems();
       } catch {
-        toast.error("Fehler beim Löschen");
+        toast.error(t("servers.addons.deleteFailed"));
       }
     });
   }
@@ -129,10 +129,10 @@ function AddonSection({
           },
         );
         if (!res.ok) throw new Error();
-        toast.success(enabled ? "Aktiviert" : "Deaktiviert");
+        toast.success(enabled ? t("servers.addons.enabled") : t("servers.addons.disabled"));
         fetchItems();
       } catch {
-        toast.error("Fehler beim Umschalten");
+        toast.error(t("servers.addons.toggleFailed"));
       }
     });
   }
@@ -152,7 +152,7 @@ function AddonSection({
               ) : (
                 <Upload className="mr-1.5 h-3.5 w-3.5" />
               )}
-              {isUploading ? `${uploadProgress}%` : "Hochladen"}
+              {isUploading ? `${uploadProgress}%` : t("servers.addons.uploading")}
             </span>
           </Button>
         </label>
@@ -167,9 +167,9 @@ function AddonSection({
       )}
       <CardContent>
         {loading ? (
-          <p className="text-sm text-zinc-500">Lade…</p>
+          <p className="text-sm text-zinc-500">{t("servers.addons.loading")}</p>
         ) : items.length === 0 ? (
-          <p className="text-sm text-zinc-500">Keine {label} installiert</p>
+          <p className="text-sm text-zinc-500">{t("servers.addons.empty", { label })}</p>
         ) : (
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {items.map((item) => (
@@ -195,7 +195,7 @@ function AddonSection({
                       size="icon"
                       disabled={isPending}
                       onClick={() => handleToggle(item.filename, !item.enabled)}
-                      title={item.enabled ? t("servers.addons.disableTooltip") : t("servers.addons.enableTooltip")}
+                      title={item.enabled ? t("servers.addons.disableTitle") : t("servers.addons.enableTitle")}
                     >
                       {item.enabled ? (
                         <ToggleRight className="h-4 w-4 text-emerald-500" />
@@ -232,6 +232,7 @@ export function ServerAddonsTab({
   serverId: string;
   modLoader?: string;
 }) {
+  const { t } = useLocale();
   const supportsMods = MOD_LOADERS.includes(modLoader as (typeof MOD_LOADERS)[number]);
   const supportsPlugins = PLUGIN_LOADERS.includes(modLoader as (typeof PLUGIN_LOADERS)[number]);
 
@@ -261,9 +262,7 @@ export function ServerAddonsTab({
       />
       {!supportsMods && !supportsPlugins && (
         <p className="col-span-full text-sm text-zinc-500">
-          Mods und Plugins sind für{" "}
-          <span className="font-medium capitalize">{modLoader ?? "Vanilla"}</span>-Server nicht
-          verfügbar. Nur Datapacks werden unterstützt.
+          {t("servers.addons.modsPluginsUnavailable", { modLoader: modLoader ?? "Vanilla" })}
         </p>
       )}
     </div>

@@ -57,7 +57,7 @@ export async function listBlueprints(
 
 export async function createBlueprint(
   projectKey: string,
-  data: { name: string; maxRam: number },
+  data: { name: string; maxRam: number; maxCpus?: number; maxBackupStorageGb?: number },
   actorId: string,
 ): Promise<IBlueprint> {
   await connectDB();
@@ -69,6 +69,8 @@ export async function createBlueprint(
     projectKey,
     name: data.name.trim(),
     maxRam: data.maxRam,
+    ...(data.maxCpus != null ? { maxCpus: data.maxCpus } : {}),
+    ...(data.maxBackupStorageGb != null ? { maxBackupStorageGb: data.maxBackupStorageGb } : {}),
     status: "available",
     createdBy: actorId,
   });
@@ -78,6 +80,8 @@ export async function createBlueprint(
     blueprintId: blueprint._id.toString(),
     name: data.name,
     maxRam: data.maxRam,
+    maxCpus: data.maxCpus,
+    maxBackupStorageGb: data.maxBackupStorageGb,
   });
 
   return blueprint.toObject() as IBlueprint;
@@ -100,7 +104,7 @@ export async function deleteBlueprint(
 
 export async function updateBlueprint(
   blueprintId: string,
-  data: { name?: string; maxRam?: number },
+  data: { name?: string; maxRam?: number; maxCpus?: number; maxBackupStorageGb?: number },
   actorId: string,
 ): Promise<IBlueprint> {
   await connectDB();
@@ -117,6 +121,8 @@ export async function updateBlueprint(
   const update: Record<string, unknown> = {};
   if (data.name !== undefined) update.name = data.name.trim();
   if (data.maxRam !== undefined) update.maxRam = data.maxRam;
+  if (data.maxCpus !== undefined) update.maxCpus = data.maxCpus;
+  if (data.maxBackupStorageGb !== undefined) update.maxBackupStorageGb = data.maxBackupStorageGb;
 
   const updated = await BlueprintModel.findByIdAndUpdate(blueprintId, update, {
     returnDocument: "after",
@@ -147,7 +153,24 @@ export async function initializeBlueprint(
     );
   }
 
-  const server = await createServer(blueprint.projectKey, serverData, actorId);
+  if (blueprint.maxCpus != null && serverData.cpus != null && serverData.cpus > blueprint.maxCpus) {
+    throw new Error(
+      `CPU exceeds blueprint limit: ${serverData.cpus} cores requested, ${blueprint.maxCpus} cores allowed`,
+    );
+  }
+
+  // Copy quota caps onto the server so they survive blueprint deletion
+  // and can be re-enforced on subsequent updateServer calls.
+  const serverDataWithQuota: ServerCreateInput = {
+    ...serverData,
+    maxRamMb: blueprint.maxRam,
+    ...(blueprint.maxCpus != null ? { maxCpus: blueprint.maxCpus } : {}),
+    ...(blueprint.maxBackupStorageGb != null
+      ? { maxBackupStorageGb: blueprint.maxBackupStorageGb }
+      : {}),
+  };
+
+  const server = await createServer(blueprint.projectKey, serverDataWithQuota, actorId);
   const serverId = server._id.toString();
 
   await BlueprintModel.findByIdAndUpdate(blueprintId, {

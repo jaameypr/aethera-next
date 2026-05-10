@@ -31,8 +31,8 @@ import {
 import { useLocale } from "@/context/locale-context";
 
 const configSchema = z.object({
-  motd: z.string().max(59, "Maximal 59 Zeichen"),
-  "max-players": z.number().min(1, "Mindestens 1").max(1000, "Maximal 1000"),
+  motd: z.string().max(59, "Max 59 characters"),
+  "max-players": z.number().min(1, "Min 1").max(1000, "Max 1000"),
   difficulty: z.enum(["peaceful", "easy", "normal", "hard"]),
   "white-list": z.boolean(),
   pvp: z.boolean(),
@@ -106,7 +106,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
         });
       })
       .catch(() => {
-        if (!cancelled) toast.error("Konfiguration konnte nicht geladen werden");
+        if (!cancelled) toast.error(t("servers.configuration.loadFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -134,38 +134,38 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
 
         await writePropertiesAction({ serverId, properties: merged });
         setRawProperties(merged);
-        toast.success("Konfiguration gespeichert");
+        toast.success(t("servers.configuration.saved"));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Fehler beim Speichern");
+        toast.error(err instanceof Error ? err.message : t("servers.configuration.saveFailed"));
       }
     });
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-500">Lade Konfiguration…</p>;
+    return <p className="text-sm text-zinc-500">{t("servers.configuration.loading")}</p>;
   }
 
   return (
     <div className="space-y-6">
       {!editable && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
-          Server muss gestoppt sein um die Konfiguration zu bearbeiten.
+          {t("servers.configuration.mustBeStopped")}
         </div>
       )}
 
       <Card>
         <form onSubmit={handleSubmit(onSave)}>
           <CardHeader>
-            <CardTitle className="text-base">server.properties</CardTitle>
+            <CardTitle className="text-base">{t("servers.configuration.cardTitle")}</CardTitle>
           </CardHeader>
 
           <CardContent className="grid gap-4 sm:grid-cols-2">
             {/* MOTD */}
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="cfg-motd">MOTD</Label>
+              <Label htmlFor="cfg-motd">{t("servers.configuration.motd")}</Label>
               <Input
                 id="cfg-motd"
-                placeholder={t("servers.config.motdPlaceholder")}
+                placeholder={t("servers.configuration.motdPlaceholder")}
                 disabled={!editable}
                 {...register("motd")}
               />
@@ -176,7 +176,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
 
             {/* Max Players */}
             <div className="space-y-1">
-              <Label htmlFor="cfg-maxplayers">Max. Spieler</Label>
+              <Label htmlFor="cfg-maxplayers">{t("servers.configuration.maxPlayers")}</Label>
               <Input
                 id="cfg-maxplayers"
                 type="number"
@@ -192,7 +192,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
 
             {/* Difficulty */}
             <div className="space-y-1">
-              <Label>Schwierigkeitsgrad</Label>
+              <Label>{t("servers.configuration.difficulty")}</Label>
               <Controller
                 name="difficulty"
                 control={control}
@@ -206,10 +206,10 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="peaceful">Friedlich</SelectItem>
-                      <SelectItem value="easy">Einfach</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="hard">Schwer</SelectItem>
+                      <SelectItem value="peaceful">{t("servers.configuration.diffPeaceful")}</SelectItem>
+                      <SelectItem value="easy">{t("servers.configuration.diffEasy")}</SelectItem>
+                      <SelectItem value="normal">{t("servers.configuration.diffNormal")}</SelectItem>
+                      <SelectItem value="hard">{t("servers.configuration.diffHard")}</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -218,7 +218,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
 
             {/* Spawn Protection */}
             <div className="space-y-1">
-              <Label htmlFor="cfg-spawn">Spawn-Schutz (Blöcke)</Label>
+              <Label htmlFor="cfg-spawn">{t("servers.configuration.spawnProtection")}</Label>
               <Input
                 id="cfg-spawn"
                 type="number"
@@ -231,10 +231,10 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
 
             {/* Level Seed */}
             <div className="space-y-1">
-              <Label htmlFor="cfg-seed">World-Seed</Label>
+              <Label htmlFor="cfg-seed">{t("servers.configuration.seed")}</Label>
               <Input
                 id="cfg-seed"
-                placeholder={t("servers.config.seedPlaceholder")}
+                placeholder={t("servers.configuration.seedPlaceholder")}
                 className="font-mono"
                 disabled={!editable}
                 {...register("level-seed")}
@@ -245,12 +245,12 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
             <div className="space-y-3 sm:col-span-2">
               {(
                 [
-                  { name: "white-list", label: t("servers.config.whitelistLabel") },
-                  { name: "pvp", label: "PvP aktivieren" },
-                  { name: "online-mode", label: "Online-Modus (Authentifizierung)" },
-                  { name: "enable-command-blocks", label: "Command Blocks aktivieren" },
-                  { name: "hardcore", label: "Hardcore-Modus" },
-                ] as const
+                  { name: "white-list" as const, label: t("servers.configuration.whitelist") },
+                  { name: "pvp" as const, label: t("servers.configuration.pvp") },
+                  { name: "online-mode" as const, label: t("servers.configuration.onlineMode") },
+                  { name: "enable-command-blocks" as const, label: t("servers.configuration.commandBlocks") },
+                  { name: "hardcore" as const, label: t("servers.configuration.hardcore") },
+                ]
               ).map(({ name, label }) => (
                 <div key={name} className="flex items-center gap-3">
                   <Controller
@@ -274,7 +274,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
           <CardFooter>
             <Button type="submit" disabled={isPending || !editable}>
               <Save className="mr-1.5 h-4 w-4" />
-              {isPending ? "Speichere…" : "Speichern"}
+              {isPending ? t("servers.configuration.saving") : t("servers.configuration.save")}
             </Button>
           </CardFooter>
         </form>

@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 export function ServerConsoleTab({ serverId }: { serverId: string }) {
+  const { t } = useLocale();
   const { lines, sendCommand, connected, error, clear } =
     useServerConsole(serverId);
   const [input, setInput] = useState("");
@@ -40,14 +42,14 @@ export function ServerConsoleTab({ serverId }: { serverId: string }) {
             )}
           />
           <span className="text-sm text-zinc-500">
-            {connected ? "Verbunden" : "Getrennt"}
+            {connected ? t("servers.console.connected") : t("servers.console.disconnected")}
           </span>
           {error && (
             <span className="text-sm text-red-500">— {error}</span>
           )}
         </div>
         <Button variant="ghost" size="sm" onClick={clear}>
-          Leeren
+          {t("servers.console.clear")}
         </Button>
       </div>
 
@@ -80,7 +82,7 @@ export function ServerConsoleTab({ serverId }: { serverId: string }) {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Befehl eingeben…"
+          placeholder={t("servers.console.placeholder")}
           className="font-mono"
           disabled={!connected}
         />

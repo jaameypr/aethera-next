@@ -52,6 +52,14 @@ export interface ServerCreateInput {
   port: number;
   rconPort?: number;
   memory: number;
+  /** CPU cores to allocate to the container (e.g. 2.0). Maps to Docker nanoCpus. */
+  cpus?: number;
+  /** RAM cap in MB — enforced on subsequent updateServer calls (copied from blueprint). */
+  maxRamMb?: number;
+  /** CPU cap — enforced on subsequent updateServer calls (copied from blueprint). */
+  maxCpus?: number;
+  /** Backup storage quota in GB (copied from blueprint on claim). */
+  maxBackupStorageGb?: number;
   version?: string;
   /** New canonical type field — replaces modLoader for new servers */
   serverType?: ServerType;
@@ -174,6 +182,7 @@ const CONFIG_FIELDS = new Set([
   "port",
   "rconPort",
   "memory",
+  "cpus",
   "version",
   "serverType",
   "modLoader",
@@ -201,6 +210,18 @@ export async function updateServer(
   if (changesConfig && server.status !== "stopped" && server.status !== "error") {
     throw new Error(
       "Server must be stopped before changing configuration fields",
+    );
+  }
+
+  if (patch.memory != null && server.maxRamMb != null && patch.memory > server.maxRamMb) {
+    throw new Error(
+      `RAM exceeds blueprint limit: ${patch.memory} MB requested, ${server.maxRamMb} MB allowed`,
+    );
+  }
+
+  if (patch.cpus != null && server.maxCpus != null && patch.cpus > server.maxCpus) {
+    throw new Error(
+      `CPU exceeds blueprint limit: ${patch.cpus} cores requested, ${server.maxCpus} cores allowed`,
     );
   }
 

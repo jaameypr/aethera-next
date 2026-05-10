@@ -14,7 +14,7 @@ import { connectDB } from "@/lib/db/connection";
 import { BackupModel, type IBackup, type BackupComponent } from "@/lib/db/models/backup";
 import { ServerModel, type IServer } from "@/lib/db/models/server";
 import { logAction } from "@/lib/services/project.service";
-import { getBackupDir, getServerDataPath, resolveServerDataPath } from "@/lib/docker/storage";
+import { getBackupDir, getServerDataPath, resolveServerDataPath, getServerDirSize } from "@/lib/docker/storage";
 import { badRequest } from "@/lib/api/errors";
 
 // ---------------------------------------------------------------------------
@@ -40,6 +40,38 @@ export interface BackupComponents {
 // ---------------------------------------------------------------------------
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Throws if the server's backup quota would be exceeded by a new backup.
+ * Uses the uncompressed server data dir size as a conservative upper bound
+ * for the new backup size (actual compressed .tar.gz will typically be smaller).
+ */
+export async function assertBackupQuota(server: IServer): Promise<void> {
+  if (server.maxBackupStorageGb == null) return;
+
+  const limitBytes = server.maxBackupStorageGb * 1024 ** 3;
+
+  const result = await BackupModel.aggregate<{ total: number }>([
+    {
+      $match: {
+        serverId: server._id,
+        status: "completed",
+      },
+    },
+    { $group: { _id: null, total: { $sum: "$size" } } },
+  ]);
+  const usedBytes: number = result[0]?.total ?? 0;
+
+  const estimatedNewBytes = await getServerDirSize(server.projectKey, server.identifier);
+
+  if (usedBytes + estimatedNewBytes > limitBytes) {
+    const usedGb = (usedBytes / 1024 ** 3).toFixed(2);
+    throw new Error(
+      `Backup quota exceeded: ${usedGb} GB used of ${server.maxBackupStorageGb} GB allowed. ` +
+        "Delete old backups to free space before creating a new one.",
+    );
+  }
+}
 
 /** itzg/minecraft-server runs as UID/GID 1000 — fix ownership after restore */
 async function fixOwnership(dirPath: string): Promise<void> {
@@ -119,6 +151,8 @@ export async function createBackup(
   if (server.status !== "stopped") {
     throw badRequest("Server must be stopped to create a backup");
   }
+
+  await assertBackupQuota(server);
 
   const serverDir = await resolveServerDataPath(server.projectKey, server.identifier);
   const destDir = backupDir(serverId);

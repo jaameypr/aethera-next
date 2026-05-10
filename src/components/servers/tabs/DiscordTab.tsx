@@ -111,6 +111,7 @@ interface Props {
 
 export function DiscordTab({ serverId }: Props) {
   const { t } = useLocale();
+
   const [moduleAvailable, setModuleAvailable] = useState<boolean | null>(null);
   const [config, setConfig]       = useState<ServerDiscordConfig>(EMPTY_CONFIG);
   const [guilds, setGuilds]       = useState<Guild[]>([]);
@@ -214,9 +215,9 @@ export function DiscordTab({ serverId }: Props) {
         body: JSON.stringify(config),
       });
       if (!res.ok) throw new Error("Save failed");
-      toast.success("Discord configuration saved");
+      toast.success(t("servers.discord.configSaved"));
     } catch {
-      toast.error("Failed to save Discord configuration");
+      toast.error(t("servers.discord.configSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -231,9 +232,9 @@ export function DiscordTab({ serverId }: Props) {
       await fetch(`/api/servers/${serverId}/discord`, { method: "DELETE" });
       setConfig(EMPTY_CONFIG);
       setChannels([]);
-      toast.success("Discord configuration removed");
+      toast.success(t("servers.discord.configRemoved"));
     } catch {
-      toast.error("Failed to remove configuration");
+      toast.error(t("servers.discord.configRemoveFailed"));
     }
   };
 
@@ -252,7 +253,7 @@ export function DiscordTab({ serverId }: Props) {
       setInviteUrl(data.url);
       setShowInviteDialog(true);
     } catch {
-      toast.error("Could not create Discord invite. Make sure the bot has permission.");
+      toast.error(t("servers.discord.inviteCreateFailed"));
     }
   };
 
@@ -291,7 +292,7 @@ export function DiscordTab({ serverId }: Props) {
     return (
       <div className="flex items-center gap-2 text-sm text-zinc-500 py-8">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading Discord configuration…
+        {t("servers.discord.loading")}
       </div>
     );
   }
@@ -303,11 +304,9 @@ export function DiscordTab({ serverId }: Props) {
           <div className="flex items-start gap-3">
             <MessageCircle className="h-8 w-8 text-zinc-400 mt-1 shrink-0" />
             <div>
-              <h3 className="font-semibold">Discord Module not installed</h3>
+              <h3 className="font-semibold">{t("servers.discord.notInstalled")}</h3>
               <p className="text-sm text-zinc-400 mt-1">
-                The Discord integration module is not installed or not running. Ask your
-                panel administrator to install the <strong>Discord Integration</strong> module
-                from the module registry.
+                {t("servers.discord.notInstalledDesc")}
               </p>
             </div>
           </div>
@@ -320,8 +319,6 @@ export function DiscordTab({ serverId }: Props) {
   // Main UI
   // -------------------------------------------------------------------------
 
-  const selectedGuild = guilds.find((g) => g.id === config.guildId);
-
   return (
     <div className="space-y-6">
 
@@ -330,10 +327,10 @@ export function DiscordTab({ serverId }: Props) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Bot className="h-4 w-4" />
-            Bot Setup
+            {t("servers.discord.botSetup")}
           </CardTitle>
           <CardDescription>
-            Invite the Discord bot to your server, then link it below.
+            {t("servers.discord.botSetupDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -343,32 +340,31 @@ export function DiscordTab({ serverId }: Props) {
                 <Button asChild variant="outline" size="sm">
                   <a href={botInviteUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-3 w-3 mr-1" />
-                    Invite Bot to Discord Server
+                    {t("servers.discord.inviteBot")}
                   </a>
                 </Button>
                 <span className="text-xs text-zinc-500">
-                  (Requires Manage Server permission on the Discord side)
+                  {t("servers.discord.inviteRequires")}
                 </span>
               </>
             ) : (
               <p className="text-sm text-zinc-500">
-                Bot invite URL unavailable — make sure the Discord module is running and{" "}
-                <strong>DISCORD_CLIENT_ID</strong> is configured in the module settings.
+                {t("servers.discord.inviteUnavailable")}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label>Linked Discord Server</Label>
+              <Label>{t("servers.discord.linkedServer")}</Label>
               <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => loadData()}>
                 <RefreshCw className="h-3 w-3 mr-1" />
-                Refresh
+                {t("servers.discord.refresh")}
               </Button>
             </div>
             {guilds.length === 0 ? (
               <p className="text-sm text-zinc-500">
-                No Discord servers found. Invite the bot to your server first, then click Refresh.
+                {t("servers.discord.noGuilds")}
               </p>
             ) : (
               <Select
@@ -376,7 +372,7 @@ export function DiscordTab({ serverId }: Props) {
                 onValueChange={selectGuild}
               >
                 <SelectTrigger className="w-full max-w-sm">
-                  <SelectValue placeholder={t("servers.discord.selectGuildPlaceholder")} />
+                  <SelectValue placeholder={t("servers.discord.selectGuild")} />
                 </SelectTrigger>
                 <SelectContent>
                   {guilds.map((g) => (
@@ -392,7 +388,7 @@ export function DiscordTab({ serverId }: Props) {
           {config.guildId && (
             <Button variant="outline" size="sm" onClick={handleCreateInvite}>
               <ExternalLink className="h-3 w-3 mr-1" />
-              Create Server Invite Link
+              {t("servers.discord.createInvite")}
             </Button>
           )}
         </CardContent>
@@ -403,7 +399,7 @@ export function DiscordTab({ serverId }: Props) {
         <>
           {/* Player Chat */}
           <ChannelConfigCard
-            title={t("servers.discord.playerChatTitle")}
+            title={t("servers.discord.playerChat")}
             description={t("servers.discord.playerChatDesc")}
             icon={<MessageCircle className="h-4 w-4" />}
             config={config.playerChat}
@@ -414,9 +410,7 @@ export function DiscordTab({ serverId }: Props) {
               <div className="flex items-start gap-2 rounded border border-yellow-700 bg-yellow-950/40 p-3">
                 <TriangleAlert className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-yellow-300">
-                  Chat relay only works with <strong>default Minecraft chat formatting</strong>.
-                  Plugins and mods that override chat format (e.g. EssentialsChat, ChatControl,
-                  LuckPerms prefixes) may not be detected or may produce incorrect output.
+                  {t("servers.discord.playerChatWarning")}
                 </p>
               </div>
             }
@@ -424,7 +418,7 @@ export function DiscordTab({ serverId }: Props) {
 
           {/* Player Join/Leave */}
           <ChannelConfigCard
-            title={t("servers.discord.playerEventsTitle")}
+            title={t("servers.discord.playerEvents")}
             description={t("servers.discord.playerEventsDesc")}
             icon={<Users className="h-4 w-4" />}
             config={config.playerEvents}
@@ -435,9 +429,7 @@ export function DiscordTab({ serverId }: Props) {
               <div className="flex items-start gap-2 rounded border border-yellow-700 bg-yellow-950/40 p-3">
                 <TriangleAlert className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-yellow-300">
-                  Join/leave detection only works with <strong>default Minecraft join/leave formatting</strong>.
-                  Plugins that override these messages (e.g. EssentialsX, CustomJoinMessages) may not be
-                  detected or may produce incorrect output.
+                  {t("servers.discord.playerEventsWarning")}
                 </p>
               </div>
             }
@@ -445,7 +437,7 @@ export function DiscordTab({ serverId }: Props) {
 
           {/* Whitelist Requests */}
           <ChannelConfigCard
-            title={t("servers.discord.whitelistRequestsTitle")}
+            title={t("servers.discord.whitelistRequests")}
             description={t("servers.discord.whitelistRequestsDesc")}
             icon={<ShieldCheck className="h-4 w-4" />}
             config={config.whitelistRequests}
@@ -457,8 +449,7 @@ export function DiscordTab({ serverId }: Props) {
               <div className="flex items-start gap-2 rounded border border-yellow-700 bg-yellow-950/40 p-3">
                 <TriangleAlert className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-yellow-300">
-                  Whitelist request detection only works with <strong>default Minecraft connection-denied formatting</strong>.
-                  Plugins that override these messages may not be detected or may produce incorrect output.
+                  {t("servers.discord.whitelistWarning")}
                 </p>
               </div>
             }
@@ -466,7 +457,7 @@ export function DiscordTab({ serverId }: Props) {
 
           {/* Server Events */}
           <ChannelConfigCard
-            title={t("servers.discord.serverEventsTitle")}
+            title={t("servers.discord.serverEvents")}
             description={t("servers.discord.serverEventsDesc")}
             icon={<Activity className="h-4 w-4" />}
             config={config.serverEvents}
@@ -481,7 +472,7 @@ export function DiscordTab({ serverId }: Props) {
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Bell className="h-4 w-4" />
-                  Pending Whitelist Requests
+                  {t("servers.discord.pendingRequests")}
                   <Badge variant="secondary">{requests.length}</Badge>
                 </CardTitle>
               </CardHeader>
@@ -512,11 +503,11 @@ export function DiscordTab({ serverId }: Props) {
           <div className="flex items-center gap-3 pt-2">
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-              Save Configuration
+              {t("servers.discord.saveConfig")}
             </Button>
             <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300" onClick={handleRemove}>
               <Trash2 className="h-3 w-3 mr-1" />
-              Remove
+              {t("servers.discord.remove")}
             </Button>
           </div>
         </>
@@ -526,9 +517,9 @@ export function DiscordTab({ serverId }: Props) {
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Discord Invite Link</DialogTitle>
+            <DialogTitle>{t("servers.discord.inviteDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Share this link with players so they can join your Discord server.
+              {t("servers.discord.inviteDialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2">
@@ -536,7 +527,7 @@ export function DiscordTab({ serverId }: Props) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { copyToClipboard(inviteUrl ?? ""); toast.success("Copied!"); }}
+              onClick={() => { copyToClipboard(inviteUrl ?? ""); toast.success(t("servers.discord.copied")); }}
             >
               <Copy className="h-3 w-3" />
             </Button>
@@ -545,7 +536,7 @@ export function DiscordTab({ serverId }: Props) {
             <Button asChild>
               <a href={inviteUrl ?? "#"} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-3 w-3 mr-1" />
-                Open Link
+                {t("servers.discord.openLink")}
               </a>
             </Button>
           </DialogFooter>
@@ -583,6 +574,7 @@ function ChannelConfigCard({
   showRoleField,
 }: ChannelConfigCardProps) {
   const { t } = useLocale();
+
   return (
     <Card className="border-zinc-800">
       <CardHeader>
@@ -593,7 +585,7 @@ function ChannelConfigCard({
           </span>
           <div className="flex items-center gap-2">
             <Label htmlFor={`toggle-${title}`} className="text-xs text-zinc-400 font-normal">
-              {config.enabled ? "Enabled" : "Disabled"}
+              {config.enabled ? t("servers.discord.enabledLabel") : t("servers.discord.disabledLabel")}
             </Label>
             <Switch
               id={`toggle-${title}`}
@@ -610,20 +602,20 @@ function ChannelConfigCard({
           {warning}
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Target Channel</Label>
+            <Label className="text-xs">{t("servers.discord.targetChannel")}</Label>
             {channelsLoading ? (
               <div className="flex items-center gap-1 text-xs text-zinc-500">
-                <Loader2 className="h-3 w-3 animate-spin" /> Loading channels…
+                <Loader2 className="h-3 w-3 animate-spin" /> {t("servers.discord.loadingChannels")}
               </div>
             ) : channels.length === 0 ? (
-              <p className="text-xs text-zinc-500">No channels found. Select a guild first.</p>
+              <p className="text-xs text-zinc-500">{t("servers.discord.noChannels")}</p>
             ) : (
               <Select
                 value={config.channelId ?? ""}
                 onValueChange={(v) => onChange({ channelId: v || null })}
               >
                 <SelectTrigger className="w-full max-w-sm">
-                  <SelectValue placeholder={t("servers.discord.selectChannelPlaceholder")} />
+                  <SelectValue placeholder={t("servers.discord.selectChannel")} />
                 </SelectTrigger>
                 <SelectContent>
                   {channels.map((c) => (
@@ -639,8 +631,8 @@ function ChannelConfigCard({
           {showRoleField && (
             <div className="space-y-1.5">
               <Label className="text-xs">
-                Required Discord Role ID{" "}
-                <span className="text-zinc-500 font-normal">(optional — leave blank to allow everyone)</span>
+                {t("servers.discord.roleIdLabel")}{" "}
+                <span className="text-zinc-500 font-normal">{t("servers.discord.roleIdOptional")}</span>
               </Label>
               <input
                 type="text"
@@ -650,8 +642,7 @@ function ChannelConfigCard({
                 onChange={(e) => onChange({ requiredRoleId: e.target.value || null })}
               />
               <p className="text-xs text-zinc-500">
-                Right-click a role in Discord → Copy Role ID. Only members with this role can
-                approve whitelist requests via the button.
+                {t("servers.discord.roleIdHelper")}
               </p>
             </div>
           )}

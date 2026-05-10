@@ -28,6 +28,7 @@ interface Blueprint {
   _id: string;
   name: string;
   maxRam: number;
+  maxCpus?: number;
   status: "available" | "claimed";
   serverId?: string;
 }
@@ -86,9 +87,7 @@ export function BlueprintsList({
       {blueprints.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-zinc-500">
-            {isAdmin
-              ? "Noch keine Blueprints. Erstelle einen, um Servern RAM-Limits zuzuweisen."
-              : "Keine Blueprints verfügbar."}
+            {t("projects.servers.noBlueprints")}
           </CardContent>
         </Card>
       ) : (
@@ -114,7 +113,7 @@ export function BlueprintsList({
                         : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
-                    {bp.status === "available" ? t("projects.blueprints.available") : t("projects.blueprints.claimed")}
+                    {bp.status === "available" ? t("projects.servers.blueprintAvailable") : t("projects.servers.blueprintClaimed")}
                   </span>
                 </div>
               </CardHeader>
@@ -160,6 +159,7 @@ export function BlueprintsList({
           onOpenChange={(o) => { if (!o) setInitTarget(null); }}
           blueprintId={initTarget._id}
           maxRam={initTarget.maxRam}
+          maxCpus={initTarget.maxCpus}
         />
       )}
 

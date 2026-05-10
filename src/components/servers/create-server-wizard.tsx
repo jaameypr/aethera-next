@@ -90,9 +90,11 @@ interface WizardState {
   javaVersion: string;
   // Step 3 — Resources
   memory: number;
+  cpus: number | null;
   port: number;
   portStatus: "idle" | "checking" | "available" | "taken";
   maxRam: number;
+  maxCpus: number | null;
   // Step 4 — Einstellungen
   whitelist: boolean;
   maxPlayers: number;
@@ -119,6 +121,7 @@ type WizardAction =
   | { type: "SET_ERRORS"; errors: Record<string, string> }
   | { type: "SET_PORT_STATUS"; status: WizardState["portStatus"] }
   | { type: "SET_MAX_RAM"; value: number }
+  | { type: "SET_MAX_CPUS"; value: number | null }
   | { type: "SET_JVM_PRESET"; preset: JvmPreset }
   | { type: "SET_JAVA_ARGS"; value: string }
   | { type: "SET_BACKUP"; selection: BackupSelection | null }
@@ -128,7 +131,7 @@ type WizardAction =
   | { type: "SET_PACK_META"; meta: ResolvedPackInfo | null }
   | { type: "SET_PACK_RESOLVING"; value: boolean }
   | { type: "SET_UPLOAD_PROGRESS"; progress: UploadProgress | null }
-  | { type: "RESET"; maxRam?: number };
+  | { type: "RESET"; maxRam?: number; maxCpus?: number | null };
 
 const DEFAULT_JVM_PRESET = JVM_FLAG_PRESETS.find((p) => p.id === "minimal")!;
 
@@ -148,9 +151,11 @@ const INITIAL_STATE: WizardState = {
   javaArgs: DEFAULT_JVM_PRESET?.flags ?? "",
   javaVersion: "21",
   memory: 2048,
+  cpus: null,
   port: 25565,
   portStatus: "idle",
   maxRam: 8192,
+  maxCpus: null,
   whitelist: true,
   maxPlayers: 20,
   difficulty: "normal",
@@ -218,6 +223,12 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
         maxRam: action.value,
         memory: Math.min(state.memory, action.value),
       };
+    case "SET_MAX_CPUS":
+      return {
+        ...state,
+        maxCpus: action.value,
+        cpus: action.value != null && state.cpus != null ? Math.min(state.cpus, action.value) : state.cpus,
+      };
     case "SET_JVM_PRESET": {
       const { preset } = action;
       return {
@@ -249,7 +260,7 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
     case "SET_UPLOAD_PROGRESS":
       return { ...state, uploadProgress: action.progress };
     case "RESET":
-      return { ...INITIAL_STATE, maxRam: action.maxRam ?? INITIAL_STATE.maxRam };
+      return { ...INITIAL_STATE, maxRam: action.maxRam ?? INITIAL_STATE.maxRam, maxCpus: action.maxCpus ?? null };
     default:
       return state;
   }
@@ -580,6 +591,30 @@ function StepResources({
         )}
       </div>
 
+      {state.maxCpus != null && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label>{t("servers.wizard.cpuCores")}</Label>
+            <span className="text-sm font-semibold">
+              {state.cpus != null ? `${state.cpus} vCPU` : t("servers.wizard.cpuCoresNoCap")}
+            </span>
+          </div>
+          <Slider
+            value={[state.cpus ?? 1]}
+            onValueChange={([v]) =>
+              dispatch({ type: "SET_FIELD", field: "cpus", value: v })
+            }
+            min={1}
+            max={state.maxCpus}
+            step={1}
+          />
+          <div className="flex justify-between text-xs text-zinc-500">
+            <span>1 vCPU</span>
+            <span>{state.maxCpus} vCPU</span>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="w-port">Port</Label>
         <div className="relative">
@@ -611,7 +646,7 @@ function StepResources({
                   <AlertCircle className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 cursor-default text-red-500" />
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  {t("servers.create.portTaken")}
+                  {t("servers.wizard.portTaken")}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -619,7 +654,7 @@ function StepResources({
         </div>
         {state.portStatus === "taken" && (
           <p className="text-xs text-red-500">
-            {t("servers.create.portTakenShort")}
+            {t("servers.wizard.portTakenShort")}
           </p>
         )}
         {state.errors.port && (
@@ -881,6 +916,7 @@ interface CreateServerWizardProps {
   onOpenChange: (open: boolean) => void;
   blueprintId?: string;
   maxRam?: number;
+  maxCpus?: number;
 }
 
 export function CreateServerWizard({
@@ -889,6 +925,7 @@ export function CreateServerWizard({
   onOpenChange,
   blueprintId,
   maxRam,
+  maxCpus,
 }: CreateServerWizardProps) {
   const { t } = useLocale();
   const router = useRouter();
@@ -896,6 +933,7 @@ export function CreateServerWizard({
     ...INITIAL_STATE,
     maxRam: maxRam ?? INITIAL_STATE.maxRam,
     memory: Math.min(INITIAL_STATE.memory, maxRam ?? INITIAL_STATE.maxRam),
+    maxCpus: maxCpus ?? null,
   });
   const [isPending, startTransition] = useTransition();
 
@@ -925,8 +963,8 @@ export function CreateServerWizard({
 
   // Reset on close
   useEffect(() => {
-    if (!open) dispatch({ type: "RESET", maxRam: maxRam ?? INITIAL_STATE.maxRam });
-  }, [open, maxRam]);
+    if (!open) dispatch({ type: "RESET", maxRam: maxRam ?? INITIAL_STATE.maxRam, maxCpus: maxCpus ?? null });
+  }, [open, maxRam, maxCpus]);
 
   function validateStep(): boolean {
     const schema = stepSchemas[state.step];
@@ -997,6 +1035,7 @@ export function CreateServerWizard({
           tag: `java${state.javaVersion}`,
           port: state.port,
           memory: state.memory,
+          cpus: state.cpus ?? undefined,
           version: state.packMeta?.mcVersion || state.version || undefined,
           serverType: state.serverType,
           packSource: SERVER_TYPE_MAP[state.serverType].packSource,
