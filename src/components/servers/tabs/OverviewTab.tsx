@@ -133,7 +133,7 @@ export function OverviewTab({ server }: OverviewTabProps) {
       toast.success(successMsg);
       // Polling (started above by the isTransitional effect) takes it from here.
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler");
+      toast.error(err instanceof Error ? err.message : t("servers.overview.actionFailed"));
       setLiveStatus(server.status);
       isRecreating.current = false;
     } finally {
@@ -177,7 +177,7 @@ export function OverviewTab({ server }: OverviewTabProps) {
           )}
         >
           {isTransitional && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-          {t(`servers.status.${liveStatus}`) || liveStatus}
+          {t(`servers.status.${liveStatus}`)}
         </span>
 
         <div className="flex flex-wrap gap-2">
