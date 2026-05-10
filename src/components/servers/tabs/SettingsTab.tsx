@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { JAVA_VERSIONS } from "@/lib/utils/java-version";
+import { useLocale } from "@/context/locale-context";
 import {
   Dialog,
   DialogContent,
@@ -83,6 +84,7 @@ interface SettingsTabProps {
 
 export function SettingsTab({ server, projectKey }: SettingsTabProps) {
   const router = useRouter();
+  const { t } = useLocale();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -135,10 +137,10 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Fehler beim Speichern");
       }
-      toast.success("Einstellungen gespeichert");
+      toast.success(t("servers.settings.saved"));
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler beim Speichern");
+      toast.error(err instanceof Error ? err.message : t("servers.settings.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -153,12 +155,12 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Fehler beim Löschen");
+        throw new Error(body.error ?? t("servers.settings.deleteFailed"));
       }
-      toast.success("Server gelöscht");
+      toast.success(t("servers.settings.deleted"));
       router.push(`/projects/${projectKey}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Fehler beim Löschen");
+      toast.error(err instanceof Error ? err.message : t("servers.settings.deleteFailed"));
       setDeleting(false);
     }
   }
@@ -168,12 +170,12 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
       {/* Hinweis wenn nicht editierbar */}
       {!editable && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
-          Server muss gestoppt sein um Einstellungen zu bearbeiten.
+          {t("servers.settings.mustBeStopped")}
         </div>
       )}
       {server.status === "error" && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
-          Server befindet sich im Fehlerzustand. Einstellungen können bearbeitet und gespeichert werden — danach neu starten.
+          {t("servers.settings.inErrorState")}
         </div>
       )}
 
@@ -181,13 +183,13 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
       <Card>
         <form onSubmit={handleSubmit(onSave)}>
           <CardHeader>
-            <CardTitle className="text-base">Server-Konfiguration</CardTitle>
+            <CardTitle className="text-base">{t("servers.settings.cardTitle")}</CardTitle>
           </CardHeader>
 
           <CardContent className="grid gap-4 sm:grid-cols-2">
             {/* Name */}
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="s-name">Name</Label>
+              <Label htmlFor="s-name">{t("servers.settings.name")}</Label>
               <Input id="s-name" disabled={!editable} {...register("name")} />
               {errors.name && (
                 <p className="text-xs text-red-500">{errors.name.message}</p>
@@ -196,7 +198,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
 
             {/* RAM */}
             <div className="space-y-1">
-              <Label htmlFor="s-memory">RAM (MB)</Label>
+              <Label htmlFor="s-memory">{t("servers.settings.ram")}</Label>
               <Input
                 id="s-memory"
                 type="number"
@@ -210,7 +212,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
 
             {/* Port */}
             <div className="space-y-1">
-              <Label htmlFor="s-port">Port</Label>
+              <Label htmlFor="s-port">{t("servers.settings.port")}</Label>
               <Input
                 id="s-port"
                 type="number"
@@ -224,7 +226,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
 
             {/* Version */}
             <div className="space-y-1">
-              <Label htmlFor="s-version">Version</Label>
+              <Label htmlFor="s-version">{t("servers.settings.version")}</Label>
               <Input
                 id="s-version"
                 placeholder="latest"
@@ -235,7 +237,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
 
             {/* Java-Version */}
             <div className="space-y-1">
-              <Label>Java-Version</Label>
+              <Label>{t("servers.settings.javaVersion")}</Label>
               <Select value={javaVersion} onValueChange={setJavaVersion} disabled={!editable}>
                 <SelectTrigger>
                   <SelectValue />
@@ -252,7 +254,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
 
             {/* ModLoader */}
             <div className="space-y-1">
-              <Label>Mod-Loader</Label>
+              <Label>{t("servers.settings.modLoader")}</Label>
               <Controller
                 name="modLoader"
                 control={control}
@@ -279,10 +281,10 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
 
             {/* Java Args */}
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="s-javaArgs">Java Argumente</Label>
+              <Label htmlFor="s-javaArgs">{t("servers.settings.javaArgs")}</Label>
               <Input
                 id="s-javaArgs"
-                placeholder="-XX:+UseG1GC"
+                placeholder={t("servers.settings.javaArgsPlaceholder")}
                 className="font-mono"
                 disabled={!editable}
                 {...register("javaArgs")}
@@ -303,14 +305,14 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                   />
                 )}
               />
-              <Label htmlFor="s-autoStart">Automatisch starten</Label>
+              <Label htmlFor="s-autoStart">{t("servers.settings.autoStart")}</Label>
             </div>
           </CardContent>
 
           <CardFooter>
             <Button type="submit" disabled={saving || !editable}>
               <Save className="mr-1.5 h-4 w-4" />
-              {saving ? "Speichere…" : "Speichern"}
+              {saving ? t("servers.settings.saving") : t("servers.settings.save")}
             </Button>
           </CardFooter>
         </form>
@@ -321,11 +323,10 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-red-600 dark:text-red-400">
             <AlertTriangle className="h-4 w-4" />
-            Gefahrenzone
+            {t("servers.settings.dangerZone")}
           </CardTitle>
           <CardDescription>
-            Löscht den Server, Container und alle zugehörigen Daten
-            unwiderruflich.
+            {t("servers.settings.dangerZoneDesc")}
           </CardDescription>
         </CardHeader>
         <CardFooter>
@@ -339,15 +340,15 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
             <DialogTrigger asChild>
               <Button variant="destructive">
                 <Trash2 className="mr-1.5 h-4 w-4" />
-                Server löschen
+                {t("servers.settings.deleteServer")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Server löschen</DialogTitle>
+                <DialogTitle>{t("servers.settings.deleteTitle")}</DialogTitle>
                 <DialogDescription asChild>
                   <div className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    <p>Gib den Servernamen ein um den Server unwiderruflich zu löschen.</p>
+                    <p>{t("servers.settings.deleteDesc")}</p>
                     <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 dark:border-zinc-700 dark:bg-zinc-900">
                       <span className="flex-1 font-mono text-xs text-zinc-700 dark:text-zinc-300">{server.name}</span>
                       <button
@@ -355,7 +356,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                         className="shrink-0 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                         onClick={() => { navigator.clipboard.writeText(server.name); setDeleteConfirm(server.name); }}
                       >
-                        Kopieren & einfügen
+                        {t("servers.settings.copyPaste")}
                       </button>
                     </div>
                   </div>
@@ -379,14 +380,14 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                   onClick={() => setDeleteOpen(false)}
                   disabled={deleting}
                 >
-                  Abbrechen
+                  {t("servers.settings.cancel")}
                 </Button>
                 <Button
                   variant="destructive"
                   disabled={deleting || deleteConfirm.trim() !== server.name.trim() || deleteConfirm.length === 0}
                   onClick={handleDelete}
                 >
-                  {deleting ? "Lösche…" : "Endgültig löschen"}
+                  {deleting ? t("servers.settings.deleting") : t("servers.settings.deleteFinal")}
                 </Button>
               </DialogFooter>
             </DialogContent>
