@@ -4,17 +4,17 @@ set -euo pipefail
 # ─────────────────────────────────────────────
 # Aethera — Cloudflare Tunnel Setup (optional bolt-on)
 #
-# Bindet cloudflared NACHTRÄGLICH ein, schließt den Panel-UI-Port
-# auf dem Host und routet das Panel über einen Cloudflare Named
-# Tunnel (HTTPS). run.sh merkt sich die Topologie via .aethera.profile,
-# sodass spätere up/rebuild/restart sie beibehalten.
+# Bolts cloudflared on AFTER THE FACT: closes the panel UI port on the
+# host and routes the panel through a Cloudflare Named Tunnel (HTTPS).
+# run.sh remembers the topology via .aethera.profile, so later
+# up/rebuild/restart keep it.
 #
-# Einrichten : ./cloudflared-setup.sh
-# Rückbau    : ./cloudflared-setup.sh --remove
+# Set up    : ./cloudflared-setup.sh
+# Tear down : ./cloudflared-setup.sh --remove
 #
-# WICHTIG: Der Tunnel trägt NUR den HTTP-Panel-Port. Game-Server-Ports
-# (TCP 25565 etc.) bleiben unverändert auf dem Host published — Spieler
-# verbinden weiterhin direkt zu Host:<port>.
+# IMPORTANT: The tunnel only carries the HTTP panel port. Game-server
+# ports (TCP 25565 etc.) stay published on the host unchanged — players
+# still connect directly to Host:<port>.
 # ─────────────────────────────────────────────
 
 COMPOSE_FILE="docker-compose.yml"
@@ -39,7 +39,7 @@ set_env() {
   fi
 }
 
-# ── --remove: Rückbau ─────────────────────────
+# ── --remove: tear down ───────────────────────
 if [ "${1:-}" = "--remove" ]; then
   warn "Removing Cloudflare tunnel and reopening the panel port..."
   if [ -f "$TUNNEL_FILE" ]; then
