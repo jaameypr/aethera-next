@@ -47,6 +47,10 @@ next-env.d.ts
 # aethera local data
 .aethera/
 
+# aethera generated topology (cloudflared-setup.sh)
+.aethera.profile
+docker-compose.tunnel.yml
+
 # claude ai
 .claude/
 

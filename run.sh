@@ -62,6 +62,13 @@ fi
 
 source .env 2>/dev/null || true
 
+# ── Compose topology (managed by cloudflared-setup.sh) ──
+# .aethera.profile may define COMPOSE_FILES / COMPOSE_PROFILES to layer in
+# docker-compose.tunnel.yml. Absent = default single-file published topology.
+[ -f .aethera.profile ] && source .aethera.profile
+COMPOSE_FILES="${COMPOSE_FILES:--f $COMPOSE_FILE}"
+export COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
+
 DATA_DIR="${AETHERA_DATA_DIR:-./.aethera/run}"
 BACKUP_DIR="${AETHERA_BACKUP_DIR:-./.aethera/backup}"
 UPLOAD_DIR="${AETHERA_WORLD_UPLOAD_DIR:-./.aethera/world_upload}"
@@ -77,25 +84,25 @@ shift || true
 case "$CMD" in
   up|start)
     info "Starting Aethera (app + mongo)..."
-    docker compose -f "$COMPOSE_FILE" up -d --build
+    docker compose $COMPOSE_FILES up -d --build
     echo ""
     info "✅  Aethera is running at http://localhost:${APP_PORT:-3000}"
     ;;
 
   down|stop)
     info "Stopping Aethera..."
-    docker compose -f "$COMPOSE_FILE" down
+    docker compose $COMPOSE_FILES down
     info "Stopped."
     ;;
 
   restart)
     info "Restarting Aethera..."
-    docker compose -f "$COMPOSE_FILE" restart
+    docker compose $COMPOSE_FILES restart
     info "Restarted."
     ;;
 
   logs)
-    docker compose -f "$COMPOSE_FILE" logs -f --tail=100
+    docker compose $COMPOSE_FILES logs -f --tail=100
     ;;
 
   rebuild)
@@ -132,7 +139,7 @@ case "$CMD" in
     fi
 
     info "Rebuilding and restarting app (keeping database intact)..."
-    docker compose -f "$COMPOSE_FILE" up -d --build --force-recreate app
+    docker compose $COMPOSE_FILES up -d --build --force-recreate app
     info "✅  Rebuilt and running."
     ;;
 
@@ -164,15 +171,15 @@ case "$CMD" in
     ;;
 
   status)
-    docker compose -f "$COMPOSE_FILE" ps
+    docker compose $COMPOSE_FILES ps
     ;;
 
   seed)
     info "Running seed script..."
-    docker compose -f "$COMPOSE_FILE" exec app node -e "
+    docker compose $COMPOSE_FILES exec app node -e "
       import('./scripts/seed.mjs').catch(console.error)
     " 2>/dev/null || \
-    docker compose -f "$COMPOSE_FILE" exec app npx tsx scripts/seed.ts
+    docker compose $COMPOSE_FILES exec app npx tsx scripts/seed.ts
     ;;
 
   *)

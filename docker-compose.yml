@@ -4,7 +4,9 @@ services:
     container_name: aethera-app
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # APP_BIND lets cloudflared-setup.sh switch the panel to loopback-only
+      # (127.0.0.1) when '!reset' is unavailable. Default 0.0.0.0 = published.
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
     env_file: .env
     environment:
       - MONGODB_URI=mongodb://${MONGO_USER:-aethera}:${MONGO_PASS}@mongo:27017/aethera?authSource=admin
