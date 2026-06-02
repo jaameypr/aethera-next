@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 let projectService: typeof import("@/lib/services/project.service");
 let ProjectModel: typeof import("@/lib/db/models/project").ProjectModel;
 let ProjectLogModel: typeof import("@/lib/db/models/project-log").ProjectLogModel;
+let UserModel: typeof import("@/lib/db/models/user").UserModel;
 
 let mongo: MongoMemoryServer;
 const ACTOR_ID = new mongoose.Types.ObjectId().toString();
@@ -30,6 +31,27 @@ beforeAll(async () => {
   ProjectModel = projectModels.ProjectModel;
   const logModels = await import("@/lib/db/models/project-log");
   ProjectLogModel = logModels.ProjectLogModel;
+  const userModels = await import("@/lib/db/models/user");
+  UserModel = userModels.UserModel;
+
+  // createProject requires the owner to exist and to hold permission to create
+  // projects — seed the owner users used throughout these tests.
+  await UserModel.create([
+    {
+      _id: new mongoose.Types.ObjectId(ACTOR_ID),
+      username: "actor",
+      email: "actor@test.local",
+      passwordHash: "x",
+      permissions: [{ name: "*", allow: true }],
+    },
+    {
+      _id: new mongoose.Types.ObjectId(OTHER_USER),
+      username: "other",
+      email: "other@test.local",
+      passwordHash: "x",
+      permissions: [{ name: "*", allow: true }],
+    },
+  ]);
 });
 
 afterAll(async () => {

@@ -24,8 +24,8 @@ import { containerName, serverEnvFromDoc } from "@/lib/docker/helpers";
 
 describe("containerName", () => {
   it("prefixes minecraft servers with aethera-mc-", () => {
-    const server = { runtime: "minecraft", identifier: "survival" } as Parameters<typeof containerName>[0];
-    expect(containerName(server)).toBe("aethera-mc-survival");
+    const server = { runtime: "minecraft", projectKey: "proj", identifier: "survival" } as Parameters<typeof containerName>[0];
+    expect(containerName(server)).toBe("aethera-mc-proj-survival");
   });
 });
 

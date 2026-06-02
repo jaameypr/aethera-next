@@ -13,6 +13,28 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Tests: mocks and fixtures legitimately use `any` and partial stubs.
+  {
+    files: ["**/__tests__/**", "**/*.test.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  // Standalone Node worker scripts are CommonJS by design (spawned via node).
+  {
+    files: ["scripts/**/*.{js,cjs}"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  // set-state-in-effect is a performance hint, not a correctness rule —
+  // keep it as a warning so it does not gate CI.
+  {
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;

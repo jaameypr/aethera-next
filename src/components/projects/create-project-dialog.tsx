@@ -24,8 +24,6 @@ import { useLocale } from "@/context/locale-context";
 type FormValues = { name: string; key: string };
 
 export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean } = {}) {
-  if (!canCreate) return null;
-
   const [open, setOpen] = useState(false);
   const { t } = useLocale();
 
@@ -77,6 +75,9 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
       toast.error(err instanceof Error ? err.message : t("common.error"));
     }
   }
+
+  // Hooks must run unconditionally; gate rendering after they are declared.
+  if (!canCreate) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

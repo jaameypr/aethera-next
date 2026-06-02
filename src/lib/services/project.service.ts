@@ -153,14 +153,15 @@ export async function createProject(data: {
   if (!user) throw new Error("User not found");
 
   const roleDocs = await RoleModel.find({ name: { $in: user.roles } }).lean();
-  const allPermissions = [
-    ...roleDocs.flatMap((r: any) => r.permissions || []),
-    ...(user.permissions || []),
+  type PermLike = { name: string; allow?: boolean; value?: string | number | null };
+  const allPermissions: PermLike[] = [
+    ...roleDocs.flatMap((r) => (r as { permissions?: PermLike[] }).permissions ?? []),
+    ...((user.permissions ?? []) as unknown as PermLike[]),
   ];
 
-  const hasWildcard = allPermissions.some((p: any) => p.name === "*" && p.allow !== false);
+  const hasWildcard = allPermissions.some((p) => p.name === "*" && p.allow !== false);
   if (!hasWildcard) {
-    const createPerm = allPermissions.find((p: any) => p.name === "projects.create" && p.allow !== false);
+    const createPerm = allPermissions.find((p) => p.name === "projects.create" && p.allow !== false);
     if (!createPerm) {
       throw new Error("Keine Berechtigung zum Erstellen von Projekten");
     }

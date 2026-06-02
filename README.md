@@ -120,21 +120,66 @@ Pack-driven servers resolve Minecraft version, loader, and loader version automa
 ## Deployment
 
 ### Prerequisites
-- Docker & Docker Compose
+- Docker & Docker Compose v2
 - A host where the panel container can reach the Docker socket
 
-### Quick Start
+### Quick Start (one command)
+
+The fastest way to get a panel running from the pre-built image — no clone, no source build:
 
 ```bash
-# 1. Copy and fill in the environment file
+curl -fsSL https://raw.githubusercontent.com/jaameypr/aethera-next/master/install.sh | bash
+```
+
+The installer will:
+- Verify Docker and Docker Compose v2 are present
+- Create a target directory (`./aethera` by default — override with `AETHERA_DIR`)
+- Download `docker-compose.prod.yml` and `.env.example` into it
+- Generate a fresh `.env` with random `JWT_SECRET` and `MONGO_PASS`
+- Create the data directories, pull the image, and start the stack
+
+When it finishes, open `http://localhost:3000` (or `APP_PORT` if overridden) and complete the `/setup` wizard. **Set `ADMIN_PASSWORD` in `.env` (or use the setup wizard) before exposing the panel.**
+
+To install a specific channel, set `AETHERA_TAG` on the `bash` that runs the installer (defaults to `latest`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaameypr/aethera-next/master/install.sh | AETHERA_TAG=0.2.0 bash
+```
+
+### Manual install (pre-built image)
+
+Prefer to drive Compose yourself? Pull the published image and use the production compose file:
+
+```bash
+# 1. Download the production compose file and the env template
+curl -fsSLO https://raw.githubusercontent.com/jaameypr/aethera-next/master/docker-compose.prod.yml
+curl -fsSLO https://raw.githubusercontent.com/jaameypr/aethera-next/master/.env.example
+
+# 2. Create your env file and fill in secrets
 cp .env.example .env
+openssl rand -hex 16   # → MONGO_PASS
+openssl rand -hex 32   # → JWT_SECRET
 
-# 2. Generate secrets (example using openssl)
-openssl rand -hex 32   # → MONGO_PASS
-openssl rand -hex 64   # → JWT_SECRET
+# 3. (Optional) Pull the image up front
+docker pull ghcr.io/jaameypr/aethera-next:latest
 
-# 3. Start the stack
-docker compose up -d
+# 4. Start the stack
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+The image is published to the GitHub Container Registry as `ghcr.io/jaameypr/aethera-next`. Available tags:
+
+| Tag | Channel | Description |
+|-----|---------|-------------|
+| `latest` | Stable | Most recent tagged release (also tagged `0.2.0`, `0.2`, …) |
+| `edge` | Master | Latest build from the `master` branch |
+| `experimental` | Experimental | Latest build from the `experimental` branch (also `experimental-<sha>`) |
+
+Select a tag via the `AETHERA_TAG` environment variable, which `docker-compose.prod.yml` reads (defaults to `latest`):
+
+```bash
+AETHERA_TAG=edge docker compose -f docker-compose.prod.yml up -d
 ```
 
 The panel is available at `http://<host>:3000` (or `APP_PORT` if overridden).  
@@ -158,6 +203,15 @@ See `.env.example` for the full list.
 ---
 
 ## Development
+
+Build and run from source — this path uses the existing `docker-compose.yml` (which builds the image locally) via `run.sh`:
+
+```bash
+# Clone the repo, then build and start the stack from source
+./run.sh up      # builds the image and starts app + mongo
+```
+
+Or run the Next.js app directly without Docker:
 
 ```bash
 npm install

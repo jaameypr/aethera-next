@@ -1,6 +1,7 @@
+# Pull-based production compose: uses the pre-built GHCR image instead of building from source.
 services:
   app:
-    build: .
+    image: ghcr.io/jaameypr/aethera-next:${AETHERA_TAG:-latest}
     container_name: aethera-app
     restart: unless-stopped
     ports:

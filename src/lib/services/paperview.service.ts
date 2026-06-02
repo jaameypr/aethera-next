@@ -242,7 +242,9 @@ export async function downloadFromPaperviewToFile(
     destDir,
     `download-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
-  const nodeStream = Readable.fromWeb(res.body as any);
+  const nodeStream = Readable.fromWeb(
+    res.body as unknown as Parameters<typeof Readable.fromWeb>[0],
+  );
   await pipeline(nodeStream, createWriteStream(tempPath));
 
   return { tempPath, filename };

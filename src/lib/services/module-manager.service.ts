@@ -660,6 +660,7 @@ async function deployDockerModule(
       ? parseMemoryLimit(docker.resources.memoryLimit)
       : undefined;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dockerode raw createContainer API is loosely typed
     const container = await (dockerClient as any).createContainer({
       name: containerNameStr,
       Image: fullImageRef,
@@ -800,6 +801,7 @@ async function buildImageFromRepo(
   // Verify image exists
   const docker = await getDockerClient();
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dockerode getImage is loosely typed
     const img = (docker as any).getImage(fullTag);
     await img.inspect();
     console.log(`[module-manager] Image ${fullTag} verified`);
@@ -864,8 +866,7 @@ function buildEnvConfig(
 
     // Auto-generate a secure random value for secret fields left empty
     if (!value && def.secret) {
-      const { randomBytes } = require("crypto");
-      value = randomBytes(24).toString("base64url");
+      value = crypto.randomBytes(24).toString("base64url");
       console.log(`[module-manager] Auto-generated secret for ${def.key}`);
     }
 
