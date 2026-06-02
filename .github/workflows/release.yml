@@ -34,10 +34,14 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/jaameypr/aethera-next
+          # latest=auto -> 'latest' only for stable (non-prerelease) tags;
+          # the action also skips {{major}}.{{minor}} for prerelease tags,
+          # so v0.1.0-experimental.1 publishes ONLY :0.1.0-experimental.1.
+          flavor: |
+            latest=auto
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
 
       - name: Build and push multi-arch image
         uses: docker/build-push-action@v6
@@ -52,6 +56,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # Tags carrying a prerelease identifier (e.g. v0.1.0-experimental.1)
+          # are published as GitHub pre-releases; clean vX.Y.Z stays stable.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             docker-compose.prod.yml
             .env.example
