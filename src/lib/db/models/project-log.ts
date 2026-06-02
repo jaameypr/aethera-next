@@ -26,7 +26,7 @@ export interface IProjectLog extends Document {
   projectKey: string;
   action: ProjectLogAction;
   actor: mongoose.Types.ObjectId;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   createdAt: Date;
 }
 

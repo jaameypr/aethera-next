@@ -16,7 +16,7 @@ export const GET = withAuth(async (_req: NextRequest, { session, params }) => {
 
     // Never expose env or properties — those may contain secrets and are
     // served through dedicated endpoints that enforce server.settings permission.
-    const { env: _env, properties: _props, ...safe } = server as any;
+    const { env: _env, properties: _props, ...safe } = server as unknown as Record<string, unknown>;
     return Response.json(safe);
   } catch (error) {
     return errorResponse(error);

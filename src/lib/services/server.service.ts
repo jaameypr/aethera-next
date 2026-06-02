@@ -291,9 +291,9 @@ async function _executeStartServer(
           containerId: server.containerId,
         });
         return { containerId: server.containerId };
-      } catch (containerErr: any) {
-        const statusCode =
-          containerErr?.statusCode ?? containerErr?.cause?.statusCode ?? 0;
+      } catch (containerErr: unknown) {
+        const e = containerErr as { statusCode?: number; cause?: { statusCode?: number } };
+        const statusCode = e?.statusCode ?? e?.cause?.statusCode ?? 0;
         if (statusCode === 404) {
           await ServerModel.findByIdAndUpdate(serverId, { containerId: null });
         } else {
@@ -311,8 +311,9 @@ async function _executeStartServer(
     let result;
     try {
       result = await orch.deploy(config);
-    } catch (deployErr: any) {
-      const msg = deployErr?.cause?.json?.message ?? deployErr?.message ?? "";
+    } catch (deployErr: unknown) {
+      const e = deployErr as { cause?: { json?: { message?: string } }; message?: string };
+      const msg = e?.cause?.json?.message ?? e?.message ?? "";
       if (msg.includes("is already in use")) {
         console.log(`[server] Removing stale container ${config.name} and retrying deploy`);
         const docker = await getDockerClient();

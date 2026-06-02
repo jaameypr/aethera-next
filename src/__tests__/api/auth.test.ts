@@ -49,11 +49,7 @@ beforeEach(async () => {
 describe("GET /api/setup", () => {
   it("reports needsSetup=true when no users exist", async () => {
     const { GET } = await import("@/app/api/setup/route");
-    const req = new Request("http://localhost:3000/api/setup", {
-      method: "GET",
-    });
-
-    const res = await GET(req as any);
+    const res = await GET();
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -69,11 +65,7 @@ describe("GET /api/setup", () => {
     });
 
     const { GET } = await import("@/app/api/setup/route");
-    const req = new Request("http://localhost:3000/api/setup", {
-      method: "GET",
-    });
-
-    const res = await GET(req as any);
+    const res = await GET();
     const body = await res.json();
 
     expect(res.status).toBe(200);
