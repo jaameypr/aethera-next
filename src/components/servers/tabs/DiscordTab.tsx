@@ -17,6 +17,7 @@ import {
   Save,
   Trash2,
   Activity,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,7 +46,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { copyToClipboard } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -357,6 +358,12 @@ export function DiscordTab({ serverId }: Props) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Label>{t("servers.discord.linkedServer")}</Label>
+              {config.guildId && (
+                <Badge variant="outline" className="gap-1 border-brand/40 text-brand">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {config.guildName ?? t("servers.discord.linkedServer")}
+                </Badge>
+              )}
               <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => loadData()}>
                 <RefreshCw className="h-3 w-3 mr-1" />
                 {t("servers.discord.refresh")}
@@ -479,7 +486,7 @@ export function DiscordTab({ serverId }: Props) {
               <CardContent>
                 <div className="space-y-2">
                   {requests.map((r) => (
-                    <div key={r.id} className="flex items-center gap-3 p-2 rounded border border-zinc-800 bg-zinc-900/50">
+                    <div key={r.id} className="flex items-center gap-3 p-2 rounded border border-zinc-800 bg-zinc-900/50 transition-colors hover:bg-zinc-900">
                       {r.skinUrl && (
                         <img src={r.skinUrl} alt={r.playerName} className="w-8 h-8 rounded" />
                       )}
@@ -582,9 +589,18 @@ function ChannelConfigCard({
           <span className="flex items-center gap-2">
             {icon}
             {title}
+            {config.enabled && config.channelId && (
+              <CheckCircle2 className="h-3.5 w-3.5 text-brand" aria-hidden />
+            )}
           </span>
           <div className="flex items-center gap-2">
-            <Label htmlFor={`toggle-${title}`} className="text-xs text-zinc-400 font-normal">
+            <Label
+              htmlFor={`toggle-${title}`}
+              className={cn(
+                "text-xs font-normal transition-colors",
+                config.enabled ? "text-brand" : "text-muted-foreground",
+              )}
+            >
               {config.enabled ? t("servers.discord.enabledLabel") : t("servers.discord.disabledLabel")}
             </Label>
             <Switch
@@ -598,7 +614,7 @@ function ChannelConfigCard({
       </CardHeader>
 
       {config.enabled && (
-        <CardContent className="space-y-3">
+        <CardContent className="animate-slide-up space-y-3">
           {warning}
 
           <div className="space-y-1.5">

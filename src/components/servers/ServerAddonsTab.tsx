@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
-import { Upload, Trash2, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
+import { Upload, Trash2, ToggleLeft, ToggleRight, Loader2, Package, PackageOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -158,35 +160,57 @@ function AddonSection({
         </label>
       </CardHeader>
       {isUploading && (
-        <div className="mx-6 mb-3 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+        <div className="mx-6 mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-200"
+            className="h-full rounded-full bg-brand transition-all duration-200 ease-out"
             style={{ width: `${uploadProgress}%` }}
           />
         </div>
       )}
       <CardContent>
         {loading ? (
-          <p className="text-sm text-zinc-500">{t("servers.addons.loading")}</p>
+          <div className="space-y-3">
+            <span className="sr-only">{t("servers.addons.loading")}</span>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between py-1">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+            ))}
+          </div>
         ) : items.length === 0 ? (
-          <p className="text-sm text-zinc-500">{t("servers.addons.empty", { label })}</p>
+          <EmptyState
+            icon={<Package className="h-6 w-6" />}
+            title={t("servers.addons.empty", { label })}
+            className="px-4 py-8"
+          />
         ) : (
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <ul className="divide-y divide-border">
             {items.map((item) => (
               <li
                 key={item.filename}
-                className="flex items-center justify-between py-2"
+                className="-mx-2 flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-accent/60"
               >
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      "truncate text-sm font-medium",
-                      !item.enabled && "text-zinc-400 line-through",
-                    )}
-                  >
-                    {item.filename}
-                  </p>
-                  <p className="text-xs text-zinc-500">{formatSize(item.size)}</p>
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  {item.enabled ? (
+                    <PackageOpen className="h-4 w-4 shrink-0 text-brand" />
+                  ) : (
+                    <Package className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cn(
+                        "truncate text-sm font-medium transition-colors",
+                        !item.enabled && "text-muted-foreground line-through",
+                      )}
+                    >
+                      {item.filename}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{formatSize(item.size)}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   {supportsToggle && (
@@ -198,9 +222,9 @@ function AddonSection({
                       title={item.enabled ? t("servers.addons.disableTitle") : t("servers.addons.enableTitle")}
                     >
                       {item.enabled ? (
-                        <ToggleRight className="h-4 w-4 text-emerald-500" />
+                        <ToggleRight className="h-4 w-4 text-brand transition-transform active:scale-90" />
                       ) : (
-                        <ToggleLeft className="h-4 w-4 text-zinc-400" />
+                        <ToggleLeft className="h-4 w-4 text-muted-foreground transition-transform active:scale-90" />
                       )}
                     </Button>
                   )}
@@ -210,7 +234,7 @@ function AddonSection({
                     disabled={isPending}
                     onClick={() => handleDelete(item.filename)}
                   >
-                    <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
+                    <Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
                   </Button>
                 </div>
               </li>
