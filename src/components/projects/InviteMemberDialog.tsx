@@ -147,7 +147,7 @@ export function InviteMemberDialog({
           {/* User search */}
           <div className="space-y-1.5">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
                 placeholder={t("projects.invite.searchPlaceholder")}
@@ -157,20 +157,20 @@ export function InviteMemberDialog({
                 autoComplete="off"
               />
               {searching && (
-                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-400" />
+                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
               )}
             </div>
 
             {showDropdown && results.length > 0 && (
-              <div className="rounded-md border border-zinc-200 bg-white shadow-md dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="animate-slide-up overflow-hidden rounded-md border border-border bg-popover shadow-z2">
                 {results.map((u) => (
                   <button
                     key={u._id}
                     type="button"
                     onClick={() => handleSelect(u)}
-                    className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    className="flex w-full items-center gap-3 px-3 py-2 text-sm transition-colors hover:bg-accent"
                   >
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold uppercase dark:bg-zinc-700">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-xs font-semibold uppercase text-secondary-foreground">
                       {u.username[0]}
                     </div>
                     {u.username}
@@ -180,13 +180,13 @@ export function InviteMemberDialog({
             )}
 
             {showDropdown && !searching && query && results.length === 0 && (
-              <p className="text-xs text-zinc-400 px-1">{t("projects.invite.noUsersFound")}</p>
+              <p className="text-xs text-muted-foreground px-1">{t("projects.invite.noUsersFound")}</p>
             )}
           </div>
 
           {/* Role cards */}
           <div className="space-y-1.5">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <p className="text-sm font-medium text-foreground/80">
               {t("projects.invite.roleLabel")}
             </p>
             <div className="space-y-2">
@@ -199,21 +199,21 @@ export function InviteMemberDialog({
                     type="button"
                     onClick={() => setRole(r.value)}
                     className={`w-full rounded-lg border-2 p-3 text-left transition-all ${
-                      active ? `${r.bg} ${r.border}` : "border-transparent bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      active ? `${r.bg} ${r.border}` : "border-transparent bg-secondary/50 hover:bg-secondary"
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${active ? r.color : "text-zinc-400"}`} />
-                        <span className={`text-sm font-semibold ${active ? r.color : "text-zinc-700 dark:text-zinc-300"}`}>
+                        <Icon className={`h-4 w-4 ${active ? r.color : "text-muted-foreground"}`} />
+                        <span className={`text-sm font-semibold ${active ? r.color : "text-foreground/80"}`}>
                           {r.label}
                         </span>
-                        <span className="text-xs text-zinc-400">{r.description}</span>
+                        <span className="text-xs text-muted-foreground">{r.description}</span>
                       </div>
                       {active && <Check className={`h-4 w-4 ${r.color}`} />}
                     </div>
                     {active && (
-                      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                      <ul className="mt-2 flex animate-slide-up flex-wrap gap-x-3 gap-y-1">
                         {r.perms.map((p) => (
                           <li key={p} className={`text-xs ${r.color} opacity-80`}>
                             · {p}

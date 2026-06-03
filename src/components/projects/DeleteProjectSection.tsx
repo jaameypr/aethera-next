@@ -57,16 +57,16 @@ export function DeleteProjectSection({
   }
 
   return (
-    <div className="rounded-lg border border-red-200 dark:border-red-900/50 p-4">
+    <div className="animate-fade-in rounded-lg border border-destructive/30 bg-destructive-muted/30 p-4">
       <div className="flex items-start gap-3">
-        <div className="rounded-md bg-red-100 p-2 dark:bg-red-950/50">
-          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+        <div className="rounded-md bg-destructive-muted p-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-red-700 dark:text-red-400">
+          <h3 className="text-sm font-semibold text-destructive">
             {t("projects.delete.sectionTitle")}
           </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {canDelete
               ? t("projects.delete.sectionDesc")
               : t("projects.delete.sectionDescBlocked", { count: serverCount })}
@@ -80,7 +80,7 @@ export function DeleteProjectSection({
             setConfirmation("");
             setOpen(true);
           }}
-          className="shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
+          className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive-muted hover:text-destructive"
         >
           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
           {t("projects.delete.deleteBtn")}
@@ -90,7 +90,7 @@ export function DeleteProjectSection({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
               {t("projects.delete.confirmTitle")}
             </DialogTitle>
@@ -100,8 +100,8 @@ export function DeleteProjectSection({
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 px-3 py-2">
-              <p className="text-xs text-red-700 dark:text-red-400">
+            <div className="rounded-lg border border-destructive/30 bg-destructive-muted px-3 py-2">
+              <p className="text-xs text-destructive">
                 {t("projects.delete.confirmHint")}{" "}
                 <span className="font-mono font-semibold">{projectName}</span>
               </p>

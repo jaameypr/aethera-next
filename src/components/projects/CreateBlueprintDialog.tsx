@@ -107,7 +107,7 @@ export function CreateBlueprintDialog({
               autoFocus
             />
             {errors.name && (
-              <p className="text-xs text-red-500">{errors.name}</p>
+              <p className="text-xs text-destructive">{errors.name}</p>
             )}
           </div>
 
@@ -123,12 +123,12 @@ export function CreateBlueprintDialog({
               max={32768}
               step={256}
             />
-            <div className="flex justify-between text-xs text-zinc-500">
+            <div className="flex justify-between text-xs text-muted-foreground">
               <span>512 MB</span>
               <span>32 GB</span>
             </div>
             {errors.maxRam && (
-              <p className="text-xs text-red-500">{errors.maxRam}</p>
+              <p className="text-xs text-destructive">{errors.maxRam}</p>
             )}
           </div>
 
