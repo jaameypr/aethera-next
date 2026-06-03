@@ -7,16 +7,23 @@ import {
   Folder,
   FolderOpen,
   File,
+  FileCode,
+  FileText,
+  FileJson,
+  FileArchive,
+  FileImage,
+  FileCog,
   Trash2,
   Upload,
   ChevronRight,
-  ChevronDown,
   Download,
   Search,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -52,6 +59,58 @@ const DRAG_TYPE = "application/x-aethera-path";
 /** Encode each path segment but keep slashes as separators */
 function encodePath(p: string): string {
   return p.split("/").map(encodeURIComponent).join("/");
+}
+
+/** Pick a lucide icon that matches the file extension for quicker scanning. */
+function FileTypeIcon({ name, className }: { name: string; className?: string }) {
+  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "";
+  const Icon = (() => {
+    switch (ext) {
+      case "json":
+      case "json5":
+        return FileJson;
+      case "yml":
+      case "yaml":
+      case "toml":
+      case "properties":
+      case "conf":
+      case "cfg":
+      case "ini":
+      case "env":
+        return FileCog;
+      case "js":
+      case "ts":
+      case "mjs":
+      case "cjs":
+      case "sh":
+      case "bat":
+      case "java":
+      case "py":
+      case "lua":
+        return FileCode;
+      case "zip":
+      case "jar":
+      case "gz":
+      case "tar":
+      case "rar":
+      case "7z":
+        return FileArchive;
+      case "png":
+      case "jpg":
+      case "jpeg":
+      case "gif":
+      case "webp":
+      case "svg":
+        return FileImage;
+      case "txt":
+      case "md":
+      case "log":
+        return FileText;
+      default:
+        return File;
+    }
+  })();
+  return <Icon className={className} />;
 }
 
 export function ServerFilesTab({ serverId }: { serverId: string }) {
@@ -254,7 +313,25 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-500">{t("servers.files.loading")}</p>;
+    return (
+      <div className="flex h-[600px] gap-4">
+        <div className="w-72 shrink-0 space-y-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2"
+              style={{ paddingLeft: `${(i % 3) * 14}px` }}
+            >
+              <Skeleton className="h-3.5 w-3.5 shrink-0 rounded" />
+              <Skeleton className="h-3.5" style={{ width: `${50 + ((i * 13) % 40)}%` }} />
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-1 items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-800">
+          <span className="sr-only">{t("servers.files.loading")}</span>
+        </div>
+      </div>
+    );
   }
 
   const dialogTitle =
@@ -302,8 +379,8 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
       {/* Tree panel */}
       <div
         className={cn(
-          "w-72 shrink-0 overflow-y-auto rounded-md border border-zinc-200 dark:border-zinc-800",
-          dragOverPath === "" && "ring-2 ring-blue-500 dark:ring-blue-400",
+          "w-72 shrink-0 overflow-y-auto rounded-md border border-border transition-[box-shadow,transform] duration-200 ease-out",
+          dragOverPath === "" && "scale-[1.01] shadow-glow-brand ring-2 ring-brand",
         )}
         onDragOver={(e) => {
           e.preventDefault();
@@ -381,12 +458,20 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
             /* ── Normal tree view ── */
             <>
               {dragOverPath === "" && (
-                <div className="pointer-events-none mb-1 rounded border-2 border-dashed border-blue-400 px-2 py-2 text-center text-xs text-blue-400">
+                <div className="animate-fade-in pointer-events-none mb-1 flex items-center justify-center gap-1.5 rounded border-2 border-dashed border-brand px-2 py-2 text-center text-xs font-medium text-brand">
+                  <Upload className="h-3.5 w-3.5" />
                   {t("servers.files.dropHere")}
                 </div>
               )}
               {tree.length === 0 && dragOverPath !== "" && (
-                <p className="px-2 py-4 text-center text-xs text-zinc-400">{t("servers.files.noFiles")}</p>
+                <div className="px-1 py-6">
+                  <EmptyState
+                    icon={<Folder className="h-6 w-6" />}
+                    title={t("servers.files.noFiles")}
+                    description={t("servers.files.dropHere")}
+                    className="px-3 py-8"
+                  />
+                </div>
               )}
               {tree.map((node) => (
                 <TreeNode
@@ -412,11 +497,23 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
       <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
         {selectedFile ? (
           <>
-            <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-              <span className="truncate font-mono text-xs text-zinc-500">
-                {selectedFile}
-              </span>
-              <Button size="sm" onClick={handleSave} disabled={isPending}>
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <nav className="flex min-w-0 items-center gap-0.5 font-mono text-xs text-muted-foreground">
+                {selectedFile.split("/").map((seg, i, arr) => (
+                  <span key={i} className="flex min-w-0 items-center gap-0.5">
+                    {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 opacity-50" />}
+                    <span
+                      className={cn(
+                        "truncate",
+                        i === arr.length - 1 && "font-medium text-foreground",
+                      )}
+                    >
+                      {seg}
+                    </span>
+                  </span>
+                ))}
+              </nav>
+              <Button size="sm" onClick={handleSave} disabled={isPending} className="ml-2 shrink-0">
                 {isPending ? t("servers.files.saving") : t("servers.files.save")}
               </Button>
             </div>
@@ -428,8 +525,12 @@ export function ServerFilesTab({ serverId }: { serverId: string }) {
             />
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
-            {t("servers.files.selectFile")}
+          <div className="flex flex-1 items-center justify-center p-6">
+            <EmptyState
+              icon={<FileText className="h-6 w-6" />}
+              title={t("servers.files.selectFile")}
+              className="border-none"
+            />
           </div>
         )}
       </div>
@@ -480,7 +581,7 @@ function SearchResultRow({
           >
             {node.isDirectory
               ? <Folder className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-              : <File className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
+              : <FileTypeIcon name={node.name} className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
             <span className="truncate text-zinc-700 dark:text-zinc-300">
               <HighlightMatch text={node.name} query={search} />
             </span>
@@ -546,6 +647,10 @@ function TreeNode({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
+            className={cn(
+              "rounded transition-colors duration-150",
+              isDragTarget && "bg-brand-muted ring-1 ring-inset ring-brand/40",
+            )}
             onDragOver={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -571,19 +676,23 @@ function TreeNode({
                 style={{ paddingLeft: `${depth * 12 + 4}px` }}
                 onClick={() => setOpen(!open)}
               >
+                <ChevronRight
+                  className={cn(
+                    "h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-200 ease-out",
+                    open && "rotate-90",
+                  )}
+                />
                 {open ? (
-                  <ChevronDown className="h-3 w-3 shrink-0 text-zinc-400" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 shrink-0 text-zinc-400" />
-                )}
-                {open ? (
-                  <FolderOpen className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0 text-brand" />
                 ) : (
                   <Folder className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
                 )}
                 <span className="truncate text-zinc-700 dark:text-zinc-300">{node.name}</span>
                 {isDragTarget && (
-                  <span className="ml-auto shrink-0 text-xs text-blue-400">{t("servers.files.dropHere")}</span>
+                  <span className="ml-auto flex shrink-0 items-center gap-1 text-xs font-medium text-brand">
+                    <Upload className="h-3 w-3" />
+                    {t("servers.files.dropHere")}
+                  </span>
                 )}
               </button>
               <button
@@ -658,7 +767,7 @@ function TreeNode({
             style={{ paddingLeft: `${depth * 12 + 16}px` }}
             onClick={() => onSelect(node.path)}
           >
-            <File className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+            <FileTypeIcon name={node.name} className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
             <span className="truncate text-zinc-700 dark:text-zinc-300">{node.name}</span>
           </button>
           <button

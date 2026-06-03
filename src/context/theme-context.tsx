@@ -35,6 +35,15 @@ export function ThemeProvider({
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
+  // Enable color cross-fade only after the first paint so the server-rendered
+  // theme never animates in on load.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      document.documentElement.classList.add("theme-transitions-enabled");
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   function setTheme(next: Theme) {
     setThemeState(next);
     startTransition(async () => {

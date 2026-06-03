@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { Shield } from "lucide-react";
+import { Shield, AlertCircle } from "lucide-react";
+import { motion } from "framer-motion";
 import { useLocale } from "@/context/locale-context";
 
 export default function SetupPage() {
@@ -85,29 +86,51 @@ export default function SetupPage() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <p className="text-zinc-500">{t("auth.setup.checkingStatus")}</p>
+          <p className="animate-pulse-soft text-muted-foreground">{t("auth.setup.checkingStatus")}</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
-          <Shield className="h-6 w-6" />
-        </div>
-        <CardTitle className="text-2xl">{t("auth.setup.title")}</CardTitle>
-        <CardDescription>{t("auth.setup.description")}</CardDescription>
-      </CardHeader>
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={{
+        hidden: {},
+        show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+      }}
+    >
+      <Card className="shadow-z3">
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 12 },
+            show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+          }}
+        >
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-brand text-brand-foreground shadow-glow-brand">
+              <Shield className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-2xl">{t("auth.setup.title")}</CardTitle>
+            <CardDescription>{t("auth.setup.description")}</CardDescription>
+          </CardHeader>
+        </motion.div>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-              {error}
+            <div className="flex animate-shake items-start gap-2 rounded-md border-l-4 border-destructive bg-destructive-muted p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
-          <div className="space-y-2">
+          <motion.div
+            className="space-y-2"
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+            }}
+          >
             <Label htmlFor="username">{t("auth.setup.username")}</Label>
             <Input
               id="username"
@@ -116,8 +139,14 @@ export default function SetupPage() {
               placeholder="admin"
               required
             />
-          </div>
-          <div className="space-y-2">
+          </motion.div>
+          <motion.div
+            className="space-y-2"
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+            }}
+          >
             <Label htmlFor="email">{t("auth.setup.email")}</Label>
             <Input
               id="email"
@@ -126,8 +155,14 @@ export default function SetupPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@example.com"
             />
-          </div>
-          <div className="space-y-2">
+          </motion.div>
+          <motion.div
+            className="space-y-2"
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+            }}
+          >
             <Label htmlFor="password">{t("auth.setup.password")}</Label>
             <PasswordInput
               id="password"
@@ -136,8 +171,14 @@ export default function SetupPage() {
               placeholder={t("auth.setup.passwordHint")}
               required
             />
-          </div>
-          <div className="space-y-2">
+          </motion.div>
+          <motion.div
+            className="space-y-2"
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+            }}
+          >
             <Label htmlFor="confirmPassword">{t("auth.setup.confirmPassword")}</Label>
             <PasswordInput
               id="confirmPassword"
@@ -146,14 +187,15 @@ export default function SetupPage() {
               placeholder={t("auth.setup.repeatPassword")}
               required
             />
-          </div>
+          </motion.div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" variant="brand" className="w-full" disabled={loading}>
             {loading ? t("auth.setup.creatingAccount") : t("auth.setup.createAccount")}
           </Button>
         </CardFooter>
       </form>
-    </Card>
+      </Card>
+    </motion.div>
   );
 }

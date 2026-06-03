@@ -50,6 +50,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ImportBackupDialog } from "@/components/backups/import-backup-dialog";
 import { RestoreBackupDialog } from "@/components/backups/restore-backup-dialog";
 
@@ -77,30 +79,54 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Locale-aware relative time ("2 hours ago"). No new i18n keys needed. */
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diffMs = then - Date.now();
+  const abs = Math.abs(diffMs);
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const units: [Intl.RelativeTimeFormatUnit, number][] = [
+    ["year", 31536000000],
+    ["month", 2592000000],
+    ["day", 86400000],
+    ["hour", 3600000],
+    ["minute", 60000],
+  ];
+  for (const [unit, ms] of units) {
+    if (abs >= ms) return rtf.format(Math.round(diffMs / ms), unit);
+  }
+  return rtf.format(Math.round(diffMs / 1000), "second");
+}
+
 function StatusBadge({ status }: { status?: string }) {
   const { t } = useLocale();
   switch (status) {
     case "pending":
       return (
-        <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-300">
+        <Badge variant="outline" className="gap-1 border-warning/40 text-warning">
           <Clock className="h-3 w-3" /> {t("servers.backups.statusPending")}
         </Badge>
       );
     case "in_progress":
       return (
-        <Badge variant="outline" className="gap-1 text-blue-600 border-blue-300">
-          <Loader2 className="h-3 w-3 animate-spin" /> {t("servers.backups.statusInProgress")}
+        <Badge variant="outline" className="gap-1.5 border-info/40 text-info">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-info opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-info" />
+          </span>
+          {t("servers.backups.statusInProgress")}
         </Badge>
       );
     case "failed":
       return (
-        <Badge variant="outline" className="gap-1 text-red-600 border-red-300">
+        <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
           <XCircle className="h-3 w-3" /> {t("servers.backups.statusFailed")}
         </Badge>
       );
     default:
       return (
-        <Badge variant="outline" className="gap-1 text-green-600 border-green-300">
+        <Badge variant="outline" className="gap-1 border-brand/40 text-brand">
           <CheckCircle2 className="h-3 w-3" /> {t("servers.backups.statusDone")}
         </Badge>
       );
@@ -323,18 +349,31 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
       </div>
 
       {loading ? (
-        <p className="text-sm text-zinc-500">{t("servers.backups.loading")}</p>
+        <div className="space-y-2">
+          <span className="sr-only">{t("servers.backups.loading")}</span>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+                <Skeleton className="ml-2 h-8 w-8 rounded-md" />
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
       ) : backups.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <HardDrive className="mx-auto mb-2 h-8 w-8 text-zinc-400" />
-            <p className="text-sm text-zinc-500">{t("servers.backups.empty")}</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<HardDrive className="h-6 w-6" />}
+          title={t("servers.backups.empty")}
+        />
       ) : (
         <div className="space-y-2">
-          {backups.map((backup) => (
-            <Card key={backup._id}>
+          {backups.map((backup) => {
+          const isRunning = backup.status === "pending" || backup.status === "in_progress";
+          return (
+            <Card key={backup._id} className="animate-fade-in">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -343,14 +382,22 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                     </CardTitle>
                     <StatusBadge status={backup.status} />
                   </div>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {backup.size > 0 && `${formatSize(backup.size)} · `}
-                    {new Date(backup.createdAt).toLocaleString()} ·{" "}
-                    {backup.components.join(", ")}
+                    <span title={new Date(backup.createdAt).toLocaleString()}>
+                      {formatRelative(backup.createdAt)}
+                    </span>{" "}
+                    · {backup.components.join(", ")}
                     {backup.strategy === "async" && ` · ${t("servers.backups.asyncLabel")}`}
                   </p>
+                  {/* Indeterminate progress bar while the backup is running */}
+                  {isRunning && (
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-info-muted">
+                      <div className="h-full w-1/3 animate-shimmer rounded-full bg-gradient-to-r from-info/40 via-info to-info/40 bg-[length:200%_100%]" />
+                    </div>
+                  )}
                   {backup.errorMessage && (
-                    <p className="text-xs text-red-500 mt-0.5">{backup.errorMessage}</p>
+                    <p className="text-xs text-destructive mt-0.5">{backup.errorMessage}</p>
                   )}
                   {backup.shareUrl && (
                     <div className="flex items-center gap-1 mt-1">
@@ -412,6 +459,7 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                       disabled={isPending}
                       onClick={() => handleRestore(backup)}
                       title={t("servers.backups.restoreTitle")}
+                      className="text-warning hover:bg-warning-muted hover:text-warning"
                     >
                       <RotateCcw className="h-4 w-4" />
                     </Button>
@@ -423,12 +471,13 @@ export function ServerBackupsTab({ serverId, serverName }: { serverId: string; s
                     onClick={() => handleDelete(backup._id)}
                     title={t("servers.backups.deleteTitle")}
                   >
-                    <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
+                    <Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
                   </Button>
                 </div>
               </CardHeader>
             </Card>
-          ))}
+          );
+          })}
         </div>
       )}
 

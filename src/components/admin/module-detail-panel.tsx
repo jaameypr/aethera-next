@@ -25,6 +25,7 @@ import {
   Heart,
   Trash2,
   RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import type { InstalledModuleResponse, ModuleManifestEnvDef } from "@/lib/api/types";
 import {
@@ -58,6 +59,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const [publicUrl, setPublicUrl] = useState(initial.publicUrl ?? "");
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
   const [showReinstallConfirm, setShowReinstallConfirm] = useState(false);
+  const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
+  // Two-stage destructive confirm: require an explicit arm before firing.
+  const [uninstallArmed, setUninstallArmed] = useState(false);
 
   // Parse configurable env defs from manifest
   const configurableDefs: ModuleManifestEnvDef[] =
@@ -137,6 +141,8 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   };
 
   const handleUninstall = async () => {
+    setShowUninstallConfirm(false);
+    setUninstallArmed(false);
     setLoading(true);
     try {
       await uninstallModuleAction(mod.moduleId);
@@ -198,7 +204,13 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
       )}
 
       {/* Actions */}
-      <Card>
+      <Card className="relative overflow-hidden">
+        {/* Action progress overlay */}
+        {loading && (
+          <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden">
+            <div className="h-full w-1/3 animate-shimmer rounded-full bg-gradient-to-r from-transparent via-brand to-transparent bg-[length:200%_100%]" />
+          </div>
+        )}
         <CardHeader>
           <CardTitle className="text-base">{t("admin.moduleDetail.actions")}</CardTitle>
         </CardHeader>
@@ -269,7 +281,10 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           )}
           <Button
             variant="destructive"
-            onClick={handleUninstall}
+            onClick={() => {
+              setUninstallArmed(false);
+              setShowUninstallConfirm(true);
+            }}
             disabled={loading}
           >
             <Trash2 className="mr-1 h-4 w-4" />
@@ -277,6 +292,64 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Uninstall confirmation dialog — two-stage destructive confirm */}
+      <Dialog
+        open={showUninstallConfirm}
+        onOpenChange={(open) => {
+          setShowUninstallConfirm(open);
+          if (!open) setUninstallArmed(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("admin.moduleDetail.uninstall")}</DialogTitle>
+            <DialogDescription>
+              {t("admin.modules.confirmUninstallDesc", { name: mod.name })}
+            </DialogDescription>
+          </DialogHeader>
+          {uninstallArmed && (
+            <div className="flex animate-shake items-start gap-2 rounded-md border border-destructive/40 bg-destructive-muted px-3 py-2 text-sm text-destructive">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>This will permanently remove the module and its data.</span>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUninstallConfirm(false);
+                setUninstallArmed(false);
+              }}
+            >
+              {t("admin.moduleDetail.cancel")}
+            </Button>
+            {!uninstallArmed ? (
+              <Button
+                variant="destructive"
+                onClick={() => setUninstallArmed(true)}
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                {t("admin.moduleDetail.uninstall")}
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                className="animate-glow"
+                onClick={handleUninstall}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-1 h-4 w-4" />
+                )}
+                {t("admin.moduleDetail.uninstall")}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reinstall confirmation dialog */}
       <Dialog open={showReinstallConfirm} onOpenChange={setShowReinstallConfirm}>

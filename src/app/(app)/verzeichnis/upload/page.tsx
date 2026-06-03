@@ -26,30 +26,55 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [identifier, setIdentifier] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const identifierError =
     identifier && !IDENTIFIER_RE.test(identifier)
       ? t("verzeichnis.upload.identifierError")
       : null;
 
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (uploading) return;
+    const dropped = e.dataTransfer.files?.[0];
+    if (dropped) setFile(dropped);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !identifier || identifierError) return;
 
     setUploading(true);
+    setProgress(0);
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("identifier", identifier);
 
-      const res = await fetch("/api/files", {
-        method: "POST",
-        body: formData,
-      });
+      // XHR (not fetch) so we can surface real upload progress.
+      const { status, body } = await new Promise<{ status: number; body: string }>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", "/api/files");
+          xhr.upload.addEventListener("progress", (ev) => {
+            if (ev.lengthComputable) {
+              setProgress(Math.round((ev.loaded / ev.total) * 100));
+            }
+          });
+          xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
+          xhr.onerror = () => reject(new Error(t("verzeichnis.upload.uploadFailed")));
+          xhr.send(formData);
+        },
+      );
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? t("verzeichnis.upload.uploadFailed"));
+      if (status < 200 || status >= 300) {
+        let errMsg = t("verzeichnis.upload.uploadFailed");
+        try {
+          errMsg = JSON.parse(body).error ?? errMsg;
+        } catch {}
+        throw new Error(errMsg);
       }
 
       toast.success(t("verzeichnis.upload.uploadSuccess"));
@@ -58,6 +83,7 @@ export default function UploadPage() {
       toast.error(err instanceof Error ? err.message : t("verzeichnis.upload.uploadFailed"));
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   }
 
@@ -71,7 +97,7 @@ export default function UploadPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">{t("verzeichnis.upload.title")}</h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted-foreground">
             {t("verzeichnis.upload.autoDelete")}
           </p>
         </div>
@@ -94,9 +120,9 @@ export default function UploadPage() {
                 onChange={(e) => setIdentifier(e.target.value.toLowerCase())}
               />
               {identifierError && (
-                <p className="text-xs text-red-500">{identifierError}</p>
+                <p className="text-xs text-destructive">{identifierError}</p>
               )}
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 {t("verzeichnis.upload.identifierHint")}
               </p>
             </div>
@@ -105,23 +131,39 @@ export default function UploadPage() {
             <div className="space-y-1">
               <Label>{t("verzeichnis.upload.fileLabel")}</Label>
               <div
-                className="cursor-pointer rounded-md border-2 border-dashed border-zinc-200 p-6 text-center transition-colors hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-500"
-                onClick={() => inputRef.current?.click()}
+                className={`cursor-pointer rounded-md border-2 border-dashed p-6 text-center transition-[border-color,background-color,box-shadow] duration-200 ${
+                  dragOver
+                    ? "border-brand bg-brand-muted/40 ring-2 ring-brand/40"
+                    : file
+                      ? "border-brand/60 bg-brand-muted/20"
+                      : "border-input hover:border-zinc-400 dark:hover:border-zinc-500"
+                }`}
+                onClick={() => !uploading && inputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!uploading) setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
               >
                 {file ? (
                   <div className="flex items-center justify-center gap-3">
-                    <FileIcon className="h-8 w-8 shrink-0 text-zinc-400" />
+                    <FileIcon className="h-8 w-8 shrink-0 text-brand" />
                     <div className="text-left">
                       <p className="text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="text-xs text-muted-foreground">
                         {formatBytes(file.size)}
                       </p>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    <Upload className="mx-auto h-8 w-8 text-zinc-400" />
-                    <p className="text-sm text-zinc-500">
+                    <Upload
+                      className={`mx-auto h-8 w-8 transition-colors ${
+                        dragOver ? "text-brand" : "text-muted-foreground"
+                      }`}
+                    />
+                    <p className="text-sm text-muted-foreground">
                       {t("verzeichnis.upload.clickToSelect")}
                     </p>
                   </div>
@@ -135,8 +177,23 @@ export default function UploadPage() {
               />
             </div>
 
+            {uploading && progress !== null && (
+              <div className="space-y-1.5">
+                <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-brand transition-[width] duration-200 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-center text-xs text-muted-foreground">
+                  {t("verzeichnis.upload.uploading")} {progress}%
+                </p>
+              </div>
+            )}
+
             <Button
               type="submit"
+              variant="brand"
               disabled={uploading || !file || !identifier || !!identifierError}
               className="w-full"
             >

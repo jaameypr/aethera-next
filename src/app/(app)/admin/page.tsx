@@ -60,9 +60,9 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <p className="text-sm text-zinc-500">
+      <div className="animate-fade-in">
+        <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
           {t("admin.subtitle")}
         </p>
       </div>

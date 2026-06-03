@@ -17,7 +17,17 @@ import {
   Cpu,
   Settings,
   Globe,
+  Box,
+  Zap,
+  Layers,
+  Boxes,
+  Wand2,
+  Upload,
+  Archive,
+  type LucideIcon,
 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -70,6 +80,25 @@ const STEPS = [
   { title: "Einstellungen", icon: Globe, description: "Welt und Server konfigurieren" },
   { title: "Bestätigung", icon: Rocket, description: "Zusammenfassung prüfen" },
 ];
+
+/** Per-type lucide icon + which types we surface as "Recommended". */
+const SERVER_TYPE_ICON: Record<ServerType, LucideIcon> = {
+  vanilla: Box,
+  paper: Zap,
+  spigot: Layers,
+  purpur: Layers,
+  forge: Boxes,
+  fabric: Zap,
+  curseforge: Boxes,
+  modrinth: Boxes,
+};
+const RECOMMENDED_TYPES = new Set<ServerType>(["paper", "fabric"]);
+
+const WORLD_SOURCE_ICON: Record<WorldSource, LucideIcon> = {
+  generate: Wand2,
+  import: Upload,
+  backup: Archive,
+};
 
 // ---------------------------------------------------------------------------
 // Zod schemas per step
@@ -282,38 +311,71 @@ function formatMemory(mb: number): string {
 function StepIndicator({ current }: { current: number }) {
   return (
     <div className="flex items-center gap-1">
-      {STEPS.map((s, i) => (
-        <div key={s.title} className="flex flex-1 items-center gap-1">
-          <div
-            className={cn(
-              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
-              i < current
-                ? "bg-emerald-500 text-white"
-                : i === current
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800",
-            )}
-          >
-            {i < current ? <Check className="h-3.5 w-3.5" /> : i + 1}
-          </div>
-          <span
-            className={cn(
-              "hidden text-sm sm:block",
-              i === current ? "font-medium text-zinc-900 dark:text-zinc-50" : "text-zinc-400",
-            )}
-          >
-            {s.title}
-          </span>
-          {i < STEPS.length - 1 && (
-            <div
+      {STEPS.map((s, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <div key={s.title} className="flex flex-1 items-center gap-1">
+            <motion.div
+              animate={
+                done
+                  ? { scale: [1, 1.18, 1] }
+                  : active
+                    ? { scale: 1 }
+                    : { scale: 1 }
+              }
+              transition={{ duration: 0.28, ease: "easeOut" }}
               className={cn(
-                "h-0.5 flex-1 rounded transition-colors",
-                i < current ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-800",
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                done
+                  ? "bg-brand text-brand-foreground shadow-glow-brand"
+                  : active
+                    ? "bg-primary text-primary-foreground ring-2 ring-ring/30"
+                    : "bg-muted text-muted-foreground",
               )}
-            />
-          )}
-        </div>
-      ))}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {done ? (
+                  <motion.span
+                    key="check"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </motion.span>
+                ) : (
+                  <motion.span key="num" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    {i + 1}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.div>
+            <span
+              className={cn(
+                "hidden text-sm sm:block transition-colors",
+                active
+                  ? "font-medium text-foreground"
+                  : done
+                    ? "text-foreground/70"
+                    : "text-muted-foreground",
+              )}
+            >
+              {s.title}
+            </span>
+            {i < STEPS.length - 1 && (
+              <div className="relative h-0.5 flex-1 overflow-hidden rounded bg-muted">
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded bg-brand"
+                  initial={false}
+                  animate={{ width: done ? "100%" : "0%" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -360,27 +422,65 @@ function Step0({
     <div className="space-y-4">
       {groups.map((g) => (
         <div key={g.label} className="space-y-1.5">
-          <p className="text-xs text-zinc-400">{g.label}</p>
-          <div className="flex flex-wrap gap-1.5">
-            {g.types.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  dispatch({ type: "SET_FIELD", field: "serverType", value: t });
-                  dispatch({ type: "SET_PACK_META", meta: null });
-                  dispatch({ type: "SET_FIELD", field: "packReference", value: {} });
-                }}
-                className={cn(
-                  "rounded-md border px-3 py-1 text-sm transition-colors",
-                  state.serverType === t
-                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600",
-                )}
-              >
-                {SERVER_TYPE_MAP[t].label}
-              </button>
-            ))}
+          <p className="text-xs text-muted-foreground">{g.label}</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {g.types.map((ty) => {
+              const selected = state.serverType === ty;
+              const TypeIcon = SERVER_TYPE_ICON[ty];
+              const recommended = RECOMMENDED_TYPES.has(ty);
+              return (
+                <button
+                  key={ty}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => {
+                    dispatch({ type: "SET_FIELD", field: "serverType", value: ty });
+                    dispatch({ type: "SET_PACK_META", meta: null });
+                    dispatch({ type: "SET_FIELD", field: "packReference", value: {} });
+                  }}
+                  className={cn(
+                    "group relative flex items-center gap-2.5 overflow-hidden rounded-lg border px-3 py-2.5 text-left",
+                    "transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out",
+                    "hover:-translate-y-0.5 hover:shadow-z2",
+                    selected
+                      ? "border-brand bg-brand-muted shadow-glow-brand ring-1 ring-brand/40"
+                      : "border-border bg-card hover:border-brand/40",
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute inset-y-0 left-0 w-1 origin-left bg-brand transition-transform duration-200 ease-out",
+                      selected ? "scale-x-100" : "scale-x-0",
+                    )}
+                  />
+                  <TypeIcon
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-colors",
+                      selected ? "text-brand" : "text-muted-foreground group-hover:text-foreground",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "truncate text-sm font-medium transition-colors",
+                      selected ? "text-foreground" : "text-foreground/80",
+                    )}
+                  >
+                    {SERVER_TYPE_MAP[ty].label}
+                  </span>
+                  <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                    {recommended && (
+                      <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-medium text-brand animate-pulse-soft">
+                        Empfohlen
+                      </span>
+                    )}
+                    {selected && (
+                      <Check className="h-3.5 w-3.5 text-brand animate-fade-in" />
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -646,12 +746,13 @@ function Step2Version({
               <button
                 key={v}
                 type="button"
+                aria-pressed={state.javaVersion === v}
                 onClick={() => dispatch({ type: "SET_FIELD", field: "javaVersion", value: v })}
                 className={cn(
-                  "rounded-md border px-3 py-1 text-sm transition-colors",
+                  "rounded-md border px-3 py-1 text-sm transition-[transform,border-color,background-color,box-shadow] duration-200 ease-out",
                   state.javaVersion === v
-                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500",
+                    ? "border-brand bg-brand-muted text-foreground ring-1 ring-brand/40"
+                    : "border-border text-foreground/70 hover:-translate-y-0.5 hover:border-brand/40",
                 )}
               >
                 Java {v}
@@ -751,19 +852,33 @@ function Step3Resources({
               type="number"
               value={state.port}
               onChange={(e) => dispatch({ type: "SET_FIELD", field: "port", value: Number(e.target.value) })}
-              className="pr-8"
+              className={cn(
+                "pr-8 transition-colors",
+                state.portStatus === "available" && "border-brand",
+                state.portStatus === "taken" && "border-destructive",
+              )}
             />
             {state.portStatus === "checking" && (
-              <Loader2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-400" />
+              <Loader2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
             )}
             {state.portStatus === "available" && (
-              <CheckCircle2 className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500" />
+              <motion.span
+                key="port-ok"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full shadow-glow-brand"
+              >
+                <CheckCircle2 className="h-4 w-4 text-brand" />
+              </motion.span>
             )}
             {state.portStatus === "taken" && (
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <AlertCircle className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 cursor-default text-red-500" />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 animate-shake">
+                      <AlertCircle className="h-4 w-4 cursor-default text-destructive" />
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent side="top">
                     {t("servers.create.portTaken")}
@@ -773,7 +888,7 @@ function Step3Resources({
             )}
           </div>
           {state.portStatus === "taken" && (
-            <p className="text-xs text-red-500">{t("servers.create.portTakenShort")}</p>
+            <p className="text-xs text-destructive animate-shake">{t("servers.create.portTakenShort")}</p>
           )}
           {state.errors.port && (
             <p className="text-xs text-red-500">{state.errors.port}</p>
@@ -877,21 +992,41 @@ function Step4Settings({
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            {(["generate", "import", "backup"] as WorldSource[]).map((src) => (
-              <button
-                key={src}
-                type="button"
-                onClick={() => dispatch({ type: "SET_FIELD", field: "worldSource", value: src })}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                  state.worldSource === src
-                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600",
-                )}
-              >
-                {src === "generate" ? "Generieren" : src === "import" ? "Importieren" : "Backup"}
-              </button>
-            ))}
+            {(["generate", "import", "backup"] as WorldSource[]).map((src) => {
+              const selected = state.worldSource === src;
+              const SrcIcon = WORLD_SOURCE_ICON[src];
+              return (
+                <button
+                  key={src}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => dispatch({ type: "SET_FIELD", field: "worldSource", value: src })}
+                  className={cn(
+                    "group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-lg border px-3 py-3 text-sm font-medium",
+                    "transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out",
+                    "hover:-translate-y-0.5 hover:shadow-z2",
+                    selected
+                      ? "border-brand bg-brand-muted text-foreground shadow-glow-brand ring-1 ring-brand/40"
+                      : "border-border bg-card text-foreground/80 hover:border-brand/40",
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute inset-y-0 left-0 w-1 origin-left bg-brand transition-transform duration-200 ease-out",
+                      selected ? "scale-x-100" : "scale-x-0",
+                    )}
+                  />
+                  <SrcIcon
+                    className={cn(
+                      "h-4 w-4 transition-colors",
+                      selected ? "text-brand" : "text-muted-foreground group-hover:text-foreground",
+                    )}
+                  />
+                  {src === "generate" ? "Generieren" : src === "import" ? "Importieren" : "Backup"}
+                </button>
+              );
+            })}
           </div>
 
           {state.worldSource === "generate" && (
@@ -962,7 +1097,11 @@ function Step5Confirm({ state }: { state: WizardState }){
           ? `Backup: ${state.worldBackupSelection.backupName}`
           : "Backup (nicht gewählt)";
 
-  const rows = [
+  const versionLabel = state.packMeta
+    ? `MC ${state.packMeta.mcVersion}`
+    : state.version || "latest";
+
+  const identityRows = [
     { label: t("servers.create.summaryName"), value: state.name },
     { label: t("servers.create.summaryIdentifier"), value: state.identifier },
     { label: t("servers.create.summaryServerType"), value: typeConfig.label },
@@ -972,6 +1111,9 @@ function Step5Confirm({ state }: { state: WizardState }){
           { label: t("servers.create.summaryLoader"), value: `${state.packMeta.loader}${state.packMeta.loaderVersion ? ` ${state.packMeta.loaderVersion}` : ""}` },
         ]
       : [{ label: t("servers.create.summaryVersion"), value: state.version || "latest" }]),
+  ];
+
+  const resourceRows = [
     { label: t("servers.create.summaryRam"), value: formatMemory(state.memory) },
     { label: t("servers.create.summaryPort"), value: String(state.port) },
     ...(isMinecraft ? [
@@ -980,7 +1122,13 @@ function Step5Confirm({ state }: { state: WizardState }){
       { label: t("servers.create.summaryDifficulty"), value: state.difficulty },
       { label: t("servers.create.summaryWhitelist"), value: state.whitelist ? "Ja" : "Nein" },
     ] : []),
-    ...(showWorldInfo ? [{ label: t("servers.create.summaryWorld"), value: worldDesc }] : []),
+  ];
+
+  const worldRows = showWorldInfo
+    ? [{ label: t("servers.create.summaryWorld"), value: worldDesc }]
+    : [];
+
+  const advancedRows = [
     ...(isMinecraft && state.jvmPresetId !== "minimal"
       ? [{ label: "JVM Preset", value: JVM_FLAG_PRESETS.find((p) => p.id === state.jvmPresetId)?.label ?? state.jvmPresetId }]
       : []),
@@ -989,21 +1137,51 @@ function Step5Confirm({ state }: { state: WizardState }){
       : []),
   ];
 
+  const sections: Array<{ title: string; icon: LucideIcon; rows: typeof identityRows }> = [
+    { title: "Identität", icon: Server, rows: identityRows },
+    { title: "Ressourcen", icon: Cpu, rows: resourceRows },
+    ...(worldRows.length ? [{ title: "Welt", icon: Globe, rows: worldRows }] : []),
+    ...(advancedRows.length ? [{ title: "Erweitert", icon: Settings, rows: advancedRows }] : []),
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
-        {rows.map((row, i) => (
-          <div
-            key={row.label}
-            className={cn(
-              "flex items-center justify-between px-4 py-2.5 text-sm",
-              i < rows.length - 1 ? "border-b border-zinc-100 dark:border-zinc-800" : "",
-            )}
-          >
-            <span className="text-zinc-500">{row.label}</span>
-            <span className="max-w-[60%] truncate text-right font-medium">{row.value}</span>
-          </div>
-        ))}
+      {/* One-line summary preview */}
+      <div className="flex items-center gap-2.5 rounded-lg border border-brand/30 bg-brand-muted px-4 py-3 animate-fade-in">
+        <Rocket className="h-4 w-4 shrink-0 text-brand" />
+        <p className="truncate text-sm">
+          <span className="font-semibold text-foreground">{state.name || state.identifier}</span>
+          <span className="text-muted-foreground">
+            {" · "}{typeConfig.label}{" · "}{versionLabel}{" · "}{formatMemory(state.memory)}{" · "}:{state.port}
+          </span>
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {sections.map((section) => {
+          const SectionIcon = section.icon;
+          return (
+            <Card key={section.title} className="overflow-hidden">
+              <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3.5 py-2">
+                <SectionIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {section.title}
+                </span>
+              </div>
+              <div className="divide-y divide-border/60">
+                {section.rows.map((row) => (
+                  <div
+                    key={row.label}
+                    className="flex items-center justify-between gap-3 px-3.5 py-2 text-sm"
+                  >
+                    <span className="shrink-0 text-muted-foreground">{row.label}</span>
+                    <span className="max-w-[60%] truncate text-right font-medium text-foreground">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
@@ -1208,35 +1386,51 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
   }
 
   const isLastStep = state.step === STEPS.length - 1;
+  const initializing = state.submitting || isPending;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <StepIndicator current={state.step} />
 
-      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <AnimatePresence mode="wait" custom={state.direction}>
-          <motion.div
-            key={state.step}
-            custom={state.direction}
-            variants={variants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="p-6"
-          >
-            {state.step === 0 && <Step0 state={state} dispatch={dispatch} />}
-            {state.step === 1 && <Step1 state={state} dispatch={dispatch} />}
-            {state.step === 2 && <Step2Version state={state} dispatch={dispatch} />}
-            {state.step === 3 && <Step3Resources state={state} dispatch={dispatch} maxRam={maxRam ?? 32768} />}
-            {state.step === 4 && <Step4Settings state={state} dispatch={dispatch} />}
-            {state.step === 5 && <Step5Confirm state={state} />}
-          </motion.div>
-        </AnimatePresence>
+      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-z1">
+        {initializing ? (
+          <div className="space-y-4 p-6 animate-fade-in">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-5 w-5 items-center justify-center">
+                <span className="absolute inset-0 rounded-full bg-brand/30 animate-pulse-ring" />
+                <Rocket className="h-4 w-4 text-brand" />
+              </span>
+              <p className="text-sm font-medium text-foreground">{t("servers.create.creating")}</p>
+            </div>
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-4/5" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : (
+          <AnimatePresence mode="wait" custom={state.direction}>
+            <motion.div
+              key={state.step}
+              custom={state.direction}
+              variants={variants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className="p-6"
+            >
+              {state.step === 0 && <Step0 state={state} dispatch={dispatch} />}
+              {state.step === 1 && <Step1 state={state} dispatch={dispatch} />}
+              {state.step === 2 && <Step2Version state={state} dispatch={dispatch} />}
+              {state.step === 3 && <Step3Resources state={state} dispatch={dispatch} maxRam={maxRam ?? 32768} />}
+              {state.step === 4 && <Step4Settings state={state} dispatch={dispatch} />}
+              {state.step === 5 && <Step5Confirm state={state} />}
+            </motion.div>
+          </AnimatePresence>
+        )}
 
         {/* Auto-start on last step */}
-        {isLastStep && (
-          <div className="border-t border-zinc-200 px-6 pb-4 pt-3 dark:border-zinc-800">
+        {isLastStep && !initializing && (
+          <div className="border-t border-border px-6 pb-4 pt-3">
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
                 checked={state.autoStart}
@@ -1250,24 +1444,29 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
         )}
 
         {/* Navigation */}
-        <div className="flex items-center justify-between border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-t border-border px-6 py-4">
           <Button
             variant="outline"
             onClick={() => dispatch({ type: "PREV" })}
-            disabled={state.step === 0 || state.submitting || isPending}
+            disabled={state.step === 0 || initializing}
           >
             <ChevronLeft className="mr-1.5 h-4 w-4" />
             Zurück
           </Button>
 
           {isLastStep ? (
-            <Button onClick={handleSubmit} disabled={state.submitting || isPending}>
-              {state.submitting || isPending ? (
+            <Button
+              variant="brand"
+              onClick={handleSubmit}
+              disabled={initializing}
+              className={cn(!initializing && "shadow-glow-brand")}
+            >
+              {initializing ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
               ) : (
                 <Rocket className="mr-1.5 h-4 w-4" />
               )}
-              {state.submitting || isPending ? t("servers.create.creating") : t("servers.create.createBtn")}
+              {initializing ? t("servers.create.creating") : t("servers.create.createBtn")}
             </Button>
           ) : (
             <Button onClick={handleNext}>

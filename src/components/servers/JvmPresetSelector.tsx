@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -7,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { JVM_FLAG_PRESETS } from "@/lib/constants/jvm-presets";
+import { cn } from "@/lib/utils";
 
 interface JvmPresetSelectorProps {
   memory: number;
@@ -35,6 +37,12 @@ export default function JvmPresetSelector({
                 ? `Empfohlen ab ${preset.minRamMb >= 1024 ? `${preset.minRamMb / 1024} GB` : `${preset.minRamMb} MB`}`
                 : preset.description;
 
+            const ramHint = preset.minRamMb
+              ? preset.minRamMb >= 1024
+                ? `${preset.minRamMb / 1024} GB+`
+                : `${preset.minRamMb} MB+`
+              : null;
+
             return (
               <Tooltip key={preset.id}>
                 <TooltipTrigger asChild>
@@ -42,22 +50,37 @@ export default function JvmPresetSelector({
                     type="button"
                     data-preset-id={preset.id}
                     data-in-range={inRange}
+                    aria-pressed={isSelected}
                     onClick={() => onPresetChange(preset.id, preset.flags)}
-                    className={[
-                      "rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors",
+                    className={cn(
+                      "group relative overflow-hidden rounded-lg border px-3 py-2 text-left text-sm font-medium",
+                      "transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out",
+                      "hover:-translate-y-0.5 hover:shadow-z2",
                       isSelected
-                        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                        : "bg-white dark:bg-zinc-900",
-                      isSelected
-                        ? inRange
-                          ? "border-emerald-500"
-                          : "border-zinc-900 dark:border-zinc-100"
+                        ? "border-brand bg-brand-muted text-foreground shadow-glow-brand ring-1 ring-brand/40"
                         : inRange
-                          ? "border-emerald-400 text-zinc-700 hover:border-emerald-500 dark:border-emerald-600 dark:text-zinc-300 dark:hover:border-emerald-500"
-                          : "border-zinc-200 text-zinc-400 hover:border-zinc-300 dark:border-zinc-700 dark:text-zinc-500 dark:hover:border-zinc-600",
-                    ].join(" ")}
+                          ? "border-border bg-card text-foreground hover:border-brand/50"
+                          : "border-border bg-card text-muted-foreground hover:border-border",
+                    )}
                   >
-                    {preset.label}
+                    {/* brand left-accent on selected */}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "absolute inset-y-0 left-0 w-1 origin-left bg-brand transition-transform duration-200 ease-out",
+                        isSelected ? "scale-x-100" : "scale-x-0",
+                      )}
+                    />
+                    <span className="flex items-center justify-between gap-2 pl-1.5">
+                      <span className="truncate">{preset.label}</span>
+                      {isSelected ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-brand animate-fade-in" />
+                      ) : ramHint ? (
+                        <span className="shrink-0 text-[10px] font-normal text-muted-foreground">
+                          {ramHint}
+                        </span>
+                      ) : null}
+                    </span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-56 text-center">
@@ -75,7 +98,7 @@ export default function JvmPresetSelector({
           onChange={(e) => onJavaArgsChange(e.target.value)}
           placeholder="-XX:+UseG1GC ..."
           rows={3}
-          className="mt-1.5 w-full resize-y rounded-md border border-zinc-200 bg-transparent px-3 py-2 font-mono text-xs text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-1 dark:border-zinc-700 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+          className="mt-1.5 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 animate-slide-up"
         />
       )}
     </div>

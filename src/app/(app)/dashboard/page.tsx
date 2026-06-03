@@ -12,6 +12,8 @@ import {
 import { FolderKanban, Server, Users } from "lucide-react";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getServerT } from "@/lib/i18n/server";
 
 export default async function DashboardPage() {
@@ -69,11 +71,11 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+        <div className="animate-fade-in">
+          <h1 className="text-2xl font-bold text-foreground">
             {t("dashboard.title")}
           </h1>
-          <p className="text-zinc-500 dark:text-zinc-400">
+          <p className="text-muted-foreground">
             {t("dashboard.welcome", { username: user?.username ?? "User" })}
           </p>
         </div>
@@ -82,19 +84,26 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        {stats.map((stat) => {
+        {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.label}>
+            <Card
+              key={stat.label}
+              interactive
+              className="animate-slide-up [animation-fill-mode:backwards]"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-zinc-500">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.label}
                 </CardTitle>
-                <Icon className="h-4 w-4 text-zinc-400" />
+                <Icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-zinc-500">{stat.description}</p>
+                <div className="text-2xl font-bold">
+                  <AnimatedCounter value={stat.value} />
+                </div>
+                <p className="text-xs text-muted-foreground">{stat.description}</p>
               </CardContent>
             </Card>
           );
@@ -103,32 +112,35 @@ export default async function DashboardPage() {
 
       {/* Projects Grid */}
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">
           {t("dashboard.yourProjects")}
         </h2>
         {projectsWithServers.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FolderKanban className="mx-auto mb-3 h-10 w-10 text-zinc-400" />
-              <p className="text-zinc-500 dark:text-zinc-400">
-                {t("dashboard.noProjects")}
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<FolderKanban className="h-6 w-6" />}
+            title={t("dashboard.noProjects")}
+            description={t("dashboard.noProjectsHint")}
+            action={<CreateProjectDialog canCreate={canCreate} />}
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projectsWithServers.map(({ project, servers }) => (
-              <ProjectCard
+            {projectsWithServers.map(({ project, servers }, i) => (
+              <div
                 key={project.key}
-                projectKey={project.key}
-                name={project.name}
-                description={project.description}
-                servers={servers.map((s) => ({
-                  _id: s._id.toString(),
-                  name: s.name,
-                  status: s.status,
-                }))}
-              />
+                className="animate-slide-up [animation-fill-mode:backwards]"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <ProjectCard
+                  projectKey={project.key}
+                  name={project.name}
+                  description={project.description}
+                  servers={servers.map((s) => ({
+                    _id: s._id.toString(),
+                    name: s.name,
+                    status: s.status,
+                  }))}
+                />
+              </div>
             ))}
           </div>
         )}

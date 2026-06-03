@@ -35,18 +35,18 @@ export default async function VerzeichnisPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="animate-slide-up">
         <h1 className="text-2xl font-bold">{t("verzeichnis.title")}</h1>
-        <p className="text-sm text-zinc-500">{t("verzeichnis.subtitle")}</p>
+        <p className="text-sm text-muted-foreground">{t("verzeichnis.subtitle")}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {sections.map(({ href, icon: Icon, title, description }) => (
-          <Link key={href} href={href}>
-            <Card className="h-full cursor-pointer transition-colors hover:border-primary/50">
+          <Link key={href} href={href} className="group">
+            <Card interactive className="h-full cursor-pointer">
               <CardHeader>
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                  <Icon className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-transform duration-200 ease-out group-hover:scale-110 group-hover:text-brand">
+                  <Icon className="h-5 w-5" />
                 </div>
                 <CardTitle className="text-base">{title}</CardTitle>
                 <CardDescription>{description}</CardDescription>

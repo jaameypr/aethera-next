@@ -14,9 +14,9 @@ import { getServerT } from "@/lib/i18n/server";
 export default async function UnauthorizedPage() {
   const { t } = await getServerT();
   return (
-    <Card className="text-center">
+    <Card className="animate-slide-up text-center shadow-z3">
       <CardHeader>
-        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-destructive-muted text-destructive ring-8 ring-destructive-muted/40">
           <ShieldAlert className="h-6 w-6" />
         </div>
         <CardTitle>{t("auth.unauthorized.title")}</CardTitle>
@@ -25,7 +25,7 @@ export default async function UnauthorizedPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted-foreground">
           {t("auth.unauthorized.description")}
         </p>
       </CardContent>

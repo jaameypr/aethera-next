@@ -167,7 +167,7 @@ function MemberRow({
 
   return (
     <>
-      <Card>
+      <Card interactive>
         <CardContent className="p-0">
           {/* Main row */}
           <div className="flex items-center gap-3 px-4 py-3">
@@ -214,7 +214,7 @@ function MemberRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-zinc-400 hover:text-red-500"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive-muted"
                   onClick={() => setConfirmRemove(true)}
                   disabled={isPending}
                 >
@@ -226,16 +226,16 @@ function MemberRow({
 
           {/* Per-server permissions expanded */}
           {expanded && serverAccess.length > 0 && (
-            <div className="border-t border-zinc-100 px-4 pb-3 pt-2 dark:border-zinc-800">
-              <p className="mb-2 text-xs font-medium text-zinc-400 uppercase tracking-wide">
+            <div className="animate-slide-up border-t border-border px-4 pb-3 pt-2">
+              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {t("projects.members.serverPermissions")}
               </p>
               <div className="space-y-2">
                 {serverAccess.map((srv) => (
                   <div key={srv.serverId}>
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Server className="h-3.5 w-3.5 text-zinc-400" />
-                      <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{srv.serverName}</span>
+                      <Server className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs font-medium text-foreground/70">{srv.serverName}</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 pl-5">
                       {SERVER_PERM_OPTIONS.map((opt) => {
@@ -247,8 +247,8 @@ function MemberRow({
                             onClick={() => handleTogglePerm(srv.serverId, opt.value)}
                             className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                               active
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                                : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500"
+                                ? "bg-brand-muted text-brand"
+                                : "bg-muted text-muted-foreground"
                             }`}
                           >
                             {active && <Check className="h-2.5 w-2.5" />}
@@ -344,7 +344,7 @@ export function ProjectMembersPanel({
 
         {/* Members */}
         {members.length === 0 && (
-          <p className="py-4 text-center text-sm text-zinc-500">
+          <p className="py-4 text-center text-sm text-muted-foreground">
             {isAdmin ? t("projects.members.noMembersInvite") : t("projects.members.noMembers")}
           </p>
         )}

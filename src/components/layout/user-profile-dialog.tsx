@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { changePasswordAction } from "@/app/(app)/actions/profile";
 import { useLocale } from "@/context/locale-context";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface UserProfileDialogProps {
@@ -74,8 +75,9 @@ export function UserProfileDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-              {error}
+            <div className="flex animate-shake items-start gap-2 rounded-md border-l-4 border-destructive bg-destructive-muted p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
           <div className="space-y-2">

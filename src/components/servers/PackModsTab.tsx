@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Ban, Loader2, Search, Package, PackageX } from "lucide-react";
+import { Plus, Trash2, Ban, Loader2, Search, Package, PackageX, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { lookupPackModAction, type PackModInfo } from "@/app/(app)/actions/servers";
 import { useLocale } from "@/context/locale-context";
@@ -99,7 +101,7 @@ function AddAdditionalModPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+    <div className="animate-slide-up space-y-3 rounded-lg border border-border p-4">
       <p className="text-sm font-medium">
         {t("servers.packMods.addModTitle", { source: source === "modrinth" ? "Modrinth" : "CurseForge" })}
       </p>
@@ -120,16 +122,17 @@ function AddAdditionalModPanel({
       {lookupError && <p className="text-xs text-red-500">{lookupError}</p>}
 
       {found && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800 dark:bg-emerald-950/40">
+        <div className="animate-slide-up space-y-2">
+          <div className="flex items-center gap-2 rounded-md border border-brand/30 bg-brand-muted px-3 py-2">
             {found.iconUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={found.iconUrl} alt="" className="h-8 w-8 rounded" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-emerald-700 dark:text-emerald-400">{found.displayName}</p>
-              <p className="truncate text-xs text-emerald-600 dark:text-emerald-500">{found.slug}</p>
+              <p className="truncate text-sm font-medium text-brand">{found.displayName}</p>
+              <p className="truncate text-xs text-brand/80">{found.slug}</p>
             </div>
+            <Check className="h-4 w-4 shrink-0 text-brand" />
           </div>
 
           <div className="space-y-1">
@@ -206,7 +209,7 @@ function AddExclusionPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+    <div className="animate-slide-up space-y-3 rounded-lg border border-border p-4">
       <p className="text-sm font-medium">{t("servers.packMods.excludeTitle")}</p>
 
       <div className="space-y-1.5">
@@ -322,14 +325,36 @@ export function PackModsTab({
   return (
     <div className="space-y-4">
       {/* Info banner */}
-      <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+      <div className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
         <p>
           {t("servers.packMods.packModsDesc", { source: sourceLabel })}
         </p>
       </div>
 
       {loading ? (
-        <p className="text-sm text-zinc-500">{t("servers.packMods.loading")}</p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <span className="sr-only">{t("servers.packMods.loading")}</span>
+          {Array.from({ length: 2 }).map((_, c) => (
+            <Card key={c}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-8 w-20 rounded-md" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-3 w-3/4" />
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Preinstalled / Exclusions */}
@@ -361,11 +386,15 @@ export function PackModsTab({
               )}
 
               {excludedMods.length === 0 ? (
-                <p className="text-sm text-zinc-500">{t("servers.packMods.noExclusions")}</p>
+                <EmptyState
+                  icon={<PackageX className="h-6 w-6" />}
+                  title={t("servers.packMods.noExclusions")}
+                  className="px-4 py-8"
+                />
               ) : (
-                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <ul className="divide-y divide-border">
                   {excludedMods.map((mod) => (
-                    <li key={mod._id} className="flex items-center justify-between py-2">
+                    <li key={mod._id} className="-mx-2 flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-accent/60">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className={cn("truncate text-sm font-medium text-zinc-500 line-through")}>
@@ -386,7 +415,7 @@ export function PackModsTab({
                         onClick={() => removeExclusion(mod._id, mod.displayName)}
                         title={t("servers.packMods.removeExclusionTitle")}
                       >
-                        <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
+                        <Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
                       </Button>
                     </li>
                   ))}
@@ -424,11 +453,15 @@ export function PackModsTab({
               )}
 
               {additionalMods.length === 0 ? (
-                <p className="text-sm text-zinc-500">{t("servers.packMods.noAdditional")}</p>
+                <EmptyState
+                  icon={<Package className="h-6 w-6" />}
+                  title={t("servers.packMods.noAdditional")}
+                  className="px-4 py-8"
+                />
               ) : (
-                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <ul className="divide-y divide-border">
                   {additionalMods.map((mod) => (
-                    <li key={mod._id} className="flex items-center justify-between py-2">
+                    <li key={mod._id} className="-mx-2 flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-accent/60">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-medium">{mod.displayName}</p>
@@ -447,7 +480,7 @@ export function PackModsTab({
                         disabled={isPending}
                         onClick={() => removeAdditionalMod(mod._id, mod.displayName)}
                       >
-                        <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
+                        <Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
                       </Button>
                     </li>
                   ))}

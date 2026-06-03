@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Check, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -51,11 +51,19 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { name: "", key: "" },
   });
+
+  const keyValue = watch("key");
+  // Mirror the schema's key constraints for a live, read-only validity hint.
+  const keyValid =
+    keyValue.length > 0 &&
+    keyValue.length <= 32 &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(keyValue);
 
   function slugify(value: string): string {
     return value
@@ -111,24 +119,43 @@ export function CreateProjectDialog({ canCreate = true }: { canCreate?: boolean 
                 })}
               />
               {errors.name && (
-                <p className="text-sm text-red-500">{errors.name.message}</p>
+                <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="project-key">{t("projects.create.key")}</Label>
-              <Input
-                id="project-key"
-                placeholder={t("projects.create.keyPlaceholder")}
-                className="font-mono"
-                {...register("key")}
-              />
+              <div className="relative">
+                <Input
+                  id="project-key"
+                  placeholder={t("projects.create.keyPlaceholder")}
+                  className="font-mono pr-9"
+                  {...register("key")}
+                />
+                {keyValue.length > 0 && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 animate-fade-in">
+                    {keyValid ? (
+                      <Check className="h-4 w-4 text-brand" />
+                    ) : (
+                      <X className="h-4 w-4 text-destructive" />
+                    )}
+                  </span>
+                )}
+              </div>
               {errors.key && (
-                <p className="text-sm text-red-500">{errors.key.message}</p>
+                <p className="text-sm text-destructive">{errors.key.message}</p>
               )}
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {t("projects.create.keyHint")}
-              </p>
+              {keyValid && (
+                <p className="animate-fade-in text-xs text-muted-foreground">
+                  {t("projects.create.keyHint")}{" "}
+                  <span className="font-mono text-foreground/70">/projects/{keyValue}</span>
+                </p>
+              )}
+              {!keyValid && (
+                <p className="text-xs text-muted-foreground">
+                  {t("projects.create.keyHint")}
+                </p>
+              )}
             </div>
           </div>
 
