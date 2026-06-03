@@ -22,6 +22,7 @@ import {
 import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { AdminRoleResponse, PermissionEntry } from "@/lib/api/types";
 
 interface AdminRolesPanelProps {
@@ -128,7 +129,7 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
           </h1>
           <p className="text-zinc-500">{t("admin.roles.subtitle")}</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)} className="shadow-z1">
           <Plus className="mr-2 h-4 w-4" />
           {t("admin.roles.createRole")}
         </Button>
@@ -137,17 +138,15 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
       {/* Roles list */}
       <div className="space-y-2">
         {roles.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center py-12 text-center">
-              <ShieldCheck className="mb-3 h-10 w-10 text-zinc-300" />
-              <p className="text-zinc-500">{t("admin.roles.noRoles")}</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<ShieldCheck className="h-6 w-6" />}
+            title={t("admin.roles.noRoles")}
+          />
         )}
         {roles.map((role) => (
-          <Card key={role._id}>
+          <Card key={role._id} interactive className="animate-fade-in">
             <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-info-muted text-info ring-2 ring-info/30">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div className="flex-1">
@@ -155,10 +154,26 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
                 <p className="text-sm text-zinc-500">
                   {role.description || t("admin.roles.noDescription")}
                 </p>
-                <p className="text-xs text-zinc-400">
-                  {t("admin.roles.permissionCount", { count: role.permissions.length })}:{" "}
-                  {role.permissions.map((p) => p.name).join(", ")}
+                <p className="mt-0.5 text-xs text-zinc-400">
+                  {t("admin.roles.permissionCount", { count: role.permissions.length })}
                 </p>
+                {role.permissions.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    {role.permissions.slice(0, 6).map((p) => (
+                      <span
+                        key={p.name}
+                        className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+                      >
+                        {p.name}
+                      </span>
+                    ))}
+                    {role.permissions.length > 6 && (
+                      <span className="text-[11px] text-zinc-400">
+                        +{role.permissions.length - 6}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <Button
@@ -174,7 +189,7 @@ export function AdminRolesPanel({ initialRoles }: AdminRolesPanelProps) {
                   size="icon"
                   onClick={() => setDeleteConfirm(role)}
                   title={t("common.delete")}
-                  className="text-red-500 hover:text-red-700"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

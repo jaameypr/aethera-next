@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { PermissionListEditor } from "./permission-list-editor";
 import {
   createUserAction,
@@ -35,8 +35,21 @@ import {
   Trash2,
   KeyRound,
   Users,
+  Search,
 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
 import type { AdminUserResponse, AdminRoleResponse, PermissionEntry } from "@/lib/api/types";
+
+/** First two initials from a username, e.g. "john.doe" -> "JD". */
+function initialsOf(name: string): string {
+  const parts = name
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  if (parts.length === 0) return name.slice(0, 2).toUpperCase();
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("");
+}
 
 interface AdminUsersPanelProps {
   initialUsers: AdminUserResponse[];
@@ -45,6 +58,7 @@ interface AdminUsersPanelProps {
 
 export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
   const [users, setUsers] = useState(initialUsers);
+  const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminUserResponse | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUserResponse | null>(null);
@@ -194,6 +208,17 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
     }
   };
 
+  const filteredUsers = (() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        u.roles.some((r) => r.toLowerCase().includes(q)),
+    );
+  })();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -203,27 +228,52 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
           </h1>
           <p className="text-zinc-500">{t("admin.users.subtitle")}</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)} className="shadow-z1">
           <Plus className="mr-2 h-4 w-4" />
           {t("admin.users.createUser")}
         </Button>
       </div>
 
+      {/* Search */}
+      {users.length > 0 && (
+        <div className="relative max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search users…"
+            className="pl-9"
+          />
+        </div>
+      )}
+
       {/* Users list */}
       <div className="space-y-2">
         {users.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center py-12 text-center">
-              <Users className="mb-3 h-10 w-10 text-zinc-300" />
-              <p className="text-zinc-500">{t("admin.users.noUsers")}</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<Users className="h-6 w-6" />}
+            title={t("admin.users.noUsers")}
+          />
         )}
-        {users.map((user) => (
-          <Card key={user._id}>
+        {users.length > 0 && filteredUsers.length === 0 && (
+          <EmptyState
+            icon={<Search className="h-6 w-6" />}
+            title={t("admin.users.noUsers")}
+            className="py-10"
+          />
+        )}
+        {filteredUsers.map((user) => (
+          <Card key={user._id} interactive className="animate-fade-in">
             <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                <Users className="h-5 w-5" />
+              <div
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ring-2 transition-colors",
+                  user.enabled
+                    ? "bg-brand-muted text-brand ring-brand/40"
+                    : "bg-zinc-100 text-zinc-500 ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700",
+                )}
+              >
+                {initialsOf(user.username)}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -234,9 +284,16 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                 </div>
                 <p className="text-sm text-zinc-500">{user.email}</p>
                 {user.roles.length > 0 && (
-                  <p className="text-xs text-zinc-400">
-                    {t("admin.users.roles")}: {user.roles.join(", ")}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {user.roles.map((role) => (
+                      <span
+                        key={role}
+                        className="rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+                      >
+                        {role}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-1">
@@ -265,7 +322,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
                   size="icon"
                   onClick={() => setDeleteConfirm(user)}
                   title={t("common.delete")}
-                  className="text-red-500 hover:text-red-700"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

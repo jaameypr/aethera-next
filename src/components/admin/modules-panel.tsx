@@ -19,6 +19,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   Package,
@@ -30,6 +32,7 @@ import {
   ExternalLink,
   ArrowUpCircle,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import type { InstalledModuleResponse, ModuleCatalogEntry } from "@/lib/api/types";
 import { getModuleCatalogAction,
@@ -68,6 +71,8 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmUninstall, setConfirmUninstall] =
     useState<InstalledModuleResponse | null>(null);
+  // Two-stage destructive confirm: user must arm the action before it fires.
+  const [uninstallArmed, setUninstallArmed] = useState(false);
   const { t } = useLocale();
 
   const loadCatalog = async () => {
@@ -110,6 +115,7 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
       await uninstallModuleAction(moduleId);
       setModules((prev) => prev.filter((m) => m.moduleId !== moduleId));
       setConfirmUninstall(null);
+      setUninstallArmed(false);
       toast.success(t("admin.modules.moduleUninstalled"));
       await loadCatalog();
     } catch (err) {
@@ -213,23 +219,39 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
           {t("admin.modules.installedCount", { count: modules.length })}
         </h2>
         {modules.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              {t("admin.modules.noModulesDesc")}
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<Package className="h-6 w-6" />}
+            title={t("admin.modules.noModulesDesc")}
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {modules.map((mod) => {
               const update = updatableModules.find(
                 (c) => c.registry.id === mod.moduleId,
               );
+              const busy = actionLoading === mod.moduleId;
               return (
-                <Card key={mod.moduleId}>
+                <Card
+                  key={mod.moduleId}
+                  interactive
+                  className="relative overflow-hidden"
+                >
+                  {/* Action progress overlay */}
+                  {busy && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/70 backdrop-blur-[1px]">
+                      <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                    </div>
+                  )}
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
-                        <Package className="h-5 w-5 text-zinc-500" />
+                        <Package
+                          className={
+                            mod.status === "running"
+                              ? "h-5 w-5 text-brand"
+                              : "h-5 w-5 text-zinc-500"
+                          }
+                        />
                         <CardTitle className="text-base">
                           {mod.name}
                         </CardTitle>
@@ -313,8 +335,11 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="text-red-600 hover:text-red-700 dark:text-red-400"
-                        onClick={() => setConfirmUninstall(mod)}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => {
+                          setUninstallArmed(false);
+                          setConfirmUninstall(mod);
+                        }}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -333,26 +358,38 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
           {t("admin.modules.availableCount", { count: availableModules.length })}
         </h2>
         {catalogLoading ? (
-          <Card>
-            <CardContent className="flex items-center justify-center py-8 text-sm text-zinc-500">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {t("admin.modules.loadingCatalog")}
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="pb-3">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="mt-2 h-4 w-full" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex gap-1">
+                    <Skeleton className="h-5 w-12" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                  <Skeleton className="h-8 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         ) : availableModules.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              {catalog.length === 0
+          <EmptyState
+            icon={<Package className="h-6 w-6" />}
+            title={
+              catalog.length === 0
                 ? t("admin.modules.registryUnavailable")
-                : t("admin.modules.allInstalled")}
-            </CardContent>
-          </Card>
+                : t("admin.modules.allInstalled")
+            }
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {availableModules.map((entry) => {
               const latest = entry.registry.versions[0];
               return (
-                <Card key={entry.registry.id}>
+                <Card key={entry.registry.id} interactive>
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-2">
                       <Package className="h-5 w-5 text-zinc-400" />
@@ -409,10 +446,13 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
         )}
       </section>
 
-      {/* Uninstall confirmation dialog */}
+      {/* Uninstall confirmation dialog — two-stage destructive confirm */}
       <Dialog
         open={!!confirmUninstall}
-        onOpenChange={() => setConfirmUninstall(null)}
+        onOpenChange={() => {
+          setConfirmUninstall(null);
+          setUninstallArmed(false);
+        }}
       >
         <DialogContent>
           <DialogHeader>
@@ -421,31 +461,52 @@ export function ModulesPanel({ initialModules }: ModulesPanelProps) {
               {t("admin.modules.confirmUninstallDesc", { name: confirmUninstall?.name ?? "" })}
             </DialogDescription>
           </DialogHeader>
+          {/* Stage 1 → Stage 2 warning banner */}
+          {uninstallArmed && (
+            <div className="flex animate-shake items-start gap-2 rounded-md border border-destructive/40 bg-destructive-muted px-3 py-2 text-sm text-destructive">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>This will permanently remove the module and its data.</span>
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setConfirmUninstall(null)}
+              onClick={() => {
+                setConfirmUninstall(null);
+                setUninstallArmed(false);
+              }}
             >
               {t("admin.modules.cancel")}
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                confirmUninstall &&
-                handleUninstall(confirmUninstall.moduleId)
-              }
-              disabled={
-                !!actionLoading &&
-                actionLoading === confirmUninstall?.moduleId
-              }
-            >
-              {actionLoading === confirmUninstall?.moduleId ? (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              ) : (
+            {!uninstallArmed ? (
+              <Button
+                variant="destructive"
+                onClick={() => setUninstallArmed(true)}
+              >
                 <Trash2 className="mr-1 h-4 w-4" />
-              )}
-              {t("admin.modules.uninstall")}
-            </Button>
+                {t("admin.modules.uninstall")}
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                className="animate-glow"
+                onClick={() =>
+                  confirmUninstall &&
+                  handleUninstall(confirmUninstall.moduleId)
+                }
+                disabled={
+                  !!actionLoading &&
+                  actionLoading === confirmUninstall?.moduleId
+                }
+              >
+                {actionLoading === confirmUninstall?.moduleId ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-1 h-4 w-4" />
+                )}
+                {t("admin.modules.uninstall")}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
