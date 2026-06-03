@@ -172,21 +172,21 @@ export function RestoreBackupDialog({
         </DialogHeader>
 
         {analyzing ? (
-          <div className="flex items-center justify-center py-8 gap-2 text-zinc-500">
+          <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">{t("backupDialogs.restore.analyzing")}</span>
           </div>
         ) : (
           <div className="space-y-1 py-2">
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-3 py-2 mb-3">
-              <Info className="h-4 w-4 text-amber-600 shrink-0" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">
+            <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-muted px-3 py-2 mb-3">
+              <Info className="h-4 w-4 text-warning shrink-0" />
+              <p className="text-xs font-medium text-warning">
                 {t("backupDialogs.restore.warning")}
               </p>
             </div>
 
             {detectedComponents.length > 1 && (
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-border">
                 <Label
                   className="text-sm font-medium cursor-pointer"
                   onClick={toggleAll}
@@ -209,22 +209,22 @@ export function RestoreBackupDialog({
               return (
                 <div
                   key={comp.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                  className={`flex items-center gap-3 rounded-lg border p-3 transition-[border-color,background-color] duration-150 ${
                     !isAvailable
-                      ? "border-zinc-100 bg-zinc-50/50 opacity-50 dark:border-zinc-900 dark:bg-zinc-950/50"
+                      ? "border-border bg-muted/40 opacity-50"
                       : checked
-                        ? "border-zinc-900 bg-zinc-50 cursor-pointer dark:border-zinc-50 dark:bg-zinc-900"
-                        : "border-zinc-200 hover:border-zinc-300 cursor-pointer dark:border-zinc-800 dark:hover:border-zinc-700"
+                        ? "border-brand bg-brand-muted/30 cursor-pointer"
+                        : "border-border hover:border-zinc-300 cursor-pointer dark:hover:border-zinc-700"
                   }`}
                   onClick={() => isAvailable && toggleComponent(comp.id)}
                 >
                   <div
-                    className={`rounded-md p-2 ${
+                    className={`rounded-md p-2 transition-colors ${
                       !isAvailable
-                        ? "bg-zinc-100 text-zinc-400 dark:bg-zinc-800"
+                        ? "bg-secondary text-muted-foreground"
                         : checked
-                          ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                          ? "bg-brand text-brand-foreground"
+                          : "bg-secondary text-muted-foreground"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -238,12 +238,12 @@ export function RestoreBackupDialog({
                         </Badge>
                       )}
                       {isAvailable && fileCount > 0 && (
-                        <span className="text-[10px] text-zinc-500">
+                        <span className="text-[10px] text-muted-foreground">
                           {t("backupDialogs.restore.fileCount", { count: fileCount })}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-500">{comp.description}</p>
+                    <p className="text-xs text-muted-foreground">{comp.description}</p>
                   </div>
                   {isAvailable && (
                     <Checkbox
@@ -257,7 +257,7 @@ export function RestoreBackupDialog({
             })}
 
             {analysis && (
-              <p className="text-xs text-zinc-500 pt-2">
+              <p className="text-xs text-muted-foreground pt-2">
                 {t("backupDialogs.restore.filesSummary", { files: analysis.totalFiles, size: formatSize(analysis.totalSize) })}
               </p>
             )}
