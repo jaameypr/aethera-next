@@ -163,35 +163,31 @@ if have_tty; then
     fi
   fi
 
-  # Cloudflare tunnel — only offer if not already configured.
-  if [ ! -f docker-compose.tunnel.yml ] && [ -z "$(read_env TUNNEL_TOKEN)" ]; then
+  # Cloudflare tunnel. Token + hostname collection is delegated to
+  # cloudflared-setup.sh (single source, prompts on /dev/tty). A saved token or
+  # an existing overlay means "bring the tunnel up", never "silently skip" —
+  # so a re-run completes a half-configured setup instead of dead-ending.
+  if [ -f docker-compose.tunnel.yml ] || [ -n "$(read_env TUNNEL_TOKEN)" ]; then
+    info "Cloudflare tunnel already configured — (re)starting it with the stack."
+    WANT_TUNNEL=1
+  else
     echo ""
     info "Cloudflare Tunnel — expose the panel over HTTPS without opening a port."
     warn "  (Game-server ports stay published — the tunnel only carries the panel.)"
     if ask_yn "  Set up a Cloudflare tunnel now? [y/N]: " N; then
-      echo "  Cloudflare dashboard: Zero Trust → Networks → Tunnels → Create → Cloudflared."
-      echo "  Copy the long string after '--token'."
-      ask_secret CF_TOKEN "  Paste tunnel token: " || true
-      ask CF_HOST "  Public panel hostname (e.g. panel.example.com): " || true
-      if [ -n "${CF_TOKEN:-}" ] && [ -n "${CF_HOST:-}" ]; then
-        CF_HOST="${CF_HOST#https://}"; CF_HOST="${CF_HOST#http://}"; CF_HOST="${CF_HOST%/}"
-        set_env TUNNEL_TOKEN "$CF_TOKEN"
-        set_env APP_PUBLIC_URL "https://${CF_HOST}"
-        WANT_TUNNEL=1
-        info "Tunnel token + public URL saved to .env"
-      else
-        warn "Token or hostname missing — skipping the tunnel (you can run ./${CF_SETUP} later)."
-      fi
+      WANT_TUNNEL=1
     fi
   fi
 else
-  # Non-interactive: honour preset env vars.
+  # Non-interactive: honour preset env vars / existing config.
   [ -n "${CURSEFORGE_API_KEY:-}" ] && set_env CURSEFORGE_API_KEY "$CURSEFORGE_API_KEY"
   if [ -n "${TUNNEL_TOKEN:-}" ] && [ -n "${APP_PUBLIC_URL:-}" ]; then
     set_env TUNNEL_TOKEN "$TUNNEL_TOKEN"
     set_env APP_PUBLIC_URL "$APP_PUBLIC_URL"
     WANT_TUNNEL=1
     info "Cloudflare tunnel configured from environment."
+  elif [ -f docker-compose.tunnel.yml ] || [ -n "$(read_env TUNNEL_TOKEN)" ]; then
+    WANT_TUNNEL=1
   fi
 fi
 
@@ -214,10 +210,12 @@ docker compose -f "$COMPOSE_FILE" pull
 
 if [ "$WANT_TUNNEL" = "1" ]; then
   echo ""
-  step "Starting Aethera behind a Cloudflare tunnel..."
+  step "Setting up the Cloudflare tunnel..."
   chmod +x "$CF_SETUP" 2>/dev/null || true
-  # cloudflared-setup.sh is prod-aware and reads TUNNEL_TOKEN + APP_PUBLIC_URL
-  # from .env, so it runs non-interactively here.
+  # cloudflared-setup.sh is prod-aware: it reuses TUNNEL_TOKEN + APP_PUBLIC_URL
+  # from .env when present, and otherwise prompts for them (on /dev/tty, so it
+  # works even though this installer is piped via curl|bash). It builds the
+  # tunnel overlay and brings the whole stack up.
   ./"$CF_SETUP"
 else
   info "Starting Aethera (app + mongo)..."
