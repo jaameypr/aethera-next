@@ -242,12 +242,14 @@ else
 fi
 
 # ── Load config for data dirs + port ─────────
+# NEVER `source .env`: values like the CurseForge key contain `$` sequences
+# which, under `set -u`, expand as unbound variables and fatally kill the
+# script (not catchable by `|| true`). Read only the keys we need, verbatim.
 
-source .env 2>/dev/null || true
-
-DATA_DIR="${AETHERA_DATA_DIR:-./.aethera/run}"
-BACKUP_DIR="${AETHERA_BACKUP_DIR:-./.aethera/backup}"
-UPLOAD_DIR="${AETHERA_WORLD_UPLOAD_DIR:-./.aethera/world_upload}"
+DATA_DIR="$(read_env AETHERA_DATA_DIR)";          DATA_DIR="${DATA_DIR:-./.aethera/run}"
+BACKUP_DIR="$(read_env AETHERA_BACKUP_DIR)";      BACKUP_DIR="${BACKUP_DIR:-./.aethera/backup}"
+UPLOAD_DIR="$(read_env AETHERA_WORLD_UPLOAD_DIR)"; UPLOAD_DIR="${UPLOAD_DIR:-./.aethera/world_upload}"
+APP_PORT="$(read_env APP_PORT)";                  APP_PORT="${APP_PORT:-3000}"
 
 mkdir -p "$DATA_DIR" "$BACKUP_DIR" "$UPLOAD_DIR"
 info "Data directories ready"
