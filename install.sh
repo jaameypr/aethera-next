@@ -14,12 +14,19 @@ set -euo pipefail
 # Environment overrides:
 #   AETHERA_DIR        Target directory      (default: ./aethera)
 #   AETHERA_TAG        Image tag to deploy   (default: latest)
+#   AETHERA_REF        Git ref to fetch companion files from (default: master).
+#                      MUST match the branch/tag this installer came from, e.g.
+#                      AETHERA_REF=experimental when fetched from experimental.
 #   CURSEFORGE_API_KEY Preset CurseForge key (skips the prompt)
 #   TUNNEL_TOKEN +     Preset Cloudflare tunnel token and...
 #   APP_PUBLIC_URL     ...public URL → enables the tunnel non-interactively
 # ─────────────────────────────────────────────
 
-RAW_BASE="https://raw.githubusercontent.com/jaameypr/aethera-next/master"
+# Companion files (compose, env template, cloudflared script) are pulled from
+# the SAME ref this installer was fetched from — otherwise a new installer can
+# drag in stale siblings from master. Override with AETHERA_REF.
+AETHERA_REF="${AETHERA_REF:-master}"
+RAW_BASE="https://raw.githubusercontent.com/jaameypr/aethera-next/${AETHERA_REF}"
 COMPOSE_FILE="docker-compose.prod.yml"
 CF_SETUP="cloudflared-setup.sh"
 
