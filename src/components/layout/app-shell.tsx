@@ -140,10 +140,11 @@ export function AppShell({ children, currentUser, projects, moduleItems, isAdmin
                       href={item.href}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-[color,background-color] duration-200 ease-out",
+                        "before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-brand before:transition-[opacity,transform] before:duration-200 before:ease-out",
                         isActive
-                          ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                          ? "bg-accent text-foreground before:scale-y-100 before:opacity-100"
+                          : "text-zinc-600 before:scale-y-0 before:opacity-0 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
                         collapsed && "justify-center px-0",
                       )}
                       title={collapsed ? item.label : undefined}
@@ -179,7 +180,7 @@ export function AppShell({ children, currentUser, projects, moduleItems, isAdmin
                     rel={item.type === "docker" ? "noopener noreferrer" : undefined}
                     onClick={() => setMobileOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-[color,background-color] duration-200 ease-out",
                       "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
                       collapsed && "justify-center px-0",
                     )}
@@ -213,10 +214,11 @@ export function AppShell({ children, currentUser, projects, moduleItems, isAdmin
                         href={href}
                         onClick={() => setMobileOpen(false)}
                         className={cn(
-                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-[color,background-color] duration-200 ease-out",
+                          "before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-brand before:transition-[opacity,transform] before:duration-200 before:ease-out",
                           isActive
-                            ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
+                            ? "bg-accent text-foreground before:scale-y-100 before:opacity-100"
+                            : "text-zinc-600 before:scale-y-0 before:opacity-0 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
                         )}
                       >
                         <FolderKanban className="h-4 w-4 shrink-0" />

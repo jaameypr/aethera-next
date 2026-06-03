@@ -55,7 +55,7 @@ export function AnimatedCounter({
 
   return (
     <span ref={ref} className={cn("tabular-nums", className)}>
-      {format(prev.current)}
+      {format(value)}
     </span>
   );
 }

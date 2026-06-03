@@ -32,6 +32,14 @@ export function UserProfileButton({ user, collapsed }: UserProfileButtonProps) {
     await logoutAction();
   };
 
+  const initials =
+    (user.username ?? "")
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || null;
+
   return (
     <>
       <DropdownMenu>
@@ -39,25 +47,30 @@ export function UserProfileButton({ user, collapsed }: UserProfileButtonProps) {
           <Button
             variant="ghost"
             className={cn(
-              "w-full justify-start gap-3",
+              "w-full justify-start gap-3 transition-colors",
               collapsed && "justify-center px-0",
             )}
           >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
-              <User className="h-4 w-4" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-muted text-xs font-semibold text-brand">
+              {initials ?? <User className="h-4 w-4" />}
             </div>
             {!collapsed && (
               <div className="flex flex-col items-start text-left">
                 <span className="text-sm font-medium">{user.username}</span>
-                <span className="text-xs text-zinc-500">{user.email}</span>
+                <span className="text-xs text-muted-foreground">{user.email}</span>
               </div>
             )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>
-            <p className="font-medium">{user.username}</p>
-            <p className="text-xs font-normal text-zinc-500">{user.email}</p>
+          <DropdownMenuLabel className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-muted text-xs font-semibold text-brand">
+              {initials ?? <User className="h-4 w-4" />}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate font-medium">{user.username}</p>
+              <p className="truncate text-xs font-normal text-muted-foreground">{user.email}</p>
+            </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setProfileOpen(true)}>
