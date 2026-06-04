@@ -18,3 +18,15 @@ describe("en i18n activity block", () => {
     expect(en.activity.bell.viewAll).toBeTypeOf("string");
   });
 });
+
+import { de } from "@/lib/i18n/locales/de";
+
+describe("de i18n activity block", () => {
+  it("has the same activity keys as en", () => {
+    const enKeys = Object.keys(en.activity.actions).sort();
+    const deKeys = Object.keys(de.activity.actions).sort();
+    expect(deKeys).toEqual(enKeys);
+    expect(de.activity.feed.title).toBeTypeOf("string");
+    expect(de.activity.bell.title).toBeTypeOf("string");
+  });
+});
