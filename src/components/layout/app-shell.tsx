@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { UserProfileButton } from "./user-profile-button";
+import { NotificationBell } from "./NotificationBell";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 import { useLocale } from "@/context/locale-context";
@@ -259,16 +260,20 @@ export function AppShell({ children, currentUser, projects, moduleItems, isAdmin
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Mobile header */}
-        <header className="flex h-14 items-center border-b border-zinc-200 px-4 lg:hidden dark:border-zinc-800">
+        {/* Top header */}
+        <header className="flex h-14 items-center border-b border-zinc-200 px-4 dark:border-zinc-800">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setMobileOpen(true)}
+            className="lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="ml-3 text-lg font-bold">Aethera</span>
+          <span className="ml-3 text-lg font-bold lg:hidden">Aethera</span>
+          <div className="ml-auto flex items-center">
+            <NotificationBell />
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
