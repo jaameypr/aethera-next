@@ -37,6 +37,9 @@ import {
 import type { ServerType, PackSource } from "@/lib/config/server-types";
 import type { IPackReference } from "@/lib/db/models/server";
 
+import { inferJavaVersion } from "@/lib/utils/java-version";
+import { getLatestRelease } from "@/lib/services/minecraft-version.service";
+
 export type { LogEntry };
 
 // ---------------------------------------------------------------------------
@@ -111,10 +114,23 @@ export async function getServer(serverId: string): Promise<IServer | null> {
 
 export async function createServer(
   projectKey: string,
-  data: ServerCreateInput,
+  dataInput: ServerCreateInput,
   actorId: string,
 ): Promise<IServer> {
   await connectDB();
+
+  let data = dataInput;
+
+  // "latest" is a sentinel: resolve it to a concrete release here (the single
+  // resolution point). The wizard only ever sends version: "latest".
+  if (data.version === "latest") {
+    const latest = await getLatestRelease();
+    data = {
+      ...data,
+      resolvedMinecraftVersion: latest,
+      javaVersion: inferJavaVersion(latest),
+    };
+  }
 
   const server = await ServerModel.create({
     ...data,
