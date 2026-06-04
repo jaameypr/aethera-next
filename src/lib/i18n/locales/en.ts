@@ -976,6 +976,8 @@ export const en = {
       loadMore: "Load more",
       loading: "Loading activity…",
       tab: "Activity",
+      sortNewest: "Newest first",
+      sortOldest: "Oldest first",
     },
     bell: {
       title: "Notifications",

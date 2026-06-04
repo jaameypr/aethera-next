@@ -21,7 +21,12 @@ export interface ProjectFeedEntry {
 
 export async function getProjectFeed(
   projectKey: string,
-  opts: { page: number; size: number; excludeActions?: ProjectLogAction[] },
+  opts: {
+    page: number;
+    size: number;
+    excludeActions?: ProjectLogAction[];
+    sort?: "asc" | "desc";
+  },
 ): Promise<{
   entries: ProjectFeedEntry[];
   total: number;
@@ -34,6 +39,7 @@ export async function getProjectFeed(
     page: opts.page,
     size: opts.size,
     excludeActions: opts.excludeActions,
+    sort: opts.sort,
   });
 
   const actorIds = [...new Set(entries.map((e) => e.actor.toString()))];

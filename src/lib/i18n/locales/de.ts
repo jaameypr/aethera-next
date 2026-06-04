@@ -980,6 +980,8 @@ export const de = {
       loadMore: "Mehr laden",
       loading: "Aktivität wird geladen…",
       tab: "Aktivität",
+      sortNewest: "Neueste zuerst",
+      sortOldest: "Älteste zuerst",
     },
     bell: {
       title: "Benachrichtigungen",

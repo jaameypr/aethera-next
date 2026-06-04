@@ -315,7 +315,12 @@ export async function removeMember(
 
 export async function getProjectLogs(
   projectKey: string,
-  options: { page: number; size: number; excludeActions?: ProjectLogAction[] },
+  options: {
+    page: number;
+    size: number;
+    excludeActions?: ProjectLogAction[];
+    sort?: "asc" | "desc";
+  },
 ): Promise<{
   entries: IProjectLog[];
   total: number;
@@ -329,9 +334,11 @@ export async function getProjectLogs(
     filter.action = { $nin: options.excludeActions };
   }
 
+  const sortDir = options.sort === "asc" ? 1 : -1;
+
   const [entries, total] = await Promise.all([
     ProjectLogModel.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: sortDir })
       .skip((options.page - 1) * options.size)
       .limit(options.size)
       .lean<IProjectLog[]>(),

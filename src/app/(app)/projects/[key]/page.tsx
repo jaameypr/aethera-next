@@ -91,11 +91,6 @@ export default async function ProjectDetailPage({ params }: Props) {
         </aside>
       </div>
 
-      {/* Activity */}
-      <section className="animate-fade-in">
-        <ProjectActivitySection projectKey={key} />
-      </section>
-
       {/* Danger zone — owner only */}
       {isOwner && (
         <DeleteProjectSection
@@ -104,6 +99,11 @@ export default async function ProjectDetailPage({ params }: Props) {
           serverCount={servers.length}
         />
       )}
+
+      {/* Activity — de-emphasized: collapsed by default, below the danger zone */}
+      <section className="animate-fade-in">
+        <ProjectActivitySection projectKey={key} />
+      </section>
     </div>
   );
 }

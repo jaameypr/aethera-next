@@ -23,11 +23,13 @@ export const GET = withAuth(async (req: NextRequest, { session, params }) => {
     const excludeActions = excludeParam
       ? (excludeParam.split(",") as ProjectLogAction[])
       : undefined;
+    const sort = url.searchParams.get("sort") === "asc" ? "asc" : "desc";
 
     const result = await getProjectFeed(params.key, {
       page,
       size,
       excludeActions,
+      sort,
     });
     return Response.json(result);
   } catch (error) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback } from "react";
 import { ActivityFeed } from "@/components/activity/ActivityFeed";
 
 interface ProjectActivitySectionProps {
@@ -8,7 +8,9 @@ interface ProjectActivitySectionProps {
 }
 
 export function ProjectActivitySection({ projectKey }: ProjectActivitySectionProps) {
-  useEffect(() => {
+  // Mark the project's activity as seen only once the user actually opens the
+  // (collapsed-by-default) feed — never on mere page load.
+  const markSeen = useCallback(() => {
     void fetch("/api/activity/seen", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -18,5 +20,5 @@ export function ProjectActivitySection({ projectKey }: ProjectActivitySectionPro
     });
   }, [projectKey]);
 
-  return <ActivityFeed projectKey={projectKey} />;
+  return <ActivityFeed projectKey={projectKey} collapsible onExpand={markSeen} />;
 }
