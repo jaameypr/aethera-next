@@ -38,7 +38,12 @@ import type { ServerType, PackSource } from "@/lib/config/server-types";
 import type { IPackReference } from "@/lib/db/models/server";
 
 import { inferJavaVersion } from "@/lib/utils/java-version";
-import { getLatestRelease } from "@/lib/services/minecraft-version.service";
+import {
+  getLatestRelease,
+  versionTracksLatest,
+  isUpdateAvailable,
+} from "@/lib/services/minecraft-version.service";
+import { VersionUpdateAvailableError } from "@/lib/api/errors";
 
 export type { LogEntry };
 
@@ -486,6 +491,15 @@ export async function recreateServer(
 // Use these from API routes to avoid blocking the HTTP response on Docker ops.
 // ---------------------------------------------------------------------------
 
+async function _executeVersionUpdateAndStart(
+  serverId: string,
+  actorId: string,
+  latest: string,
+): Promise<void> {
+  void serverId; void actorId; void latest;
+  throw new Error("not implemented");
+}
+
 /**
  * Atomically claims "starting" state and fires the Docker start in the background.
  * Returns once the status is set; callers should poll /status for the final state.
@@ -494,10 +508,46 @@ export async function recreateServer(
 export async function beginStartServer(
   serverId: string,
   actorId: string,
+  opts?: { versionAction?: "update" | "keep" },
 ): Promise<void> {
   await connectDB();
 
   await assertNoActiveBackupForServer(serverId);
+
+  // --- Version pre-flight (runs BEFORE the status claim) ---
+  const preflight = await ServerModel.findById(serverId);
+  if (preflight && versionTracksLatest(preflight)) {
+    let latest: string | null = null;
+    try {
+      latest = await getLatestRelease();
+    } catch (err) {
+      // Fail-open: a version-check failure must never block a start.
+      console.warn(
+        `[server] Version pre-flight skipped for ${serverId} (Mojang fetch failed):`,
+        err,
+      );
+    }
+
+    if (latest) {
+      const current = preflight.resolvedMinecraftVersion;
+      if (current == null) {
+        // First start: silently adopt the latest release.
+        await ServerModel.findByIdAndUpdate(serverId, {
+          resolvedMinecraftVersion: latest,
+          javaVersion: inferJavaVersion(latest),
+        });
+      } else if (isUpdateAvailable(current, latest)) {
+        if (!opts?.versionAction) {
+          throw new VersionUpdateAvailableError(current, latest);
+        }
+        if (opts.versionAction === "update") {
+          await _executeVersionUpdateAndStart(serverId, actorId, latest);
+          return;
+        }
+        // versionAction === "keep" → fall through to a normal start.
+      }
+    }
+  }
 
   const server = await ServerModel.findOneAndUpdate(
     { _id: serverId, status: { $in: ["stopped", "error"] } },
