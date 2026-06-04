@@ -151,3 +151,28 @@ describe("_executeVersionUpdateAndStart via beginStartServer", () => {
     expect(mockDeploy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("auto-update — backup failure", () => {
+  it("sets error, leaves version unchanged, and never deploys when backup fails", async () => {
+    const { BackupModel } = await import("@/lib/db/models/backup");
+    const s = await makeLatestServer({ resolvedMinecraftVersion: "1.21.3" });
+
+    mockCreateBackup.mockImplementation(async (serverId: string) => {
+      const b = await BackupModel.create({
+        serverId, name: "pre-update", filename: "f.tar.gz", path: "/p/f.tar.gz",
+        size: 0, components: ["world"], status: "failed", strategy: "sync",
+        errorMessage: "disk full", createdBy: ACTOR,
+      });
+      return b.toObject();
+    });
+
+    await svc.beginStartServer(String(s._id), ACTOR, { versionAction: "update" });
+    await new Promise((r) => setTimeout(r, 100));
+
+    const after = await ServerModel.findById(s._id);
+    expect(after!.status).toBe("error");
+    expect(after!.containerStatus).toBe("pre-update backup failed");
+    expect(after!.resolvedMinecraftVersion).toBe("1.21.3");
+    expect(mockDeploy).not.toHaveBeenCalled();
+  });
+});
