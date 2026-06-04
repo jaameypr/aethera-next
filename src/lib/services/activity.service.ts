@@ -2,14 +2,26 @@ import "server-only";
 
 import { connectDB } from "@/lib/db/connection";
 import { UserModel } from "@/lib/db/models/user";
-import { type IProjectLog } from "@/lib/db/models/project-log";
+import { type IProjectLog, type ProjectLogAction } from "@/lib/db/models/project-log";
 import { getProjectLogs } from "@/lib/services/project.service";
 
-export type ProjectFeedEntry = IProjectLog & { actorUsername: string };
+/**
+ * Plain, JSON-serializable feed entry (safe to return from a route and pass to
+ * a client component — no Mongoose Document, ObjectId or Date instances).
+ */
+export interface ProjectFeedEntry {
+  _id: string;
+  projectKey: string;
+  action: ProjectLogAction;
+  actor: string;
+  actorUsername: string;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
 
 export async function getProjectFeed(
   projectKey: string,
-  opts: { page: number; size: number },
+  opts: { page: number; size: number; excludeActions?: ProjectLogAction[] },
 ): Promise<{
   entries: ProjectFeedEntry[];
   total: number;
@@ -21,6 +33,7 @@ export async function getProjectFeed(
   const { entries, total, page, size } = await getProjectLogs(projectKey, {
     page: opts.page,
     size: opts.size,
+    excludeActions: opts.excludeActions,
   });
 
   const actorIds = [...new Set(entries.map((e) => e.actor.toString()))];
@@ -33,8 +46,13 @@ export async function getProjectFeed(
 
   return {
     entries: entries.map((e) => ({
-      ...e,
+      _id: e._id.toString(),
+      projectKey: e.projectKey,
+      action: e.action,
+      actor: e.actor.toString(),
       actorUsername: usernameMap.get(e.actor.toString()) ?? e.actor.toString(),
+      details: e.details,
+      createdAt: e.createdAt.toISOString(),
     })),
     total,
     page,
