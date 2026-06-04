@@ -69,3 +69,36 @@ describe("ActivityRead model", () => {
     expect(await ActivityReadModel.countDocuments({ userId })).toBe(2);
   });
 });
+
+describe("getProjectFeed", () => {
+  it("resolves actor usernames and paginates", async () => {
+    const actor = await UserModel.create({
+      username: "alice",
+      email: "alice@test.local",
+      passwordHash: "x",
+    });
+    await ProjectLogModel.create([
+      { projectKey: "feed", action: "SERVER_STARTED", actor: actor._id, details: {} },
+      { projectKey: "feed", action: "SERVER_STOPPED", actor: actor._id, details: {} },
+    ]);
+
+    const result = await activityService.getProjectFeed("feed", { page: 1, size: 10 });
+
+    expect(result.total).toBe(2);
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries.every((e) => e.actorUsername === "alice")).toBe(true);
+  });
+
+  it("falls back to the actor id when the user is missing", async () => {
+    const orphanId = new mongoose.Types.ObjectId();
+    await ProjectLogModel.create({
+      projectKey: "feed",
+      action: "SERVER_STARTED",
+      actor: orphanId,
+      details: {},
+    });
+
+    const result = await activityService.getProjectFeed("feed", { page: 1, size: 10 });
+    expect(result.entries[0].actorUsername).toBe(orphanId.toString());
+  });
+});
