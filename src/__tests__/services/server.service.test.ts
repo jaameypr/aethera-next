@@ -257,12 +257,13 @@ describe("getRamRemaining", () => {
 });
 
 describe("createServer with version 'latest'", () => {
-  it("resolves to a concrete version and infers java", async () => {
+  it("resolves to a concrete version and defaults to the highest java", async () => {
     const server = await createTestServer({ version: "latest", identifier: "latest-mc" });
 
     expect(server.version).toBe("latest");
     expect(server.resolvedMinecraftVersion).toBe("1.21.4");
-    expect(server.javaVersion).toBe("21");
+    // "latest" servers default to the highest supported Java (future-proof).
+    expect(server.javaVersion).toBe("25");
   });
 
   it("leaves a pinned version untouched", async () => {

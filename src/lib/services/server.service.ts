@@ -37,7 +37,7 @@ import {
 import type { ServerType, PackSource } from "@/lib/config/server-types";
 import type { IPackReference } from "@/lib/db/models/server";
 
-import { inferJavaVersion } from "@/lib/utils/java-version";
+import { HIGHEST_JAVA_VERSION } from "@/lib/utils/java-version";
 import {
   getLatestRelease,
   versionTracksLatest,
@@ -134,7 +134,7 @@ export async function createServer(
     data = {
       ...data,
       resolvedMinecraftVersion: latest,
-      javaVersion: inferJavaVersion(latest),
+      javaVersion: HIGHEST_JAVA_VERSION,
     };
   }
 
@@ -545,7 +545,7 @@ async function _executeVersionUpdateAndStart(
     // 3) Switch version + java, then reload the fresh doc.
     await ServerModel.findByIdAndUpdate(serverId, {
       resolvedMinecraftVersion: latest,
-      javaVersion: inferJavaVersion(latest),
+      javaVersion: HIGHEST_JAVA_VERSION,
     });
     const fresh = await ServerModel.findById(serverId);
     if (!fresh) throw new Error("Server not found");
@@ -659,7 +659,7 @@ export async function beginStartServer(
         // First start: silently adopt the latest release.
         await ServerModel.findByIdAndUpdate(serverId, {
           resolvedMinecraftVersion: latest,
-          javaVersion: inferJavaVersion(latest),
+          javaVersion: HIGHEST_JAVA_VERSION,
         });
       } else if (isUpdateAvailable(current, latest)) {
         if (!opts?.versionAction) {

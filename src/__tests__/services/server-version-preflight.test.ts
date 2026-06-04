@@ -84,7 +84,8 @@ describe("beginStartServer pre-flight — first start", () => {
     await new Promise((r) => setTimeout(r, 50));
     const updated = await ServerModel.findById(s._id);
     expect(updated!.resolvedMinecraftVersion).toBe("1.21.4");
-    expect(updated!.javaVersion).toBe("21");
+    // "latest" servers default to the highest supported Java (future-proof).
+    expect(updated!.javaVersion).toBe("25");
   });
 });
 
@@ -146,7 +147,8 @@ describe("_executeVersionUpdateAndStart via beginStartServer", () => {
       String(s._id), expect.any(Array), ACTOR, { bypassStateGuard: true },
     );
     expect(after!.resolvedMinecraftVersion).toBe("1.21.4");
-    expect(after!.javaVersion).toBe("21");
+    // "latest" servers default to the highest supported Java (future-proof).
+    expect(after!.javaVersion).toBe("25");
     expect(after!.status).toBe("running");
     expect(mockDeploy).toHaveBeenCalledTimes(1);
   });

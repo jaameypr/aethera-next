@@ -69,7 +69,7 @@ import {
   type BackupSelection,
 } from "@/components/backups/backup-selector";
 import { uploadChunked, type UploadProgress } from "@/lib/utils/upload-chunked";
-import { inferJavaVersion, JAVA_VERSIONS } from "@/lib/utils/java-version";
+import { inferJavaVersion, JAVA_VERSIONS, HIGHEST_JAVA_VERSION } from "@/lib/utils/java-version";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -175,10 +175,10 @@ const INITIAL_STATE: WizardState = {
   name: "",
   identifier: "",
   identifierEdited: false,
-  version: "",
+  version: "latest",
   jvmPresetId: DEFAULT_JVM_PRESET?.id ?? "minimal",
   javaArgs: DEFAULT_JVM_PRESET?.flags ?? "",
-  javaVersion: "21",
+  javaVersion: HIGHEST_JAVA_VERSION,
   memory: 2048,
   cpus: null,
   port: 25565,

@@ -1,9 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { inferJavaVersion, JAVA_VERSIONS } from "@/lib/utils/java-version";
+import {
+  inferJavaVersion,
+  JAVA_VERSIONS,
+  HIGHEST_JAVA_VERSION,
+} from "@/lib/utils/java-version";
 
 describe("inferJavaVersion", () => {
   it("JAVA_VERSIONS lists the supported itzg values", () => {
     expect(JAVA_VERSIONS).toEqual(["8", "11", "17", "21", "25"]);
+  });
+
+  it("HIGHEST_JAVA_VERSION is the last (newest) supported value", () => {
+    expect(HIGHEST_JAVA_VERSION).toBe("25");
+  });
+
+  it("maps the 'latest' sentinel to the highest Java (case-insensitive)", () => {
+    expect(inferJavaVersion("latest")).toBe("25");
+    expect(inferJavaVersion("LATEST")).toBe("25");
   });
 
   it("maps 1.16.5 → 8 (legacy)", () => {

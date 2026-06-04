@@ -6,6 +6,10 @@
 export const JAVA_VERSIONS = ["8", "11", "17", "21", "25"] as const;
 export type JavaVersion = (typeof JAVA_VERSIONS)[number];
 
+/** Highest Java version the itzg image supports — the default for "latest" servers. */
+export const HIGHEST_JAVA_VERSION: JavaVersion =
+  JAVA_VERSIONS[JAVA_VERSIONS.length - 1];
+
 /**
  * Maps a snapshot id (e.g. "24w44a") to a Java version by year+week.
  * Boundaries follow Mojang's dev cycles:
@@ -24,6 +28,10 @@ function inferFromSnapshot(year: number, week: number): JavaVersion {
 
 export function inferJavaVersion(mcVersion: string | undefined | null): JavaVersion {
   if (!mcVersion) return "21";
+
+  // "latest" tracks the newest release → use the highest supported Java so the
+  // server is future-proof and never needs a JDK downgrade on auto-update.
+  if (mcVersion.trim().toLowerCase() === "latest") return HIGHEST_JAVA_VERSION;
 
   // Strip pre-release / release-candidate / labelled suffixes:
   // everything from the first "-" or whitespace onward (e.g. "1.21.5-rc1", "1.19 Pre-Release").

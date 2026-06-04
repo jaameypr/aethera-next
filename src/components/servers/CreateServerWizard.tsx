@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { uploadChunked, type UploadProgress } from "@/lib/utils/upload-chunked";
-import { inferJavaVersion, JAVA_VERSIONS } from "@/lib/utils/java-version";
+import { inferJavaVersion, JAVA_VERSIONS, HIGHEST_JAVA_VERSION } from "@/lib/utils/java-version";
 import {
   resolvePackAction,
   createServerAction,
@@ -205,13 +205,13 @@ const initialState: WizardState = {
   name: "",
   identifier: "",
   identifierEdited: false,
-  version: "",
+  version: "latest",
   memory: 2048,
   port: 25565,
   portStatus: "idle",
   jvmPresetId: DEFAULT_JVM_PRESET?.id ?? "minimal",
   javaArgs: DEFAULT_JVM_PRESET?.flags ?? "",
-  javaVersion: "21",
+  javaVersion: HIGHEST_JAVA_VERSION,
   whitelist: true,
   maxPlayers: 20,
   difficulty: "normal",
