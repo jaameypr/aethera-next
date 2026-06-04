@@ -37,3 +37,29 @@ describe("GET /api/activity/unread", () => {
     expect(getUnreadSummary).toHaveBeenCalledWith("u1");
   });
 });
+
+describe("GET /api/activity/recent", () => {
+  it("returns recent entries for the session user", async () => {
+    getGlobalRecent.mockResolvedValue([
+      {
+        _id: "log1",
+        projectKey: "proj-a",
+        action: "SERVER_STARTED",
+        actorUsername: "alice",
+        details: {},
+        createdAt: "2026-06-04T00:00:00.000Z",
+      },
+    ]);
+    const { GET } = await import("@/app/api/activity/recent/route");
+
+    const res = await GET({ url: "http://localhost/api/activity/recent" } as NextRequest, {
+      params: Promise.resolve({}),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].actorUsername).toBe("alice");
+    expect(getGlobalRecent).toHaveBeenCalledWith("u1");
+  });
+});
