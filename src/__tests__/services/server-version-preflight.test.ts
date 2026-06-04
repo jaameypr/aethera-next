@@ -37,6 +37,10 @@ vi.mock("@/lib/services/minecraft-version.service", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/services/minecraft-version.service")>();
   return { ...actual, getLatestRelease: mockGetLatest };
 });
+const mockCreateBackup = vi.fn();
+vi.mock("@/lib/services/backup-strategy.service", () => ({
+  createBackupWithStrategy: mockCreateBackup,
+}));
 
 let svc: typeof import("@/lib/services/server.service");
 let ServerModel: typeof import("@/lib/db/models/server").ServerModel;
@@ -61,6 +65,7 @@ beforeEach(async () => {
   mockDeploy.mockClear();
   mockGetLatest.mockClear();
   mockGetLatest.mockResolvedValue("1.21.4");
+  mockCreateBackup.mockClear();
 });
 
 async function makeLatestServer(over: Record<string, unknown> = {}) {
@@ -115,5 +120,34 @@ describe("beginStartServer pre-flight — update available", () => {
     const after = await ServerModel.findById(s._id);
     expect(after!.status).toBe("running");
     expect(after!.resolvedMinecraftVersion).toBe("1.21.3");
+  });
+});
+
+describe("_executeVersionUpdateAndStart via beginStartServer", () => {
+  it("backs up, switches version+java, deploys, and logs the update", async () => {
+    const { BackupModel } = await import("@/lib/db/models/backup");
+    const s = await makeLatestServer({ resolvedMinecraftVersion: "1.21.3" });
+
+    // The backup completes immediately (status 'completed').
+    mockCreateBackup.mockImplementation(async (serverId: string) => {
+      const b = await BackupModel.create({
+        serverId, name: "pre-update", filename: "f.tar.gz", path: "/p/f.tar.gz",
+        size: 1, components: ["world"], status: "completed", strategy: "sync",
+        createdBy: ACTOR,
+      });
+      return b.toObject();
+    });
+
+    await svc.beginStartServer(String(s._id), ACTOR, { versionAction: "update" });
+    await new Promise((r) => setTimeout(r, 100));
+
+    const after = await ServerModel.findById(s._id);
+    expect(mockCreateBackup).toHaveBeenCalledWith(
+      String(s._id), expect.any(Array), ACTOR, { bypassStateGuard: true },
+    );
+    expect(after!.resolvedMinecraftVersion).toBe("1.21.4");
+    expect(after!.javaVersion).toBe("21");
+    expect(after!.status).toBe("running");
+    expect(mockDeploy).toHaveBeenCalledTimes(1);
   });
 });
