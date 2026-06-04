@@ -568,10 +568,44 @@ function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.
           <p className="text-xs text-zinc-500">Version wird automatisch aus dem Pack übernommen.</p>
         </div>
       ) : (
-        <div className="space-y-1.5">
-          <Label htmlFor="w-version">{isMinecraft ? "Minecraft-Version" : "Version"}</Label>
-          <Input id="w-version" value={state.version} onChange={(e) => dispatch({ type: "SET_FIELD", field: "version", value: e.target.value })} placeholder={t("servers.create.versionPlaceholder")} />
-          <p className="text-xs text-zinc-500">Leer lassen für die neueste Version</p>
+        <div className="space-y-2">
+          {isMinecraft && (
+            <button
+              type="button"
+              aria-pressed={state.version === "latest"}
+              onClick={() =>
+                dispatch({
+                  type: "SET_FIELD",
+                  field: "version",
+                  value: state.version === "latest" ? "" : "latest",
+                })
+              }
+              className={cn(
+                "flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                state.version === "latest"
+                  ? "border-brand bg-brand-muted text-foreground ring-1 ring-brand/40"
+                  : "border-border text-foreground/80 hover:border-brand/40",
+              )}
+            >
+              <span className="font-medium">Latest (immer neueste Release)</span>
+              {state.version === "latest" && <Check className="h-4 w-4 text-brand" />}
+            </button>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="w-version">{isMinecraft ? "Minecraft-Version" : "Version"}</Label>
+            <Input
+              id="w-version"
+              value={state.version === "latest" ? "" : state.version}
+              disabled={state.version === "latest"}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "version", value: e.target.value })}
+              placeholder={t("servers.create.versionPlaceholder")}
+            />
+            <p className="text-xs text-zinc-500">
+              {state.version === "latest"
+                ? "Beim Start wird gegen die neueste Release geprüft."
+                : "Leer lassen für die neueste Version"}
+            </p>
+          </div>
         </div>
       )}
       {isMinecraft && (
@@ -1179,7 +1213,9 @@ export function CreateServerWizard({
           port: state.port,
           memory: state.memory,
           cpus: state.cpus ?? undefined,
-          version: state.packMeta?.mcVersion || state.version || undefined,
+          version:
+            state.packMeta?.mcVersion ||
+            (state.version === "latest" ? "latest" : state.version || undefined),
           serverType: state.serverType,
           packSource: SERVER_TYPE_MAP[state.serverType].packSource,
           packReference: state.packMeta ? state.packReference : undefined,
