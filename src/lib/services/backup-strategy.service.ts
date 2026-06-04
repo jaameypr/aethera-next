@@ -51,15 +51,16 @@ export async function createBackupWithStrategy(
   serverId: string,
   components: BackupComponent[],
   actorId: string,
+  opts: { bypassStateGuard?: boolean } = {},
 ): Promise<IBackup> {
   const caps = await getBackupCapabilities();
 
   if (caps.async) {
-    return createAsyncBackup(serverId, components, actorId, caps.sharing);
+    return createAsyncBackup(serverId, components, actorId, caps.sharing, opts.bypassStateGuard);
   }
 
   // Worker path: create backup off the main thread
-  return createBackupViaWorker(serverId, components, actorId, caps.sharing);
+  return createBackupViaWorker(serverId, components, actorId, caps.sharing, opts.bypassStateGuard);
 }
 
 /* ------------------------------------------------------------------ */
@@ -71,6 +72,7 @@ async function createAsyncBackup(
   components: BackupComponent[],
   actorId: string,
   sharingAvailable: boolean,
+  bypassStateGuard = false,
 ): Promise<IBackup> {
   await connectDB();
 
@@ -78,7 +80,7 @@ async function createAsyncBackup(
   if (!server) throw new Error("Server not found");
 
   // Only allow backup from stable states — reject transitional ones.
-  if (server.status !== "stopped" && server.status !== "running") {
+  if (!bypassStateGuard && server.status !== "stopped" && server.status !== "running") {
     throw badRequest(
       `Cannot start a backup while the server is ${server.status}. ` +
         "Wait for the server to finish before triggering a backup.",
@@ -354,6 +356,7 @@ async function createBackupViaWorker(
   components: BackupComponent[],
   actorId: string,
   sharingAvailable: boolean,
+  bypassStateGuard = false,
 ): Promise<IBackup> {
   await connectDB();
 
@@ -361,7 +364,7 @@ async function createBackupViaWorker(
   if (!server) throw new Error("Server not found");
 
   // Only allow backup from stable states — reject transitional ones.
-  if (server.status !== "stopped" && server.status !== "running") {
+  if (!bypassStateGuard && server.status !== "stopped" && server.status !== "running") {
     throw badRequest(
       `Cannot start a backup while the server is ${server.status}. ` +
         "Wait for the server to finish before triggering a backup.",

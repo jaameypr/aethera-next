@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth/guards";
 import { errorResponse, forbidden, notFound } from "@/lib/api/errors";
-import { getProject, getProjectLogs } from "@/lib/services/project.service";
+import { getProject } from "@/lib/services/project.service";
+import { getProjectFeed } from "@/lib/services/activity.service";
 import type { ProjectLogAction } from "@/lib/db/models/project-log";
 
 export const GET = withAuth(async (req: NextRequest, { session, params }) => {
@@ -23,7 +24,7 @@ export const GET = withAuth(async (req: NextRequest, { session, params }) => {
       ? (excludeParam.split(",") as ProjectLogAction[])
       : undefined;
 
-    const result = await getProjectLogs(params.key, {
+    const result = await getProjectFeed(params.key, {
       page,
       size,
       excludeActions,

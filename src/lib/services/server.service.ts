@@ -37,6 +37,15 @@ import {
 import type { ServerType, PackSource } from "@/lib/config/server-types";
 import type { IPackReference } from "@/lib/db/models/server";
 
+import { inferJavaVersion } from "@/lib/utils/java-version";
+import {
+  getLatestRelease,
+  versionTracksLatest,
+  isUpdateAvailable,
+} from "@/lib/services/minecraft-version.service";
+import { VersionUpdateAvailableError } from "@/lib/api/errors";
+import { createBackupWithStrategy } from "@/lib/services/backup-strategy.service";
+
 export type { LogEntry };
 
 // ---------------------------------------------------------------------------
@@ -111,10 +120,23 @@ export async function getServer(serverId: string): Promise<IServer | null> {
 
 export async function createServer(
   projectKey: string,
-  data: ServerCreateInput,
+  dataInput: ServerCreateInput,
   actorId: string,
 ): Promise<IServer> {
   await connectDB();
+
+  let data = dataInput;
+
+  // "latest" is a sentinel: resolve it to a concrete release here (the single
+  // resolution point). The wizard only ever sends version: "latest".
+  if (data.version === "latest") {
+    const latest = await getLatestRelease();
+    data = {
+      ...data,
+      resolvedMinecraftVersion: latest,
+      javaVersion: inferJavaVersion(latest),
+    };
+  }
 
   const server = await ServerModel.create({
     ...data,
@@ -470,6 +492,139 @@ export async function recreateServer(
 // Use these from API routes to avoid blocking the HTTP response on Docker ops.
 // ---------------------------------------------------------------------------
 
+async function _executeVersionUpdateAndStart(
+  serverId: string,
+  actorId: string,
+  latest: string,
+): Promise<void> {
+  // Claim "starting" first so the UI shows busy and parallel starts are blocked.
+  const claimed = await ServerModel.findOneAndUpdate(
+    { _id: serverId, status: { $in: ["stopped", "error"] } },
+    { $set: { status: "starting" } },
+    { returnDocument: "before" },
+  );
+  if (!claimed) {
+    const current = await ServerModel.findById(serverId);
+    throw new Error(`Server cannot be started from state: ${current?.status ?? "unknown"}`);
+  }
+
+  const from = claimed.resolvedMinecraftVersion ?? null;
+
+  void (async () => {
+    // 1) Pre-update backup — orchestration owns the lifecycle, so bypass the
+    //    "stopped/running only" guard while status is "starting".
+    const backup = await createBackupWithStrategy(
+      serverId,
+      ["world", "config", "mods", "plugins", "datapacks"],
+      actorId,
+      { bypassStateGuard: true },
+    );
+
+    // 2) Wait for the backup to reach a terminal state.
+    const final = await waitForBackupTerminal(backup._id.toString());
+
+    if (final.status !== "completed") {
+      await ServerModel.findByIdAndUpdate(serverId, {
+        status: "error",
+        containerStatus: "pre-update backup failed",
+      });
+      await logAction(claimed.projectKey, "BACKUP_FAILED", actorId, {
+        serverId,
+        backupId: backup._id.toString(),
+        reason: "pre-update backup failed",
+      });
+      return;
+    }
+
+    await logAction(claimed.projectKey, "BACKUP_CREATED", actorId, {
+      serverId,
+      backupId: backup._id.toString(),
+      reason: "pre-update",
+    });
+
+    // 3) Switch version + java, then reload the fresh doc.
+    await ServerModel.findByIdAndUpdate(serverId, {
+      resolvedMinecraftVersion: latest,
+      javaVersion: inferJavaVersion(latest),
+    });
+    const fresh = await ServerModel.findById(serverId);
+    if (!fresh) throw new Error("Server not found");
+
+    // 4) Deploy with the same stale-container retry as _executeStartServer.
+    try {
+      const orch = await getOrchestrator();
+      const dataDir = getServerDataPath(fresh.projectKey, fresh.identifier);
+      await ensureServerDir(fresh.projectKey, fresh.identifier);
+      const config = deployConfigFromDoc(fresh, dataDir);
+
+      let result;
+      try {
+        result = await orch.deploy(config);
+      } catch (deployErr: unknown) {
+        const e = deployErr as { cause?: { json?: { message?: string } }; message?: string };
+        const msg = e?.cause?.json?.message ?? e?.message ?? "";
+        if (msg.includes("is already in use")) {
+          const docker = await getDockerClient();
+          try {
+            const old = docker.getContainer(config.name);
+            await old.remove({ force: true });
+          } catch {
+            // container might already be gone
+          }
+          result = await orch.deploy(config);
+        } else {
+          throw deployErr;
+        }
+      }
+
+      await ServerModel.findByIdAndUpdate(serverId, {
+        containerId: result.containerId,
+        containerStatus: result.status,
+        status: "running",
+      });
+
+      await logAction(fresh.projectKey, "SERVER_VERSION_UPDATED", actorId, {
+        serverId,
+        from,
+        to: latest,
+      });
+      await logAction(fresh.projectKey, "SERVER_STARTED", actorId, {
+        serverId,
+        containerId: result.containerId,
+      });
+    } catch (err) {
+      await ServerModel.findByIdAndUpdate(serverId, {
+        status: "error",
+        containerStatus: err instanceof Error ? err.message : "deploy failed",
+      });
+      throw err;
+    }
+  })().catch((err) =>
+    console.error(`[server] Background version-update start failed for ${serverId}:`, err),
+  );
+}
+
+/**
+ * Polls a backup document until it reaches "completed" or "failed".
+ * Used by the auto-update orchestration which must wait before switching.
+ */
+async function waitForBackupTerminal(
+  backupId: string,
+  timeoutMs = 30 * 60 * 1000,
+  intervalMs = 1000,
+): Promise<{ status: "completed" | "failed" }> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const b = await BackupModel.findById(backupId).lean();
+    if (!b) return { status: "failed" };
+    if (b.status === "completed" || b.status === "failed") {
+      return { status: b.status };
+    }
+    if (Date.now() > deadline) return { status: "failed" };
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
 /**
  * Atomically claims "starting" state and fires the Docker start in the background.
  * Returns once the status is set; callers should poll /status for the final state.
@@ -478,10 +633,46 @@ export async function recreateServer(
 export async function beginStartServer(
   serverId: string,
   actorId: string,
+  opts?: { versionAction?: "update" | "keep" },
 ): Promise<void> {
   await connectDB();
 
   await assertNoActiveBackupForServer(serverId);
+
+  // --- Version pre-flight (runs BEFORE the status claim) ---
+  const preflight = await ServerModel.findById(serverId);
+  if (preflight && versionTracksLatest(preflight)) {
+    let latest: string | null = null;
+    try {
+      latest = await getLatestRelease();
+    } catch (err) {
+      // Fail-open: a version-check failure must never block a start.
+      console.warn(
+        `[server] Version pre-flight skipped for ${serverId} (Mojang fetch failed):`,
+        err,
+      );
+    }
+
+    if (latest) {
+      const current = preflight.resolvedMinecraftVersion;
+      if (current == null) {
+        // First start: silently adopt the latest release.
+        await ServerModel.findByIdAndUpdate(serverId, {
+          resolvedMinecraftVersion: latest,
+          javaVersion: inferJavaVersion(latest),
+        });
+      } else if (isUpdateAvailable(current, latest)) {
+        if (!opts?.versionAction) {
+          throw new VersionUpdateAvailableError(current, latest);
+        }
+        if (opts.versionAction === "update") {
+          await _executeVersionUpdateAndStart(serverId, actorId, latest);
+          return;
+        }
+        // versionAction === "keep" → fall through to a normal start.
+      }
+    }
+  }
 
   const server = await ServerModel.findOneAndUpdate(
     { _id: serverId, status: { $in: ["stopped", "error"] } },

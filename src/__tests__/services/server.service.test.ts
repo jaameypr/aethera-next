@@ -73,6 +73,11 @@ vi.mock("@/lib/services/project.service", () => ({
   logAction: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/lib/services/minecraft-version.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/minecraft-version.service")>();
+  return { ...actual, getLatestRelease: vi.fn().mockResolvedValue("1.21.4") };
+});
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -248,5 +253,22 @@ describe("getRamRemaining", () => {
     expect(ram).toHaveProperty("used");
     expect(ram).toHaveProperty("available");
     expect(ram.total).toBeGreaterThan(0);
+  });
+});
+
+describe("createServer with version 'latest'", () => {
+  it("resolves to a concrete version and infers java", async () => {
+    const server = await createTestServer({ version: "latest", identifier: "latest-mc" });
+
+    expect(server.version).toBe("latest");
+    expect(server.resolvedMinecraftVersion).toBe("1.21.4");
+    expect(server.javaVersion).toBe("21");
+  });
+
+  it("leaves a pinned version untouched", async () => {
+    const server = await createTestServer({ version: "1.20.1", identifier: "pinned-mc" });
+
+    expect(server.version).toBe("1.20.1");
+    expect(server.resolvedMinecraftVersion).toBeUndefined();
   });
 });

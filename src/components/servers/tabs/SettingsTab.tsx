@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Save, Trash2, AlertTriangle, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -247,11 +248,34 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
             {/* Version */}
             <div className="space-y-1">
               <Label htmlFor="s-version">{t("servers.settings.version")}</Label>
-              <Input
-                id="s-version"
-                placeholder="latest"
-                disabled={!editable}
-                {...register("version")}
+              <Controller
+                name="version"
+                control={control}
+                render={({ field }) => (
+                  <div className="space-y-1.5">
+                    <Input
+                      id="s-version"
+                      placeholder="latest"
+                      disabled={!editable || field.value === "latest"}
+                      value={field.value === "latest" ? "" : (field.value ?? "")}
+                      onChange={field.onChange}
+                    />
+                    <button
+                      type="button"
+                      disabled={!editable}
+                      aria-pressed={field.value === "latest"}
+                      onClick={() => field.onChange(field.value === "latest" ? "" : "latest")}
+                      className={cn(
+                        "rounded-md border px-2.5 py-1 text-xs transition-colors disabled:opacity-50",
+                        field.value === "latest"
+                          ? "border-brand bg-brand-muted text-foreground ring-1 ring-brand/40"
+                          : "border-border text-foreground/70 hover:border-brand/40",
+                      )}
+                    >
+                      Latest (immer neueste Release)
+                    </button>
+                  </div>
+                )}
               />
             </div>
 
