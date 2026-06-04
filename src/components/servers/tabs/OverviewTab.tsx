@@ -18,6 +18,14 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { cn } from "@/lib/utils";
 import MetricsCharts, { useMetricsStream } from "@/components/servers/MetricsCharts";
@@ -146,6 +154,8 @@ export function OverviewTab({ server }: OverviewTabProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   // True during a recreate so we don't treat the intermediate "stopped" as terminal.
   const isRecreating = useRef(false);
+  // Update-available prompt: holds {current, latest} when /start returns 409.
+  const [updatePrompt, setUpdatePrompt] = useState<{ current: string | null; latest: string } | null>(null);
 
   // Sync liveStatus when the SSR prop refreshes (after router.refresh() completes).
   useEffect(() => {
@@ -222,6 +232,47 @@ export function OverviewTab({ server }: OverviewTabProps) {
     }
   }
 
+  async function startServer(versionAction?: "update" | "keep") {
+    setLiveStatus("starting");
+    setPendingAction("start");
+    try {
+      const res = await fetch(`/api/servers/${server._id}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(versionAction ? { versionAction } : {}),
+      });
+      if (res.status === 409) {
+        const body = (await res.json().catch(() => ({}))) as {
+          code?: string;
+          current?: string | null;
+          latest?: string;
+        };
+        if (body.code === "VERSION_UPDATE_AVAILABLE" && body.latest) {
+          setLiveStatus(server.status);
+          setUpdatePrompt({ current: body.current ?? null, latest: body.latest });
+          return;
+        }
+        throw new Error((body as { error?: string }).error ?? t("servers.overview.actionFailed"));
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? t("servers.overview.actionFailed"));
+      }
+      toast.success(t("servers.overview.startToast"));
+      // Polling (isTransitional effect) takes over from here.
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("servers.overview.actionFailed"));
+      setLiveStatus(server.status);
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function confirmUpdate(versionAction: "update" | "keep") {
+    setUpdatePrompt(null);
+    await startServer(versionAction);
+  }
+
   const isRunning = liveStatus === "running";
   const isStopped = liveStatus === "stopped" || liveStatus === "error";
 
@@ -290,7 +341,7 @@ export function OverviewTab({ server }: OverviewTabProps) {
               <Button
                 size="sm"
                 variant="brand"
-                onClick={() => handleAction("start", t("servers.overview.startToast"), "starting")}
+                onClick={() => startServer()}
                 disabled={isTransitional || !isStopped}
               >
                 {spinnerOrIcon(Play, "start")}
@@ -406,6 +457,32 @@ export function OverviewTab({ server }: OverviewTabProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Version-update prompt (shown when /start returns 409 VERSION_UPDATE_AVAILABLE) */}
+      <Dialog open={updatePrompt !== null} onOpenChange={(o) => !o && setUpdatePrompt(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("servers.overview.updateTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("servers.overview.updateDesc", {
+                latest: updatePrompt?.latest ?? "",
+                current: updatePrompt?.current ?? "—",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setUpdatePrompt(null)}>
+              {t("servers.overview.updateCancel")}
+            </Button>
+            <Button variant="secondary" onClick={() => confirmUpdate("keep")}>
+              {t("servers.overview.updateKeep")}
+            </Button>
+            <Button variant="brand" onClick={() => confirmUpdate("update")}>
+              {t("servers.overview.updateConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
