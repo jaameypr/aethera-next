@@ -159,3 +159,51 @@ describe("getUnreadSummary", () => {
     expect(summary.perProject["proj-b"]).toBe(1); // only the future-dated one
   });
 });
+
+describe("markSeen idempotency & getGlobalRecent", () => {
+  it("upserts exactly one ActivityRead row on repeated calls", async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    await activityService.markSeen(userId, "p1");
+    const first = await ActivityReadModel.findOne({ userId, projectKey: "p1" }).lean();
+    await activityService.markSeen(userId, "p1");
+    const second = await ActivityReadModel.findOne({ userId, projectKey: "p1" }).lean();
+
+    expect(await ActivityReadModel.countDocuments({ userId, projectKey: "p1" })).toBe(1);
+    expect(second!.lastSeenAt.getTime()).toBeGreaterThanOrEqual(first!.lastSeenAt.getTime());
+  });
+
+  it("returns the newest logs across the user's projects with usernames", async () => {
+    const me = await UserModel.create({
+      username: "me",
+      email: "me@test.local",
+      passwordHash: "x",
+    });
+    const other = await UserModel.create({
+      username: "bob",
+      email: "bob@test.local",
+      passwordHash: "x",
+    });
+    await ProjectModel.create({ name: "P1", key: "g1", owner: me._id, members: [] });
+    await ProjectModel.create({
+      name: "P2",
+      key: "g2",
+      owner: other._id,
+      members: [{ userId: me._id, role: "member" }],
+    });
+    await ProjectModel.create({ name: "Hidden", key: "g3", owner: other._id, members: [] });
+
+    await ProjectLogModel.create([
+      { projectKey: "g1", action: "SERVER_STARTED", actor: other._id, details: { serverName: "mc" }, createdAt: new Date(1000) },
+      { projectKey: "g2", action: "SERVER_STOPPED", actor: other._id, details: {}, createdAt: new Date(2000) },
+      { projectKey: "g3", action: "SERVER_DELETED", actor: other._id, details: {}, createdAt: new Date(3000) },
+    ]);
+
+    const recent = await activityService.getGlobalRecent(me._id.toString(), 15);
+    expect(recent).toHaveLength(2); // g3 excluded (not a member)
+    expect(recent[0].projectKey).toBe("g2"); // newest first
+    expect(recent[0].action).toBe("SERVER_STOPPED");
+    expect(recent[0].actorUsername).toBe("bob");
+    expect(typeof recent[0].createdAt).toBe("string");
+    expect(typeof recent[0]._id).toBe("string");
+  });
+});

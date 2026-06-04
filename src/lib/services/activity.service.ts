@@ -100,3 +100,44 @@ export async function markSeen(userId: string, projectKey: string): Promise<void
     { upsert: true },
   );
 }
+
+export interface GlobalRecentEntry {
+  _id: string;
+  projectKey: string;
+  action: string;
+  actorUsername: string;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
+export async function getGlobalRecent(
+  userId: string,
+  limit = 15,
+): Promise<GlobalRecentEntry[]> {
+  await connectDB();
+
+  const keys = await userProjectKeys(userId);
+  if (keys.length === 0) return [];
+
+  const logs = await ProjectLogModel.find({ projectKey: { $in: keys } })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean<IProjectLog[]>();
+
+  const actorIds = [...new Set(logs.map((l) => l.actor.toString()))];
+  const users = await UserModel.find({ _id: { $in: actorIds } })
+    .select("_id username")
+    .lean();
+  const usernameMap = new Map(
+    users.map((u) => [u._id.toString(), u.username as string]),
+  );
+
+  return logs.map((l) => ({
+    _id: l._id.toString(),
+    projectKey: l.projectKey,
+    action: l.action,
+    actorUsername: usernameMap.get(l.actor.toString()) ?? l.actor.toString(),
+    details: l.details,
+    createdAt: l.createdAt.toISOString(),
+  }));
+}
