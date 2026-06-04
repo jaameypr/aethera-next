@@ -17,10 +17,14 @@ vi.mock("@/lib/services/activity.service", () => ({
   markSeen,
 }));
 
+const getProject = vi.fn();
+vi.mock("@/lib/services/project.service", () => ({ getProject }));
+
 beforeEach(() => {
   getUnreadSummary.mockReset();
   getGlobalRecent.mockReset();
   markSeen.mockReset();
+  getProject.mockReset();
 });
 
 describe("GET /api/activity/unread", () => {
@@ -61,5 +65,52 @@ describe("GET /api/activity/recent", () => {
     expect(body).toHaveLength(1);
     expect(body[0].actorUsername).toBe("alice");
     expect(getGlobalRecent).toHaveBeenCalledWith("u1");
+  });
+});
+
+describe("POST /api/activity/seen", () => {
+  it("marks the project seen for members and returns 204", async () => {
+    getProject.mockResolvedValue({
+      owner: { toString: () => "owner-x" },
+      members: [{ userId: { toString: () => "u1" } }],
+    });
+    const { POST } = await import("@/app/api/activity/seen/route");
+
+    const res = await POST(
+      {
+        json: async () => ({ projectKey: "proj-a" }),
+      } as unknown as NextRequest,
+      { params: Promise.resolve({}) },
+    );
+
+    expect(res.status).toBe(204);
+    expect(markSeen).toHaveBeenCalledWith("u1", "proj-a");
+  });
+
+  it("rejects non-members with 403 and does not mark seen", async () => {
+    getProject.mockResolvedValue({
+      owner: { toString: () => "owner-x" },
+      members: [],
+    });
+    const { POST } = await import("@/app/api/activity/seen/route");
+
+    const res = await POST(
+      {
+        json: async () => ({ projectKey: "proj-a" }),
+      } as unknown as NextRequest,
+      { params: Promise.resolve({}) },
+    );
+
+    expect(res.status).toBe(403);
+    expect(markSeen).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when projectKey is missing", async () => {
+    const { POST } = await import("@/app/api/activity/seen/route");
+    const res = await POST(
+      { json: async () => ({}) } as unknown as NextRequest,
+      { params: Promise.resolve({}) },
+    );
+    expect(res.status).toBe(400);
   });
 });
