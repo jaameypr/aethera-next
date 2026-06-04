@@ -15,8 +15,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLocale } from "@/context/locale-context";
 import { formatActivityLabel } from "@/lib/utils/activity-format";
+import { activityVisual } from "@/lib/utils/activity-visuals";
+import { cn } from "@/lib/utils";
 
 const POLL_MS = 45_000;
+/** Cap the dropdown so a busy feed stays readable — the rest is one click away. */
+const MAX_RECENT = 6;
 
 interface RecentEntry {
   _id: string;
@@ -111,27 +115,33 @@ export function NotificationBell() {
             {t("activity.bell.empty")}
           </div>
         ) : (
-          recent.map((entry) => (
-            <DropdownMenuItem key={entry._id} asChild>
-              <Link
-                href={`/projects/${entry.projectKey}`}
-                onClick={() => markProjectSeen(entry.projectKey)}
-                className="flex flex-col items-start gap-0.5"
-              >
-                <span className="line-clamp-2 text-sm">
-                  {formatActivityLabel(
-                    t,
-                    entry.action,
-                    entry.actorUsername,
-                    entry.details,
-                  )}
-                </span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {entry.projectKey}
-                </span>
-              </Link>
-            </DropdownMenuItem>
-          ))
+          recent.slice(0, MAX_RECENT).map((entry) => {
+            const { Icon, className } = activityVisual(entry.action);
+            return (
+              <DropdownMenuItem key={entry._id} asChild>
+                <Link
+                  href={`/projects/${entry.projectKey}`}
+                  onClick={() => markProjectSeen(entry.projectKey)}
+                  className="flex items-start gap-2"
+                >
+                  <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", className)} />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="line-clamp-2 text-sm">
+                      {formatActivityLabel(
+                        t,
+                        entry.action,
+                        entry.actorUsername,
+                        entry.details,
+                      )}
+                    </span>
+                    <span className="truncate font-mono text-xs text-muted-foreground">
+                      {entry.projectKey}
+                    </span>
+                  </span>
+                </Link>
+              </DropdownMenuItem>
+            );
+          })
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
