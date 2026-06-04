@@ -36,14 +36,18 @@ function req(body?: unknown) {
 describe("POST /start", () => {
   it("passes versionAction from the JSON body", async () => {
     mockBegin.mockResolvedValue(undefined);
-    const res = await route.POST(req({ versionAction: "update" }), { id: "s1" });
+    const res = await route.POST(req({ versionAction: "update" }), {
+      id: "s1",
+    } as unknown as { params: Promise<Record<string, string>> });
     expect(res.status).toBe(202);
     expect(mockBegin).toHaveBeenCalledWith("s1", "u1", { versionAction: "update" });
   });
 
   it("tolerates an empty/absent body", async () => {
     mockBegin.mockResolvedValue(undefined);
-    const res = await route.POST(req(), { id: "s1" });
+    const res = await route.POST(req(), {
+      id: "s1",
+    } as unknown as { params: Promise<Record<string, string>> });
     expect(res.status).toBe(202);
     expect(mockBegin).toHaveBeenCalledWith("s1", "u1", { versionAction: undefined });
   });
@@ -51,7 +55,9 @@ describe("POST /start", () => {
   it("maps VersionUpdateAvailableError to 409 with code/current/latest", async () => {
     const { VersionUpdateAvailableError } = await import("@/lib/api/errors");
     mockBegin.mockRejectedValue(new VersionUpdateAvailableError("1.21.3", "1.21.4"));
-    const res = await route.POST(req({}), { id: "s1" });
+    const res = await route.POST(req({}), {
+      id: "s1",
+    } as unknown as { params: Promise<Record<string, string>> });
     expect(res.status).toBe(409);
     const json = await res.json();
     expect(json.code).toBe("VERSION_UPDATE_AVAILABLE");
