@@ -8,6 +8,7 @@ import { connectDB } from "@/lib/db/connection";
 import { ProjectServerSection } from "@/components/projects/ProjectServerSection";
 import { ProjectMembersPanel } from "@/components/projects/ProjectMembersPanel";
 import { DeleteProjectSection } from "@/components/projects/DeleteProjectSection";
+import { ProjectActivitySection } from "@/components/activity/ProjectActivitySection";
 import { getServerT } from "@/lib/i18n/server";
 
 interface Props {
@@ -89,6 +90,11 @@ export default async function ProjectDetailPage({ params }: Props) {
           />
         </aside>
       </div>
+
+      {/* Activity */}
+      <section className="animate-fade-in">
+        <ProjectActivitySection projectKey={key} />
+      </section>
 
       {/* Danger zone — owner only */}
       {isOwner && (
