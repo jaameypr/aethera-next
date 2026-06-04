@@ -82,3 +82,38 @@ describe("beginStartServer pre-flight — first start", () => {
     expect(updated!.javaVersion).toBe("21");
   });
 });
+
+import { VersionUpdateAvailableError } from "@/lib/api/errors";
+
+describe("beginStartServer pre-flight — update available", () => {
+  it("throws VersionUpdateAvailableError when no versionAction is given", async () => {
+    const s = await makeLatestServer({ resolvedMinecraftVersion: "1.21.3" });
+    await expect(svc.beginStartServer(String(s._id), ACTOR)).rejects.toBeInstanceOf(
+      VersionUpdateAvailableError,
+    );
+    // No state change occurred.
+    const after = await ServerModel.findById(s._id);
+    expect(after!.status).toBe("stopped");
+    expect(after!.resolvedMinecraftVersion).toBe("1.21.3");
+    expect(mockDeploy).not.toHaveBeenCalled();
+  });
+
+  it("with versionAction 'keep' starts on the current version unchanged", async () => {
+    const s = await makeLatestServer({ resolvedMinecraftVersion: "1.21.3" });
+    await svc.beginStartServer(String(s._id), ACTOR, { versionAction: "keep" });
+    await new Promise((r) => setTimeout(r, 50));
+    const after = await ServerModel.findById(s._id);
+    expect(after!.resolvedMinecraftVersion).toBe("1.21.3");
+    expect(after!.status).toBe("running");
+  });
+
+  it("fails open and starts normally when Mojang fetch fails", async () => {
+    mockGetLatest.mockRejectedValueOnce(new Error("network"));
+    const s = await makeLatestServer({ resolvedMinecraftVersion: "1.21.3" });
+    await svc.beginStartServer(String(s._id), ACTOR);
+    await new Promise((r) => setTimeout(r, 50));
+    const after = await ServerModel.findById(s._id);
+    expect(after!.status).toBe("running");
+    expect(after!.resolvedMinecraftVersion).toBe("1.21.3");
+  });
+});
