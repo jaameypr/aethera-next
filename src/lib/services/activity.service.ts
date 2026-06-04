@@ -41,3 +41,62 @@ export async function getProjectFeed(
     size,
   };
 }
+
+import mongoose from "mongoose";
+import { ProjectModel } from "@/lib/db/models/project";
+import { ProjectLogModel } from "@/lib/db/models/project-log";
+import { ActivityReadModel } from "@/lib/db/models/activity-read";
+
+const EPOCH = new Date(0);
+
+/** All project keys the user can see (owner or member). */
+async function userProjectKeys(userId: string): Promise<string[]> {
+  const projects = await ProjectModel.find({
+    $or: [{ owner: userId }, { "members.userId": userId }],
+  })
+    .select("key")
+    .lean();
+  return projects.map((p) => p.key as string);
+}
+
+export async function getUnreadSummary(
+  userId: string,
+): Promise<{ total: number; perProject: Record<string, number> }> {
+  await connectDB();
+
+  const keys = await userProjectKeys(userId);
+  if (keys.length === 0) return { total: 0, perProject: {} };
+
+  const reads = await ActivityReadModel.find({ userId, projectKey: { $in: keys } })
+    .select("projectKey lastSeenAt")
+    .lean();
+  const seenMap = new Map(reads.map((r) => [r.projectKey, r.lastSeenAt as Date]));
+
+  const actorObjectId = new mongoose.Types.ObjectId(userId);
+  const perProject: Record<string, number> = {};
+  let total = 0;
+
+  for (const key of keys) {
+    const since = seenMap.get(key) ?? EPOCH;
+    const count = await ProjectLogModel.countDocuments({
+      projectKey: key,
+      createdAt: { $gt: since },
+      actor: { $ne: actorObjectId },
+    });
+    if (count > 0) {
+      perProject[key] = count;
+      total += count;
+    }
+  }
+
+  return { total, perProject };
+}
+
+export async function markSeen(userId: string, projectKey: string): Promise<void> {
+  await connectDB();
+  await ActivityReadModel.updateOne(
+    { userId, projectKey },
+    { $set: { lastSeenAt: new Date() } },
+    { upsert: true },
+  );
+}

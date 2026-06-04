@@ -102,3 +102,60 @@ describe("getProjectFeed", () => {
     expect(result.entries[0].actorUsername).toBe(orphanId.toString());
   });
 });
+
+describe("getUnreadSummary", () => {
+  it("counts unread logs across the user's projects, excluding own actions", async () => {
+    const me = await UserModel.create({
+      username: "me",
+      email: "me@test.local",
+      passwordHash: "x",
+    });
+    const other = await UserModel.create({
+      username: "other",
+      email: "other@test.local",
+      passwordHash: "x",
+    });
+    await ProjectModel.create({ name: "Proj A", key: "proj-a", owner: me._id, members: [] });
+
+    // 2 by other (unread), 1 by me (excluded)
+    await ProjectLogModel.create([
+      { projectKey: "proj-a", action: "SERVER_STARTED", actor: other._id, details: {} },
+      { projectKey: "proj-a", action: "SERVER_STOPPED", actor: other._id, details: {} },
+      { projectKey: "proj-a", action: "BACKUP_CREATED", actor: me._id, details: {} },
+    ]);
+
+    const summary = await activityService.getUnreadSummary(me._id.toString());
+    expect(summary.total).toBe(2);
+    expect(summary.perProject["proj-a"]).toBe(2);
+  });
+
+  it("respects lastSeenAt as the unread boundary", async () => {
+    const me = await UserModel.create({
+      username: "me",
+      email: "me@test.local",
+      passwordHash: "x",
+    });
+    const other = await UserModel.create({
+      username: "other",
+      email: "other@test.local",
+      passwordHash: "x",
+    });
+    await ProjectModel.create({
+      name: "Proj B",
+      key: "proj-b",
+      owner: other._id,
+      members: [{ userId: me._id, role: "member" }],
+    });
+
+    const old = new Date(Date.now() - 60_000);
+    const fresh = new Date(Date.now() + 60_000);
+    await ProjectLogModel.create([
+      { projectKey: "proj-b", action: "SERVER_STARTED", actor: other._id, details: {}, createdAt: old },
+      { projectKey: "proj-b", action: "SERVER_STOPPED", actor: other._id, details: {}, createdAt: fresh },
+    ]);
+    await activityService.markSeen(me._id.toString(), "proj-b"); // lastSeenAt = now
+
+    const summary = await activityService.getUnreadSummary(me._id.toString());
+    expect(summary.perProject["proj-b"]).toBe(1); // only the future-dated one
+  });
+});
