@@ -44,3 +44,42 @@ describe("getLatestRelease", () => {
     await expect(svc.getLatestRelease()).rejects.toThrow();
   });
 });
+
+import type { IServer } from "@/lib/db/models/server";
+
+const asServer = (o: Partial<IServer>) => o as IServer;
+
+describe("versionTracksLatest", () => {
+  it("is true only when version === 'latest'", () => {
+    expect(svc.versionTracksLatest(asServer({ version: "latest" }))).toBe(true);
+    expect(svc.versionTracksLatest(asServer({ version: "1.21.4" }))).toBe(false);
+    expect(svc.versionTracksLatest(asServer({ version: undefined }))).toBe(false);
+  });
+});
+
+describe("isUpdateAvailable", () => {
+  it("is true when current differs from latest", () => {
+    expect(svc.isUpdateAvailable("1.21.3", "1.21.4")).toBe(true);
+  });
+  it("is false when current equals latest", () => {
+    expect(svc.isUpdateAvailable("1.21.4", "1.21.4")).toBe(false);
+  });
+  it("is true when current is null/undefined", () => {
+    expect(svc.isUpdateAvailable(null, "1.21.4")).toBe(true);
+    expect(svc.isUpdateAvailable(undefined, "1.21.4")).toBe(true);
+  });
+});
+
+describe("resolveEffectiveVersion", () => {
+  it("returns resolvedMinecraftVersion when tracking latest", () => {
+    expect(
+      svc.resolveEffectiveVersion(asServer({ version: "latest", resolvedMinecraftVersion: "1.21.4" })),
+    ).toBe("1.21.4");
+  });
+  it("returns version when not tracking latest", () => {
+    expect(svc.resolveEffectiveVersion(asServer({ version: "1.20.1" }))).toBe("1.20.1");
+  });
+  it("returns null when tracking latest but unresolved", () => {
+    expect(svc.resolveEffectiveVersion(asServer({ version: "latest" }))).toBeNull();
+  });
+});

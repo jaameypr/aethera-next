@@ -40,3 +40,32 @@ export async function getLatestRelease(): Promise<string> {
   _cache = { value: release, fetchedAt: Date.now() };
   return release;
 }
+
+import type { IServer } from "@/lib/db/models/server";
+
+/** True when the server is pinned to the "latest" sentinel. */
+export function versionTracksLatest(server: IServer): boolean {
+  return server.version === "latest";
+}
+
+/**
+ * Mojang release strings are exact identifiers — an update is available
+ * whenever the running version differs from the latest release.
+ */
+export function isUpdateAvailable(
+  current: string | null | undefined,
+  latest: string,
+): boolean {
+  return current !== latest;
+}
+
+/**
+ * The concrete version a "latest"-tracking server is currently running on,
+ * or the pinned version for fixed servers. null if "latest" is unresolved.
+ */
+export function resolveEffectiveVersion(server: IServer): string | null {
+  if (versionTracksLatest(server)) {
+    return server.resolvedMinecraftVersion ?? null;
+  }
+  return server.version ?? null;
+}
