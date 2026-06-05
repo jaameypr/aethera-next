@@ -94,12 +94,16 @@ export function serverEnvFromDoc(server: IServer): Record<string, string> {
     }
   }
 
-  // --- Loader version (Forge/Fabric) ---
+  // --- Loader version (Forge/Fabric/NeoForge/Quilt) ---
   if (server.resolvedLoaderVersion) {
     if (server.serverType === "forge" || server.modLoader === "forge") {
       env.FORGE_VERSION = server.resolvedLoaderVersion;
     } else if (server.serverType === "fabric" || server.modLoader === "fabric") {
       env.FABRIC_LOADER_VERSION = server.resolvedLoaderVersion;
+    } else if (server.serverType === "neoforge") {
+      env.NEOFORGE_VERSION = server.resolvedLoaderVersion;
+    } else if (server.serverType === "quilt") {
+      env.QUILT_LOADER_VERSION = server.resolvedLoaderVersion;
     }
   }
 
