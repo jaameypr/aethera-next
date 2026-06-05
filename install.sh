@@ -7,9 +7,10 @@ set -euo pipefail
 #   curl -fsSL https://raw.githubusercontent.com/jaameypr/aethera-next/master/install.sh | bash
 #
 # Interactive when run on a terminal (even via curl | bash): asks for an
-# optional CurseForge API key and whether to expose the panel through a
-# Cloudflare tunnel. Falls back to a non-interactive install when there is
-# no terminal (CI), honouring env vars instead.
+# optional CurseForge API key and how to reach the panel — published on the
+# host port, bound to localhost only (for a local reverse proxy like Caddy),
+# or exposed through a Cloudflare tunnel. Falls back to a non-interactive
+# install when there is no terminal (CI), honouring env vars instead.
 #
 # Environment overrides:
 #   AETHERA_DIR        Target directory      (default: ./aethera)
@@ -20,6 +21,10 @@ set -euo pipefail
 #   CURSEFORGE_API_KEY Preset CurseForge key (skips the prompt)
 #   TUNNEL_TOKEN +     Preset Cloudflare tunnel token and...
 #   APP_PUBLIC_URL     ...public URL → enables the tunnel non-interactively
+#   AETHERA_BIND       loopback|public — bind the panel to 127.0.0.1 (for a
+#                      local reverse proxy like Caddy) instead of publishing it.
+#                      Honoured non-interactively; ignored when a tunnel is set.
+#                      With loopback, set APP_PUBLIC_URL too for correct links.
 # ─────────────────────────────────────────────
 
 # Companion files (compose, env template, cloudflared script) are pulled from
@@ -201,32 +206,55 @@ if have_tty; then
     fi
   fi
 
-  # Cloudflare tunnel — token + hostname are collected HERE (visible prompts on
-  # /dev/tty) and the tunnel is brought up inline later. No child-script handoff,
-  # so it can't dead-end under curl|bash. A saved token / existing overlay means
-  # "bring it up", never "silently skip".
+  # Panel exposure — published (default), localhost-only (for a local reverse
+  # proxy like Caddy), or a Cloudflare tunnel. Tunnel token + hostname are
+  # collected HERE (visible prompts on /dev/tty) and the tunnel is brought up
+  # inline later — no child-script handoff, so it can't dead-end under curl|bash.
+  # A saved token / existing overlay means "bring it up", never "silently skip".
   if [ -f docker-compose.tunnel.yml ] || [ -n "$(read_env TUNNEL_TOKEN)" ]; then
     info "Cloudflare tunnel already configured — it will be (re)started with the stack."
     WANT_TUNNEL=1
   else
+    EXPOSE_PORT="$(read_env APP_PORT)"; EXPOSE_PORT="${EXPOSE_PORT:-3000}"
     echo ""
-    info "Cloudflare Tunnel — expose the panel over HTTPS without opening a port."
-    warn "  (Game-server ports stay published — the tunnel only carries the panel.)"
-    if ask_yn "  Set up a Cloudflare tunnel now? [y/N]: " N; then
-      echo "  Cloudflare dashboard: Zero Trust → Networks → Tunnels → Create → Cloudflared."
-      echo "  Copy the long token after '--token' in the install command it shows."
-      ask CF_TOKEN "  Paste tunnel token: " || true
-      ask CF_HOST  "  Public panel hostname (e.g. panel.example.com): " || true
-      if [ -n "${CF_TOKEN:-}" ] && [ -n "${CF_HOST:-}" ]; then
-        CF_HOST="${CF_HOST#https://}"; CF_HOST="${CF_HOST#http://}"; CF_HOST="${CF_HOST%/}"
-        set_env TUNNEL_TOKEN "$CF_TOKEN"
-        set_env APP_PUBLIC_URL "https://${CF_HOST}"
-        WANT_TUNNEL=1
-        info "Saved tunnel token + public URL to .env"
-      else
-        warn "Token or hostname blank — skipping the tunnel (starting with the published port)."
-      fi
-    fi
+    info "How do you want to reach the panel?"
+    echo "    1) Published on this host  (http://host:${EXPOSE_PORT})        [default]"
+    echo "    2) Localhost only          (127.0.0.1 — behind Caddy/nginx)"
+    echo "    3) Cloudflare Tunnel       (HTTPS, no open port)"
+    ask EXPOSE_CHOICE "  Choice [1]: " || true
+    case "${EXPOSE_CHOICE:-1}" in
+      2)
+        set_env APP_BIND 127.0.0.1
+        info "Panel will bind to 127.0.0.1 — front it with your own reverse proxy."
+        echo "  Optional: the public URL your proxy will serve (for correct links/cookies)."
+        ask RP_URL "  Public URL (e.g. https://panel.example.com, blank to skip): " || true
+        if [ -n "${RP_URL:-}" ]; then
+          RP_URL="${RP_URL#https://}"; RP_URL="${RP_URL#http://}"; RP_URL="${RP_URL%/}"
+          set_env APP_PUBLIC_URL "https://${RP_URL}"
+          info "Saved APP_PUBLIC_URL=https://${RP_URL}"
+        fi
+        ;;
+      3)
+        echo "  Cloudflare dashboard: Zero Trust → Networks → Tunnels → Create → Cloudflared."
+        echo "  Copy the long token after '--token' in the install command it shows."
+        ask CF_TOKEN "  Paste tunnel token: " || true
+        ask CF_HOST  "  Public panel hostname (e.g. panel.example.com): " || true
+        if [ -n "${CF_TOKEN:-}" ] && [ -n "${CF_HOST:-}" ]; then
+          CF_HOST="${CF_HOST#https://}"; CF_HOST="${CF_HOST#http://}"; CF_HOST="${CF_HOST%/}"
+          set_env TUNNEL_TOKEN "$CF_TOKEN"
+          set_env APP_PUBLIC_URL "https://${CF_HOST}"
+          WANT_TUNNEL=1
+          info "Saved tunnel token + public URL to .env"
+        else
+          warn "Token or hostname blank — skipping the tunnel (starting with the published port)."
+        fi
+        ;;
+      *)
+        # Published (default). Reset APP_BIND in case a prior run set loopback.
+        set_env APP_BIND 0.0.0.0
+        info "Panel will be published on the host port."
+        ;;
+    esac
   fi
 else
   # Non-interactive: honour preset env vars / existing config.
@@ -238,6 +266,18 @@ else
     info "Cloudflare tunnel configured from environment."
   elif [ -f docker-compose.tunnel.yml ] || [ -n "$(read_env TUNNEL_TOKEN)" ]; then
     WANT_TUNNEL=1
+  else
+    # No tunnel — honour AETHERA_BIND for headless loopback selection.
+    case "${AETHERA_BIND:-}" in
+      loopback|127.0.0.1)
+        set_env APP_BIND 127.0.0.1
+        [ -n "${APP_PUBLIC_URL:-}" ] && set_env APP_PUBLIC_URL "$APP_PUBLIC_URL"
+        info "AETHERA_BIND=${AETHERA_BIND} — panel bound to 127.0.0.1 (front it with a reverse proxy)."
+        ;;
+      public|0.0.0.0)
+        set_env APP_BIND 0.0.0.0
+        ;;
+    esac
   fi
 fi
 
@@ -293,10 +333,21 @@ fi
 # ── Done ─────────────────────────────────────
 
 echo ""
+APP_BIND_NOW="$(read_env APP_BIND)"
 if [ "$WANT_TUNNEL" = "1" ]; then
   info "✅  Aethera is running behind your Cloudflare tunnel."
   info "    Public URL:  $(read_env APP_PUBLIC_URL)"
   warn "    Finish the route in the Cloudflare dashboard (see the steps above)."
+elif [ "$APP_BIND_NOW" = "127.0.0.1" ]; then
+  info "✅  Aethera is running on http://127.0.0.1:${APP_PORT:-3000} (localhost only)."
+  info "    Point your reverse proxy (Caddy/nginx) at 127.0.0.1:${APP_PORT:-3000}."
+  PUB_URL="$(read_env APP_PUBLIC_URL)"
+  if [ -n "$PUB_URL" ]; then
+    info "    Public URL:  ${PUB_URL}"
+  else
+    warn "    Tip: set APP_PUBLIC_URL in .env to the address your proxy serves (correct links/cookies)."
+  fi
+  warn "First run: set ADMIN_PASSWORD in .env, or complete the /setup wizard via your proxy."
 else
   info "✅  Aethera is running at http://localhost:${APP_PORT:-3000}"
   warn "First run: set ADMIN_PASSWORD in .env, or complete the /setup wizard:"
