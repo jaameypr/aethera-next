@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useEffect, useTransition, useCallback } from "react";
+import { useReducer, useEffect, useTransition, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { z } from "zod";
@@ -88,6 +88,8 @@ const SERVER_TYPE_ICON: Record<ServerType, LucideIcon> = {
   purpur: Layers,
   forge: Boxes,
   fabric: Zap,
+  neoforge: Boxes,
+  quilt: Layers,
   curseforge: Boxes,
   modrinth: Boxes,
 };
@@ -114,6 +116,7 @@ interface WizardState {
   identifierEdited: boolean;
   // Step 2 — Version
   version: string;
+  loaderVersion: string;
   jvmPresetId: string;
   javaArgs: string;
   javaVersion: string;
@@ -176,6 +179,7 @@ const INITIAL_STATE: WizardState = {
   identifier: "",
   identifierEdited: false,
   version: "latest",
+  loaderVersion: "",
   jvmPresetId: DEFAULT_JVM_PRESET?.id ?? "minimal",
   javaArgs: DEFAULT_JVM_PRESET?.flags ?? "",
   javaVersion: HIGHEST_JAVA_VERSION,
@@ -329,7 +333,7 @@ function StepTyp({ state, dispatch }: { state: WizardState; dispatch: React.Disp
   const typeConfig = SERVER_TYPE_MAP[state.serverType];
   const groups = [
     { label: t("servers.create.groupVanilla"), types: ["vanilla", "paper", "spigot", "purpur"] as ServerType[] },
-    { label: t("servers.create.groupMods"), types: ["forge", "fabric"] as ServerType[] },
+    { label: t("servers.create.groupMods"), types: ["forge", "fabric", "neoforge", "quilt"] as ServerType[] },
     { label: t("servers.create.groupModpacks"), types: ["curseforge", "modrinth"] as ServerType[] },
   ];
 
@@ -555,6 +559,7 @@ function StepBasis({ state, dispatch }: { state: WizardState; dispatch: React.Di
 
 function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.Dispatch<WizardAction> }) {
   const { t } = useLocale();
+  const [loaderOpen, setLoaderOpen] = useState(false);
   const typeConfig = SERVER_TYPE_MAP[state.serverType];
   const isPack = typeConfig.isPack;
   const isMinecraft = getRuntimeFromType(state.serverType) === "minecraft";
@@ -606,6 +611,38 @@ function StepVersion({ state, dispatch }: { state: WizardState; dispatch: React.
                 : "Leer lassen für die neueste Version"}
             </p>
           </div>
+        </div>
+      )}
+      {typeConfig.hasLoader && !isPack && (
+        <div className="rounded-md border border-zinc-200 dark:border-zinc-700">
+          <button
+            type="button"
+            onClick={() => setLoaderOpen((o) => !o)}
+            className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            <span>{t("servers.create.loaderVersionAdvanced")}</span>
+            <svg
+              className={cn("h-4 w-4 transition-transform", loaderOpen && "rotate-180")}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {loaderOpen && (
+            <div className="space-y-1.5 border-t border-zinc-200 p-3 dark:border-zinc-700">
+              <Label htmlFor="w-loader-version">{t("servers.create.loaderVersionLabel")}</Label>
+              <Input
+                id="w-loader-version"
+                value={state.loaderVersion}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "loaderVersion", value: e.target.value })}
+                placeholder={t("servers.create.loaderVersionPlaceholder")}
+              />
+              <p className="text-xs text-zinc-500">{t("servers.create.loaderVersionHelp")}</p>
+            </div>
+          )}
         </div>
       )}
       {isMinecraft && (
@@ -1204,6 +1241,12 @@ export function CreateServerWizard({
           !!state.backupSelection ||
           (needsPostWorldSetup && state.worldSource !== "generate");
 
+        const typeCfg = SERVER_TYPE_MAP[state.serverType];
+        const manualLoaderVersion =
+          typeCfg.hasLoader && !typeCfg.isPack && state.loaderVersion.trim()
+            ? state.loaderVersion.trim()
+            : undefined;
+
         const input = {
           name: state.name,
           identifier: state.identifier,
@@ -1220,8 +1263,8 @@ export function CreateServerWizard({
           packSource: SERVER_TYPE_MAP[state.serverType].packSource,
           packReference: state.packMeta ? state.packReference : undefined,
           resolvedMinecraftVersion: state.packMeta?.mcVersion,
-          resolvedLoader: state.packMeta?.loader,
-          resolvedLoaderVersion: state.packMeta?.loaderVersion,
+          resolvedLoader: state.packMeta?.loader ?? (manualLoaderVersion ? state.serverType : undefined),
+          resolvedLoaderVersion: state.packMeta?.loaderVersion ?? manualLoaderVersion,
           javaArgs: state.javaArgs || undefined,
           javaVersion: state.javaVersion || undefined,
           autoStart: needsPostCreation ? false : state.autoStart,
