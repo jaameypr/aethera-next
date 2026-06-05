@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { JVM_FLAG_PRESETS } from "@/lib/constants/jvm-presets";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 interface JvmPresetSelectorProps {
   memory: number;
@@ -25,6 +26,7 @@ export default function JvmPresetSelector({
   javaArgs,
   onJavaArgsChange,
 }: JvmPresetSelectorProps) {
+  const { t } = useLocale();
   return (
     <div className="space-y-1.5">
       <TooltipProvider delayDuration={300}>
@@ -34,8 +36,10 @@ export default function JvmPresetSelector({
             const inRange = memory >= (preset.minRamMb ?? 0);
             const tooltipText =
               !inRange && preset.minRamMb
-                ? `Empfohlen ab ${preset.minRamMb >= 1024 ? `${preset.minRamMb / 1024} GB` : `${preset.minRamMb} MB`}`
-                : preset.description;
+                ? t("servers.jvmPresets.recommendedFrom", {
+                    ram: preset.minRamMb >= 1024 ? `${preset.minRamMb / 1024} GB` : `${preset.minRamMb} MB`,
+                  })
+                : t(`servers.jvmPresets.${preset.id}.description`);
 
             const ramHint = preset.minRamMb
               ? preset.minRamMb >= 1024
@@ -72,7 +76,7 @@ export default function JvmPresetSelector({
                       )}
                     />
                     <span className="flex items-center justify-between gap-2 pl-1.5">
-                      <span className="truncate">{preset.label}</span>
+                      <span className="truncate">{t(`servers.jvmPresets.${preset.id}.label`)}</span>
                       {isSelected ? (
                         <Check className="h-3.5 w-3.5 shrink-0 text-brand animate-fade-in" />
                       ) : ramHint ? (

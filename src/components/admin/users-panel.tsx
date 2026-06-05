@@ -241,7 +241,7 @@ export function AdminUsersPanel({ initialUsers, roles }: AdminUsersPanelProps) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search users…"
+            placeholder={t("admin.users.searchPlaceholder")}
             className="pl-9"
           />
         </div>

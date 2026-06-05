@@ -193,7 +193,7 @@ export function PermissionListEditor({
                           : "bg-destructive-muted text-destructive",
                       )}
                     >
-                      {perm.allow ? "Allow" : "Deny"}
+                      {perm.allow ? t("admin.permEditor.allow") : t("admin.permEditor.deny")}
                     </span>
                     <Button
                       type="button"
@@ -222,7 +222,7 @@ export function PermissionListEditor({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search permissions…"
+            placeholder={t("admin.permEditor.searchPlaceholder")}
             className="pl-8"
           />
         </div>

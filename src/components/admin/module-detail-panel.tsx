@@ -134,9 +134,9 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
   const handleHealthCheck = async () => {
     try {
       const result = await checkModuleHealthAction(mod.moduleId);
-      setHealthStatus(result.healthy ? "✓ Healthy" : `✗ ${result.status}`);
+      setHealthStatus(result.healthy ? t("admin.moduleDetail.healthy") : `✗ ${result.status}`);
     } catch {
-      setHealthStatus("✗ Error");
+      setHealthStatus(t("admin.moduleDetail.healthError"));
     }
   };
 
@@ -311,7 +311,7 @@ export function ModuleDetailPanel({ module: initial }: ModuleDetailPanelProps) {
           {uninstallArmed && (
             <div className="flex animate-shake items-start gap-2 rounded-md border border-destructive/40 bg-destructive-muted px-3 py-2 text-sm text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>This will permanently remove the module and its data.</span>
+              <span>{t("admin.modules.permanentRemove")}</span>
             </div>
           )}
           <DialogFooter>

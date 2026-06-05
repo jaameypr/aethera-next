@@ -17,6 +17,7 @@ import {
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -251,6 +252,7 @@ export function RamChart({ points }: { points: MetricsPoint[] }) {
 
 /** Live connection status line: pulsing brand dot streaming / destructive reconnecting. */
 function ConnectionHeader({ connected, error }: { connected: boolean; error: string | null }) {
+  const { t } = useLocale();
   const ok = connected && !error;
   return (
     <div className="flex items-center gap-2 text-xs font-medium">
@@ -266,7 +268,7 @@ function ConnectionHeader({ connected, error }: { connected: boolean; error: str
         />
       </span>
       <span className={ok ? "text-brand" : "text-destructive"}>
-        {ok ? "Streaming…" : "Reconnecting…"}
+        {ok ? t("servers.overview.streaming") : t("servers.overview.reconnecting")}
       </span>
     </div>
   );

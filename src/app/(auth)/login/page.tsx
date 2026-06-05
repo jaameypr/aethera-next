@@ -43,7 +43,7 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Login failed");
+        setError(data.error || t("auth.login.loginFailed"));
         return;
       }
 

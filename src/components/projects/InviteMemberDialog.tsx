@@ -49,7 +49,7 @@ export function InviteMemberDialog({
     () => [
       {
         value: "admin" as ProjectMemberRole,
-        label: "Admin",
+        label: t("projects.invite.roleAdmin"),
         icon: Shield,
         color: "text-purple-600 dark:text-purple-400",
         bg: "bg-purple-50 dark:bg-purple-950/30",
@@ -59,7 +59,7 @@ export function InviteMemberDialog({
       },
       {
         value: "manager" as ProjectMemberRole,
-        label: "Manager",
+        label: t("projects.invite.roleManager"),
         icon: Wrench,
         color: "text-blue-600 dark:text-blue-400",
         bg: "bg-blue-50 dark:bg-blue-950/30",
@@ -69,7 +69,7 @@ export function InviteMemberDialog({
       },
       {
         value: "viewer" as ProjectMemberRole,
-        label: "Viewer",
+        label: t("projects.invite.roleViewer"),
         icon: Eye,
         color: "text-zinc-600 dark:text-zinc-400",
         bg: "bg-zinc-50 dark:bg-zinc-900",

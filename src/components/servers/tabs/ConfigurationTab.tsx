@@ -187,7 +187,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
               ) : isDirty ? (
                 <span className="flex items-center gap-1.5 text-xs font-medium text-warning">
                   <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse-soft" />
-                  Unsaved changes
+                  {t("servers.settings.unsavedChanges")}
                 </span>
               ) : null}
             </CardTitle>

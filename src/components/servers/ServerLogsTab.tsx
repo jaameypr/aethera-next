@@ -74,7 +74,7 @@ export function ServerLogsTab({ serverId }: { serverId: string }) {
             {t("servers.logs.lines", { count: filtered.length })}
           </span>
           {autoScroll && connected && (
-            <span className="text-xs font-medium text-brand">Following</span>
+            <span className="text-xs font-medium text-brand">{t("servers.logs.following")}</span>
           )}
           {error && <span className="text-sm text-red-500">— {error}</span>}
         </div>

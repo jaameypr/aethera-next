@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed": "npx tsx scripts/seed.ts"
+    "seed": "npx tsx scripts/seed.ts",
+    "i18n:check": "npx tsx scripts/check-i18n-parity.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

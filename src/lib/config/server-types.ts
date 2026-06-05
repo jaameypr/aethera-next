@@ -45,7 +45,7 @@ export interface ServerTypeConfig {
 export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   vanilla: {
     label: "Vanilla",
-    description: "Reiner Vanilla-Server ohne Mods",
+    description: "Pure vanilla server without mods",
     dockerType: "VANILLA",
     isPack: false,
     supportsManualVersion: true,
@@ -54,7 +54,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   paper: {
     label: "Paper",
-    description: "Optimierter Bukkit-Fork mit Plugin-Support",
+    description: "Optimized Bukkit fork with plugin support",
     dockerType: "PAPER",
     isPack: false,
     supportsManualVersion: true,
@@ -63,7 +63,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   spigot: {
     label: "Spigot",
-    description: "Bewährter Bukkit-Fork mit Plugin-Support",
+    description: "Proven Bukkit fork with plugin support",
     dockerType: "SPIGOT",
     isPack: false,
     supportsManualVersion: true,
@@ -72,7 +72,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   purpur: {
     label: "Purpur",
-    description: "Paper-Fork mit erweiterten Konfigurationsoptionen",
+    description: "Paper fork with extended configuration options",
     dockerType: "PURPUR",
     isPack: false,
     supportsManualVersion: true,
@@ -81,7 +81,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   forge: {
     label: "Forge",
-    description: "Klassischer Mod-Loader für umfangreiche Mods",
+    description: "Classic mod loader for extensive mods",
     dockerType: "FORGE",
     isPack: false,
     supportsManualVersion: true,
@@ -90,7 +90,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   fabric: {
     label: "Fabric",
-    description: "Leichtgewichtiger Mod-Loader, schnelle Updates",
+    description: "Lightweight mod loader, fast updates",
     dockerType: "FABRIC",
     isPack: false,
     supportsManualVersion: true,
@@ -99,7 +99,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   neoforge: {
     label: "NeoForge",
-    description: "Moderner Forge-Fork, aktiv weiterentwickelt",
+    description: "Modern Forge fork, actively developed",
     dockerType: "NEOFORGE",
     isPack: false,
     supportsManualVersion: true,
@@ -108,7 +108,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   quilt: {
     label: "Quilt",
-    description: "Fabric-kompatibler Loader mit Erweiterungen",
+    description: "Fabric-compatible loader with extensions",
     dockerType: "QUILT",
     isPack: false,
     supportsManualVersion: true,
@@ -117,7 +117,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   curseforge: {
     label: "CurseForge",
-    description: "Modpack von CurseForge installieren",
+    description: "Install a modpack from CurseForge",
     dockerType: "AUTO_CURSEFORGE",
     packSource: "curseforge",
     isPack: true,
@@ -127,7 +127,7 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
   },
   modrinth: {
     label: "Modrinth",
-    description: "Modpack von Modrinth (.mrpack) installieren",
+    description: "Install a modpack from Modrinth (.mrpack)",
     dockerType: "MODRINTH",
     packSource: "modrinth",
     isPack: true,

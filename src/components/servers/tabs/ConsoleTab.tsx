@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { RefreshCw, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLocale } from "@/context/locale-context";
 
 interface LogLine {
   stream: "stdout" | "stderr";
@@ -49,6 +50,7 @@ function splitTimestamp(message: string): [string | null, string] {
 }
 
 export function ConsoleTab({ serverId, serverStatus }: ConsoleTabProps) {
+  const { t } = useLocale();
   const [lines, setLines] = useState<LogLine[]>([]);
   const [command, setCommand] = useState("");
   const [loading, setLoading] = useState(false);
@@ -150,14 +152,14 @@ export function ConsoleTab({ serverId, serverStatus }: ConsoleTabProps) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        toast.error(body.error ?? "Befehl konnte nicht gesendet werden");
+        toast.error(body.error ?? t("servers.console.sendFailed"));
         return;
       }
       // Brief green border-flash to confirm the command was accepted.
       setSentFlash(true);
       setTimeout(() => setSentFlash(false), 350);
     } catch {
-      toast.error("Netzwerkfehler beim Senden des Befehls");
+      toast.error(t("servers.console.networkError"));
     }
   }
 
@@ -177,7 +179,7 @@ export function ConsoleTab({ serverId, serverStatus }: ConsoleTabProps) {
               )}
             />
           </span>
-          {lines.length} Zeilen
+          {lines.length} {t("servers.console.lines")}
         </span>
         <Button
           variant="outline"
@@ -189,7 +191,7 @@ export function ConsoleTab({ serverId, serverStatus }: ConsoleTabProps) {
           disabled={loading}
         >
           <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", loading && "animate-spin")} />
-          Logs laden
+          {t("servers.console.loadLogs")}
         </Button>
       </div>
 
@@ -200,7 +202,7 @@ export function ConsoleTab({ serverId, serverStatus }: ConsoleTabProps) {
       >
         {lines.length === 0 ? (
           <span className="text-zinc-500">
-            {loading ? "Lade Logs…" : "Keine Logs verfügbar"}
+            {loading ? t("servers.console.loadingLogs") : t("servers.console.noLogs")}
           </span>
         ) : (
           lines.map((line, i) => {
@@ -238,7 +240,7 @@ export function ConsoleTab({ serverId, serverStatus }: ConsoleTabProps) {
           }}
           onKeyDown={handleKeyDown}
           placeholder={
-            isRunning ? "Befehl eingeben…" : "Server muss laufen"
+            isRunning ? t("servers.console.placeholder") : t("servers.console.serverMustRun")
           }
           className={cn(
             "font-mono transition-colors duration-300",

@@ -201,7 +201,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
               ) : isDirty ? (
                 <span className="flex items-center gap-1.5 text-xs font-medium text-warning">
                   <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse-soft" />
-                  Unsaved changes
+                  {t("servers.settings.unsavedChanges")}
                 </span>
               ) : null}
             </CardTitle>
@@ -272,7 +272,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                           : "border-border text-foreground/70 hover:border-brand/40",
                       )}
                     >
-                      Latest (immer neueste Release)
+                      {t("servers.create.latestRelease")}
                     </button>
                   </div>
                 )}

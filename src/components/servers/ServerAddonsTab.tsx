@@ -266,7 +266,7 @@ export function ServerAddonsTab({
         <AddonSection
           serverId={serverId}
           type="mods"
-          label="Mods"
+          label={t("servers.addons.catMods")}
           supportsToggle={true}
         />
       )}
@@ -274,14 +274,14 @@ export function ServerAddonsTab({
         <AddonSection
           serverId={serverId}
           type="plugins"
-          label="Plugins"
+          label={t("servers.addons.catPlugins")}
           supportsToggle={false}
         />
       )}
       <AddonSection
         serverId={serverId}
         type="datapacks"
-        label="Datapacks"
+        label={t("servers.addons.catDatapacks")}
         supportsToggle={true}
       />
       {!supportsMods && !supportsPlugins && (

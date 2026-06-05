@@ -302,7 +302,7 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
           value={systemData.docker?.daemon ?? t("common.unknown")}
           subtitle={
             systemData.docker
-              ? `Circuit: ${systemData.docker.circuit}`
+              ? `${t("admin.dashboard.circuitLabel")}: ${systemData.docker.circuit}`
               : undefined
           }
           icon={Activity}

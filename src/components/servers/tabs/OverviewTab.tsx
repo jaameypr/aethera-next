@@ -284,18 +284,18 @@ export function OverviewTab({ server }: OverviewTabProps) {
     );
 
   const info: { label: string; value: string; mono?: boolean }[] = [
-    { label: "Runtime", value: server.runtime },
-    { label: "Version", value: server.version ?? "latest", mono: true },
-    { label: "Mod-Loader", value: server.modLoader ?? "Vanilla" },
-    { label: "Port", value: String(server.port), mono: true },
+    { label: t("servers.overview.fieldRuntime"), value: server.runtime },
+    { label: t("servers.overview.fieldVersion"), value: server.version ?? "latest", mono: true },
+    { label: t("servers.overview.fieldModLoader"), value: server.modLoader ?? "Vanilla" },
+    { label: t("servers.overview.fieldPort"), value: String(server.port), mono: true },
     {
-      label: "RCON Port",
+      label: t("servers.overview.fieldRconPort"),
       value: server.rconPort ? String(server.rconPort) : "—",
       mono: true,
     },
-    { label: "RAM", value: `${server.memory} MB` },
-    { label: "Identifier", value: server.identifier, mono: true },
-    { label: "Image", value: `${server.image}:${server.tag}`, mono: true },
+    { label: t("servers.overview.fieldRam"), value: `${server.memory} MB` },
+    { label: t("servers.overview.fieldIdentifier"), value: server.identifier, mono: true },
+    { label: t("servers.overview.fieldImage"), value: `${server.image}:${server.tag}`, mono: true },
   ];
 
   const busy = pendingAction !== null || isTransitional;
@@ -303,12 +303,12 @@ export function OverviewTab({ server }: OverviewTabProps) {
   const startReason = isTransitional
     ? t(`servers.status.${liveStatus}`)
     : !isStopped
-      ? "Server is already running"
+      ? t("servers.overview.alreadyRunning")
       : null;
   const runningReason = isTransitional
     ? t(`servers.status.${liveStatus}`)
     : !isRunning
-      ? "Server must be running"
+      ? t("servers.overview.mustBeRunning")
       : null;
 
   // Wrap a disabled button so the reason is explained on hover/focus.
