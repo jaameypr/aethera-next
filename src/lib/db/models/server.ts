@@ -174,7 +174,7 @@ const ExcludedPackModSchema = new Schema<IExcludedPackMod>(
 
 const SERVER_TYPES = [
   "vanilla", "paper", "spigot", "purpur",
-  "forge", "fabric", "curseforge", "modrinth",
+  "forge", "fabric", "neoforge", "quilt", "curseforge", "modrinth",
 ] as const;
 
 const ServerSchema = new Schema<IServer>(

@@ -11,6 +11,8 @@ export type ServerType =
   | "purpur"
   | "forge"
   | "fabric"
+  | "neoforge"
+  | "quilt"
   | "curseforge"
   | "modrinth";
 
@@ -95,6 +97,24 @@ export const SERVER_TYPE_MAP: Record<ServerType, ServerTypeConfig> = {
     hasLoader: true,
     group: "modded",
   },
+  neoforge: {
+    label: "NeoForge",
+    description: "Moderner Forge-Fork, aktiv weiterentwickelt",
+    dockerType: "NEOFORGE",
+    isPack: false,
+    supportsManualVersion: true,
+    hasLoader: true,
+    group: "modded",
+  },
+  quilt: {
+    label: "Quilt",
+    description: "Fabric-kompatibler Loader mit Erweiterungen",
+    dockerType: "QUILT",
+    isPack: false,
+    supportsManualVersion: true,
+    hasLoader: true,
+    group: "modded",
+  },
   curseforge: {
     label: "CurseForge",
     description: "Modpack von CurseForge installieren",
@@ -125,6 +145,8 @@ export const SERVER_TYPE_ORDER: ServerType[] = [
   "purpur",
   "forge",
   "fabric",
+  "neoforge",
+  "quilt",
   "curseforge",
   "modrinth",
 ];

@@ -89,6 +89,8 @@ const SERVER_TYPE_ICON: Record<ServerType, LucideIcon> = {
   purpur: Layers,
   forge: Boxes,
   fabric: Zap,
+  neoforge: Boxes,
+  quilt: Layers,
   curseforge: Boxes,
   modrinth: Boxes,
 };
@@ -151,6 +153,7 @@ interface WizardState {
   identifierEdited: boolean;
   // Step 2 — Version
   version: string;
+  loaderVersion: string;
   // Step 3 — Ressourcen
   memory: number;
   port: number;
@@ -206,6 +209,7 @@ const initialState: WizardState = {
   identifier: "",
   identifierEdited: false,
   version: "latest",
+  loaderVersion: "",
   memory: 2048,
   port: 25565,
   portStatus: "idle",
@@ -395,7 +399,7 @@ function Step0({
   const typeConfig = SERVER_TYPE_MAP[state.serverType];
   const groups: Array<{ label: string; types: ServerType[] }> = [
     { label: t("servers.create.groupVanilla"), types: ["vanilla", "paper", "spigot", "purpur"] },
-    { label: t("servers.create.groupMods"), types: ["forge", "fabric"] },
+    { label: t("servers.create.groupMods"), types: ["forge", "fabric", "neoforge", "quilt"] },
     { label: t("servers.create.groupModpacks"), types: ["curseforge", "modrinth"] },
   ];
 
@@ -710,6 +714,7 @@ function Step2Version({
 }) {
   const { t } = useLocale();
   const [jvmOpen, setJvmOpen] = useState(false);
+  const [loaderOpen, setLoaderOpen] = useState(false);
   const typeConfig = SERVER_TYPE_MAP[state.serverType];
   const isPack = typeConfig.isPack;
   const isMinecraft = getRuntimeFromType(state.serverType) === "minecraft";
@@ -764,6 +769,39 @@ function Step2Version({
                 : "Leer lassen für die neueste Version"}
             </p>
           </div>
+        </div>
+      )}
+
+      {typeConfig.hasLoader && !isPack && (
+        <div className="rounded-md border border-zinc-200 dark:border-zinc-700">
+          <button
+            type="button"
+            onClick={() => setLoaderOpen((o) => !o)}
+            className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            <span>{t("servers.create.loaderVersionAdvanced")}</span>
+            <svg
+              className={cn("h-4 w-4 transition-transform", loaderOpen && "rotate-180")}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {loaderOpen && (
+            <div className="space-y-1.5 border-t border-zinc-200 p-3 dark:border-zinc-700">
+              <Label htmlFor="w-loader-version">{t("servers.create.loaderVersionLabel")}</Label>
+              <Input
+                id="w-loader-version"
+                value={state.loaderVersion}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "loaderVersion", value: e.target.value })}
+                placeholder={t("servers.create.loaderVersionPlaceholder")}
+              />
+              <p className="text-xs text-zinc-500">{t("servers.create.loaderVersionHelp")}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1313,6 +1351,12 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
           !!state.backupSelection ||
           (needsPostWorldSetup && state.worldSource !== "generate");
 
+        const typeCfg = SERVER_TYPE_MAP[state.serverType];
+        const manualLoaderVersion =
+          typeCfg.hasLoader && !typeCfg.isPack && state.loaderVersion.trim()
+            ? state.loaderVersion.trim()
+            : undefined;
+
         const input = {
           name: state.name,
           identifier: state.identifier,
@@ -1328,8 +1372,8 @@ export function CreateServerWizard({ projectKey, blueprintId, maxRam }: Props) {
           packSource: SERVER_TYPE_MAP[state.serverType].packSource,
           packReference: state.packMeta ? state.packReference : undefined,
           resolvedMinecraftVersion: state.packMeta?.mcVersion,
-          resolvedLoader: state.packMeta?.loader,
-          resolvedLoaderVersion: state.packMeta?.loaderVersion,
+          resolvedLoader: state.packMeta?.loader ?? (manualLoaderVersion ? state.serverType : undefined),
+          resolvedLoaderVersion: state.packMeta?.loaderVersion ?? manualLoaderVersion,
           javaArgs: state.javaArgs || undefined,
           javaVersion: state.javaVersion || undefined,
           autoStart: needsPostCreation ? false : state.autoStart,
