@@ -16,6 +16,7 @@ import {
   Menu,
   Puzzle,
   ExternalLink,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -40,9 +41,11 @@ interface AppShellProps {
   projects?: Array<{ _id: string; key: string; name: string }>;
   moduleItems?: ModuleSidebarItem[];
   isAdmin?: boolean;
+  /** System-admin (`admin.system`) — gates the cross-project audit log tab. */
+  canViewAuditLog?: boolean;
 }
 
-export function AppShell({ children, currentUser, projects, moduleItems, isAdmin }: AppShellProps) {
+export function AppShell({ children, currentUser, projects, moduleItems, isAdmin, canViewAuditLog }: AppShellProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -72,6 +75,9 @@ export function AppShell({ children, currentUser, projects, moduleItems, isAdmin
               { label: t("nav.users"), href: "/admin/users", icon: Users },
               { label: t("nav.roles"), href: "/admin/roles", icon: ShieldCheck },
               { label: t("nav.modules"), href: "/admin/modules", icon: Puzzle },
+              ...(canViewAuditLog
+                ? [{ label: t("nav.auditLog"), href: "/admin/audit-log", icon: ScrollText }]
+                : []),
             ],
           },
         ]
