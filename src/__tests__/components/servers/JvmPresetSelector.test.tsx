@@ -12,6 +12,17 @@ vi.mock("@/components/ui/tooltip", () => ({
   TooltipContent: () => null,
 }));
 
+// Provide a real English `t` without the full LocaleProvider (router + server action) stack
+vi.mock("@/context/locale-context", async () => {
+  const i18n = await vi.importActual<typeof import("@/lib/i18n/index")>(
+    "@/lib/i18n/index",
+  );
+  const t = i18n.buildT(i18n.getTranslations("en"));
+  return {
+    useLocale: () => ({ locale: "en", t, setLocale: vi.fn(), isPending: false }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Default props helper
 // ---------------------------------------------------------------------------
