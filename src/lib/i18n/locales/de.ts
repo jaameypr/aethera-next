@@ -274,6 +274,23 @@ export const de = {
       deny: "Verbieten",
       searchPlaceholder: "Berechtigungen suchen…",
     },
+    update: {
+      updateNow: "Jetzt aktualisieren",
+      updating: "Wird aktualisiert…",
+      busy: "Aktualisierung nicht möglich, während Aufgaben laufen. Bitte erneut versuchen, sobald sie abgeschlossen sind.",
+      success: "Aktualisierung gestartet. Das Panel wird in Kürze neu gestartet.",
+      error: "Aktualisierung fehlgeschlagen. Details in den Server-Logs.",
+    },
+  },
+  version: {
+    available: {
+      title: "Aethera {version} ist verfügbar",
+      description:
+        "Eine neuere Version des Panels ist verfügbar. Prüfe das Changelog vor der Aktualisierung.",
+      changelog: "Changelog ansehen",
+      upToDate: "Du verwendest die aktuellste Version.",
+      dismiss: "Schließen",
+    },
   },
   projects: {
     title: "Projekte",
