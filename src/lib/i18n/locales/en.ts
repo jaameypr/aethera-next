@@ -271,6 +271,23 @@ export const en = {
       deny: "Deny",
       searchPlaceholder: "Search permissions…",
     },
+    update: {
+      updateNow: "Update now",
+      updating: "Updating…",
+      busy: "Cannot update while jobs are running. Try again once they finish.",
+      success: "Update started. The panel will restart shortly.",
+      error: "Update failed. Check the server logs for details.",
+    },
+  },
+  version: {
+    available: {
+      title: "Aethera {version} is available",
+      description:
+        "A newer version of the panel is available. Review the changelog before updating.",
+      changelog: "View changelog",
+      upToDate: "You are running the latest version.",
+      dismiss: "Dismiss",
+    },
   },
   projects: {
     title: "Projects",

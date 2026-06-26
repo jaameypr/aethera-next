@@ -31,6 +31,18 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     category: "Admin",
   },
   {
+    name: "admin.system",
+    label: "System Administration",
+    description: "View system metrics, audit log, and apply updates",
+    category: "Admin",
+  },
+  {
+    name: "system.update",
+    label: "Update System",
+    description: "Check for and apply Aethera panel updates",
+    category: "Admin",
+  },
+  {
     name: "project.*",
     label: "All Project Permissions",
     description: "Full access to all projects",
@@ -114,6 +126,8 @@ export const PERMISSION_QUICK_PRESETS: PermissionPreset[] = [
       { name: "admin.users", allow: true },
       { name: "admin.roles", allow: true },
       { name: "admin.mail", allow: true },
+      { name: "admin.system", allow: true },
+      { name: "system.update", allow: true },
       { name: "project.*", allow: true },
       { name: "files.upload", allow: true },
       { name: "files.manage", allow: true },

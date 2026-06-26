@@ -2,7 +2,10 @@ import { requireSession } from "@/lib/auth/guards";
 import { getUserById } from "@/lib/services/user.service";
 import { listProjects } from "@/lib/services/project.service";
 import { listServers } from "@/lib/services/server.service";
+import { listAllRoles } from "@/lib/services/role.service";
 import { checkPermission } from "@/lib/services/permission-check";
+import { hasPermission } from "@/lib/permissions";
+import type { PermissionEntry } from "@/lib/api/types";
 import {
   Card,
   CardHeader,
@@ -14,16 +17,36 @@ import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { EmptyState } from "@/components/ui/empty-state";
+import { VersionAvailableAlert } from "@/components/admin/version-available-alert";
 import { getServerT } from "@/lib/i18n/server";
 
 export default async function DashboardPage() {
   const session = await requireSession();
   const { t } = await getServerT();
-  const [user, projects, canCreate] = await Promise.all([
+  const [user, projects, canCreate, allRoles] = await Promise.all([
     getUserById(session.userId),
     listProjects(session.userId),
     checkPermission(session.userId, "projects.create"),
+    listAllRoles(),
   ]);
+
+  // Mirror the admin layout: resolve the viewer's effective permissions so the
+  // update banner only renders for admins and only offers the update action to
+  // those who hold `system.update`.
+  const rolePermissions: PermissionEntry[] = allRoles
+    .filter((r) => (user?.roles ?? []).includes(r.name))
+    .flatMap((r) => r.permissions);
+  const userPermissions: PermissionEntry[] = user?.permissions ?? [];
+  const isAdmin =
+    hasPermission(userPermissions, rolePermissions, "admin.users") ||
+    hasPermission(userPermissions, rolePermissions, "admin.roles") ||
+    hasPermission(userPermissions, rolePermissions, "admin.system") ||
+    hasPermission(userPermissions, rolePermissions, "admin.mail");
+  const canUpdate = hasPermission(
+    userPermissions,
+    rolePermissions,
+    "system.update",
+  );
 
   const projectsWithServers = await Promise.all(
     projects.map(async (project) => {
@@ -81,6 +104,8 @@ export default async function DashboardPage() {
         </div>
         <CreateProjectDialog canCreate={canCreate} />
       </div>
+
+      {isAdmin && <VersionAvailableAlert canUpdate={canUpdate} />}
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">

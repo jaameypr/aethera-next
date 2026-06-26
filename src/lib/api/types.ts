@@ -105,6 +105,8 @@ export interface RegistryModuleVersion {
   version: string;
   releaseDate: string;
   minAetheraVersion: string;
+  /** Upper bound (inclusive) for the compatible panel version range. */
+  maxAetheraVersion?: string;
   changelog: string;
   /** Pre-built Docker image reference (docker modules). */
   image?: string;

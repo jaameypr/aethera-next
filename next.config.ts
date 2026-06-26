@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import pkg from "./package.json";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -14,6 +15,9 @@ const nextConfig: NextConfig = {
   // so child_process.fork() can resolve it at runtime.
   outputFileTracingIncludes: {
     "/": ["./scripts/backup-worker.js"],
+  },
+  env: {
+    NEXT_PUBLIC_APP_VERSION: pkg.version,
   },
 };
 
