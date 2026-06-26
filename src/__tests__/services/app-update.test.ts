@@ -158,4 +158,24 @@ describe("runUpdate", () => {
     expect(result.status).toBe("pulled");
     expect(result.imageTag).toBe("0.3.0");
   });
+
+  it("never removes the app container under AETHERA_SELF_UPDATE — returns pulled/manual", async () => {
+    // The self-update flag is EXPERIMENTAL: it must NOT tear down aethera-app.
+    // It still only pulls and asks the operator to recreate the container.
+    process.env.AETHERA_SELF_UPDATE = "true";
+    const { createContainer, startContainer } = await import(
+      "@pruefertit/docker-orchestrator"
+    );
+
+    const result = await svc.runUpdate({ wait: false });
+
+    expect(mockPullImage).toHaveBeenCalledTimes(1);
+    // No detached helper container is ever created/started — nothing that could
+    // `docker rm -f aethera-app` without bringing it back.
+    expect(createContainer).not.toHaveBeenCalled();
+    expect(startContainer).not.toHaveBeenCalled();
+    expect(result.status).toBe("pulled");
+    expect(result.manual).toBe(true);
+    expect(result.imageTag).toBe("0.3.0");
+  });
 });
