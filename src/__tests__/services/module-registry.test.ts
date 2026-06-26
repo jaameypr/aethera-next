@@ -148,6 +148,43 @@ describe("module-registry.service", () => {
       expect(result.modules[0].versions[0].version).toBe("1.0.0");
     });
 
+    it("includes a version whose minAetheraVersion EQUALS the panel version (>= boundary)", async () => {
+      process.env.NEXT_PUBLIC_APP_VERSION = "0.2.0";
+      process.env.MODULE_REGISTRY_URL = "https://h/api/registry";
+
+      const registryPayload = makeRegistry([
+        {
+          id: "edge-mod",
+          name: "Edge Mod",
+          description: "",
+          author: "",
+          icon: "",
+          repository: "",
+          category: "test",
+          tags: [],
+          type: "docker",
+          versions: [
+            {
+              version: "1.0.0",
+              releaseDate: "2026-01-01",
+              minAetheraVersion: "0.2.0", // exactly equals panel → keep
+              changelog: "",
+              manifestUrl: "https://h/manifest/1.0.0",
+            },
+          ],
+        },
+      ]);
+
+      const mockFetch = vi.fn().mockResolvedValue(makeOkResponse(registryPayload));
+      vi.stubGlobal("fetch", mockFetch);
+
+      const { fetchRegistry } = await import("@/lib/services/module-registry.service");
+      const result = await fetchRegistry();
+
+      expect(result.modules).toHaveLength(1);
+      expect(result.modules[0].versions.map((v) => v.version)).toEqual(["1.0.0"]);
+    });
+
     it("drops a module entirely when all versions are incompatible", async () => {
       process.env.NEXT_PUBLIC_APP_VERSION = "0.2.0";
       process.env.MODULE_REGISTRY_URL = "https://h/api/registry";
@@ -240,6 +277,61 @@ describe("module-registry.service", () => {
 
       // The module should be dropped because its only version has invalid minAetheraVersion
       expect(result.modules).toHaveLength(0);
+    });
+
+    it("sorts surviving versions newest-first even when the source order is shuffled", async () => {
+      process.env.NEXT_PUBLIC_APP_VERSION = "0.5.0";
+      process.env.MODULE_REGISTRY_URL = "https://h/api/registry";
+
+      // Deliberately out-of-order (a legacy/dumb registry may not sort).
+      const registryPayload = makeRegistry([
+        {
+          id: "mod-a",
+          name: "Mod A",
+          description: "",
+          author: "",
+          icon: "",
+          repository: "",
+          category: "test",
+          tags: [],
+          type: "docker",
+          versions: [
+            {
+              version: "1.2.0",
+              releaseDate: "2026-01-01",
+              minAetheraVersion: "0.1.0",
+              changelog: "",
+              manifestUrl: "https://h/manifest/1.2.0",
+            },
+            {
+              version: "2.0.0",
+              releaseDate: "2026-03-01",
+              minAetheraVersion: "0.1.0",
+              changelog: "",
+              manifestUrl: "https://h/manifest/2.0.0",
+            },
+            {
+              version: "1.10.0",
+              releaseDate: "2026-02-01",
+              minAetheraVersion: "0.1.0",
+              changelog: "",
+              manifestUrl: "https://h/manifest/1.10.0",
+            },
+          ],
+        },
+      ]);
+
+      const mockFetch = vi.fn().mockResolvedValue(makeOkResponse(registryPayload));
+      vi.stubGlobal("fetch", mockFetch);
+
+      const { fetchRegistry } = await import("@/lib/services/module-registry.service");
+      const result = await fetchRegistry();
+
+      expect(result.modules[0].versions.map((v) => v.version)).toEqual([
+        "2.0.0",
+        "1.10.0",
+        "1.2.0",
+      ]);
     });
 
     it("respects maxAetheraVersion — excludes version when panel is above max", async () => {

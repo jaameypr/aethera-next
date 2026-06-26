@@ -33,3 +33,12 @@ export function withinRange(version: string, min: string, max?: string): boolean
 export function isValid(v: string): boolean {
   return semver.valid(v) !== null;
 }
+
+/**
+ * Comparator that orders newest-first when passed to `Array.prototype.sort`.
+ * Returns a negative number when `a` is newer than `b`, positive when older,
+ * zero when equal.
+ */
+export function compareDesc(a: string, b: string): number {
+  return semver.rcompare(a, b);
+}

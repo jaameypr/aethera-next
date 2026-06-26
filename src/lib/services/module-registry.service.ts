@@ -9,7 +9,7 @@ import type {
 import { connectDB } from "@/lib/db/connection";
 import { InstalledModuleModel } from "@/lib/db/models/installed-module";
 import { APP_VERSION } from "@/lib/version";
-import { isValid, withinRange } from "@/lib/utils/semver";
+import { isValid, withinRange, compareDesc } from "@/lib/utils/semver";
 
 /* ------------------------------------------------------------------ */
 /*  Cache                                                              */
@@ -71,6 +71,11 @@ function getRegistryUrl(): string {
  *
  * If minAetheraVersion is missing or invalid, the version is excluded.
  * Per-version errors are swallowed so a bad entry never breaks the whole registry.
+ *
+ * Surviving versions are sorted newest-first (semver-descending) so the panel
+ * is self-consistent regardless of source ordering. The Hub already returns
+ * newest-first, but a legacy/dumb registry may not — and `getModuleCatalog`
+ * trusts `versions[0]` as the latest version for the "update available" badge.
  */
 function gateRegistry(data: ModuleRegistry): ModuleRegistry {
   const gatedModules = data.modules
@@ -84,6 +89,19 @@ function gateRegistry(data: ModuleRegistry): ModuleRegistry {
           return false;
         }
       });
+
+      // Newest-first. Guard against an invalid `version` string (rcompare
+      // throws on bad semver): sort valid versions ahead of invalid ones, and
+      // leave invalid pairs in their original relative order.
+      compatibleVersions.sort((a, b) => {
+        const aValid = isValid(a.version);
+        const bValid = isValid(b.version);
+        if (aValid && bValid) return compareDesc(a.version, b.version);
+        if (aValid) return -1;
+        if (bValid) return 1;
+        return 0;
+      });
+
       return { ...mod, versions: compatibleVersions };
     })
     .filter((mod) => mod.versions.length > 0);
