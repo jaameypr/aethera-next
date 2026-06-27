@@ -181,6 +181,23 @@ else
   info ".env already exists — keeping your existing configuration"
 fi
 
+# ── Module registry sanity check ─────────────
+# The existing .env is intentionally kept on upgrades. But warn loudly if the
+# module registry isn't the Aethera Hub — a stale Paperview /shares URL or an
+# empty value means the module catalog won't load.
+REGISTRY_WARN=""
+REG_URL="$(read_env MODULE_REGISTRY_URL)"
+if [ -z "$REG_URL" ]; then
+  REGISTRY_WARN="MODULE_REGISTRY_URL is empty — the module catalog will be unavailable."
+elif ! printf '%s' "$REG_URL" | grep -q "modules\.getaethera\.de"; then
+  REGISTRY_WARN="MODULE_REGISTRY_URL does not point at the Aethera Hub (modules.getaethera.de) — modules may not load."
+fi
+if [ -n "$REGISTRY_WARN" ]; then
+  warn "⚠  $REGISTRY_WARN"
+  warn "     current:  ${REG_URL:-<unset>}"
+  warn "     expected: MODULE_REGISTRY_URL=https://modules.getaethera.de/api/registry"
+fi
+
 # Pin the chosen image tag into .env so compose + cloudflared-setup.sh agree.
 export AETHERA_TAG="${AETHERA_TAG:-latest}"
 set_env AETHERA_TAG "$AETHERA_TAG"
@@ -365,4 +382,13 @@ fi
 info "Manage with:  docker compose -f ${COMPOSE_FILE} [logs -f | down | pull]"
 if [ "$WANT_TUNNEL" = "1" ] || [ -f docker-compose.tunnel.yml ]; then
   info "Tunnel:       ./${CF_SETUP} --remove   (reopen the host port + drop the tunnel)"
+fi
+
+# Re-surface the registry warning at the very end — under curl | bash the early
+# output scrolls past, so repeat it where the admin will actually see it.
+if [ -n "$REGISTRY_WARN" ]; then
+  echo ""
+  warn "⚠  Module registry: $REGISTRY_WARN"
+  warn "     Edit .env → MODULE_REGISTRY_URL=https://modules.getaethera.de/api/registry, then:"
+  warn "       docker compose -f ${COMPOSE_FILE} up -d"
 fi
