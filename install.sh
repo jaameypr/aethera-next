@@ -88,6 +88,31 @@ set_env() {
 }
 read_env() { grep -E "^$1=" .env 2>/dev/null | head -n1 | cut -d= -f2- || true; }
 
+# sync_env_keys — additive .env migration. Appends any KEY present in
+# .env.example but MISSING from .env (verbatim default value); never touches an
+# existing value. Records the added keys in ENV_KEYS_ADDED so the admin can be
+# told to review them. This is how new config (e.g. AETHERA_CHANNEL,
+# AETHERA_HUB_URL) reaches an .env created by an older installer.
+ENV_KEYS_ADDED=""
+sync_env_keys() {
+  [ -f .env.example ] || return 0
+  local added=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|\#*) continue ;; esac   # skip blanks + comments
+    case "$line" in *=*) : ;; *) continue ;; esac
+    local key="${line%%=*}"
+    if ! grep -q "^${key}=" .env 2>/dev/null; then
+      printf '%s\n' "$line" >> .env
+      added="${added:+$added }${key}"
+    fi
+  done < .env.example
+  ENV_KEYS_ADDED="$added"
+  if [ -n "$added" ]; then
+    warn "Added new key(s) from .env.example to your .env — review them:"
+    for k in $added; do warn "    + ${k}=$(read_env "$k")"; done
+  fi
+}
+
 # Generate the cloudflared overlay and bring the stack up with the tunnel.
 # Done INLINE (no child-script handoff) so it works reliably under curl|bash.
 # Expects TUNNEL_TOKEN + APP_PUBLIC_URL already in .env.
@@ -180,6 +205,10 @@ if [ ! -f .env ]; then
 else
   info ".env already exists — keeping your existing configuration"
 fi
+
+# ── Migrate: pull any new keys from .env.example into the existing .env ──
+# Additive only (existing values untouched), so upgrades gain new config.
+sync_env_keys
 
 # ── Module registry sanity check ─────────────
 # The existing .env is intentionally kept on upgrades. But warn loudly if the
@@ -384,8 +413,14 @@ if [ "$WANT_TUNNEL" = "1" ] || [ -f docker-compose.tunnel.yml ]; then
   info "Tunnel:       ./${CF_SETUP} --remove   (reopen the host port + drop the tunnel)"
 fi
 
-# Re-surface the registry warning at the very end — under curl | bash the early
-# output scrolls past, so repeat it where the admin will actually see it.
+# Re-surface migration + registry notices at the very end — under curl | bash
+# the early output scrolls past, so repeat where the admin will actually see it.
+if [ -n "$ENV_KEYS_ADDED" ]; then
+  echo ""
+  warn "New .env keys were added from .env.example — review their values:"
+  for k in $ENV_KEYS_ADDED; do warn "    + ${k}=$(read_env "$k")"; done
+  warn "     (e.g. on a preview install set AETHERA_CHANNEL=experimental, then 'up -d')"
+fi
 if [ -n "$REGISTRY_WARN" ]; then
   echo ""
   warn "⚠  Module registry: $REGISTRY_WARN"
