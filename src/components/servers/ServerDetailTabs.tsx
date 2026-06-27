@@ -13,6 +13,7 @@ import { ServerBackupsTab } from "./ServerBackupsTab";
 import { ServerAccessTab } from "./ServerAccessTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { ConfigurationTab } from "./tabs/ConfigurationTab";
+import { PlayersTab } from "./tabs/PlayersTab";
 import { DiscordTab } from "./tabs/DiscordTab";
 
 interface ServerPlain {
@@ -57,6 +58,7 @@ export function ServerDetailTabs({ server, projectKey, isOwner, userPermissions 
     { value: "addons",    label: t("servers.tabs.addons"),     show: can("server.files") },
     { value: "backups",   label: t("servers.tabs.backups"),    show: can("server.backups") },
     { value: "config",    label: t("servers.tabs.config"),     show: can("server.settings") },
+    { value: "players",   label: t("servers.tabs.players"),    show: can("server.settings") },
     { value: "discord",   label: t("servers.tabs.discord"),    show: can("server.settings") },
     { value: "access",    label: t("servers.tabs.access"),     show: can("server.settings") },
     { value: "settings",  label: t("servers.tabs.settings"),   show: can("server.settings") },
@@ -120,6 +122,15 @@ export function ServerDetailTabs({ server, projectKey, isOwner, userPermissions 
         {visibleValues.has("config") && (
           <TabsContent value="config">
             <ConfigurationTab serverId={server._id} serverStatus={server.status} />
+          </TabsContent>
+        )}
+        {visibleValues.has("players") && (
+          <TabsContent value="players">
+            <PlayersTab
+              serverId={server._id}
+              serverStatus={server.status}
+              serverName={server.name}
+            />
           </TabsContent>
         )}
         {visibleValues.has("discord") && (
