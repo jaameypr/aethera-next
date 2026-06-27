@@ -8,13 +8,16 @@
  *
  * A process cannot cleanly recreate the very container it runs in: tearing down
  * `aethera-app` mid-call would kill this Node process before the new container
- * could be renamed/started, and a detached shell helper that does
- * `docker rm -f aethera-app` would permanently down the panel if anything after
- * the removal fails. The hard requirement is therefore that NO path here removes
- * `aethera-app` without recreating it. Until a verified self-recreate exists,
- * even the `AETHERA_SELF_UPDATE` path stops at "image pulled" and asks the
- * operator (or their compose/run wrapper) to recreate the container. The flag is
- * EXPERIMENTAL and never exercised by unit tests.
+ * could be renamed/started. So when `AETHERA_SELF_UPDATE === "true"` we launch a
+ * DETACHED ONE-SHOT HELPER CONTAINER from the NEW image (`aethera-updater`). The
+ * new image already ships node + dockerode + `scripts/self-update-finish.js`, so
+ * the helper can stop/rename/recreate `aethera-app` and OUTLIVE the old panel.
+ * The finisher does RENAME-BASED ROLLBACK (rename live → `-prev`, create+verify
+ * new, only then delete `-prev`; on any failure it restores `-prev`), so the
+ * panel is never left without a running `aethera-app`. The flag is EXPERIMENTAL.
+ *
+ * With the flag unset (default) we stop at "image pulled" and leave the recreate
+ * to the operator (or their compose/run wrapper).
  *
  * Audit trail: there is no system-level audit model (project.service.logAction
  * is scoped to a project key and a typed ProjectLogAction), so each major step
@@ -30,6 +33,12 @@ import { HttpError } from "@/lib/api/errors";
 
 const IMAGE_NAME = "ghcr.io/jaameypr/aethera-next";
 const APP_CONTAINER = "aethera-app";
+/** Detached one-shot helper that recreates the panel container (#20). */
+const UPDATER_CONTAINER = "aethera-updater";
+/** Network the panel + helper share so the finisher can reach the daemon/DNS. */
+const UPDATER_NETWORK = "aethera-net";
+/** Path the finisher script ships at inside the standalone image. */
+const FINISHER_PATH = "/app/scripts/self-update-finish.js";
 
 /** Poll interval used by `drainJobs`. */
 const POLL_INTERVAL_MS = 1000;
@@ -125,10 +134,11 @@ export interface RunUpdateResult {
  *  1. Confirm an update is actually available (force-refresh the check).
  *  2. Refuse (409) — or wait — if jobs are still in flight.
  *  3. Pull the target image.
- *  4. Return a "pulled, apply manually" status. Recreating `aethera-app` is
- *     left to the operator (or their compose/run wrapper) so a failed teardown
- *     can never leave the panel down. `AETHERA_SELF_UPDATE` is EXPERIMENTAL and
- *     currently only changes the operator instruction that is logged/returned.
+ *  4. If `AETHERA_SELF_UPDATE === "true"` (EXPERIMENTAL): launch a detached
+ *     one-shot helper container from the NEW image that recreates `aethera-app`
+ *     (rename-based rollback), and return `{status:"updating", restarting:true}`.
+ *     Otherwise return "pulled, apply manually" and leave the recreate to the
+ *     operator (or their compose/run wrapper).
  */
 export async function runUpdate(
   opts: RunUpdateOptions = {},
@@ -170,26 +180,58 @@ export async function runUpdate(
 
   // (d) Apply.
   //
-  // Hard requirement: never remove `aethera-app` without recreating it. A clean
-  // self-recreate is not achievable from this process — `recreateContainer`
-  // would stop the very container running this code mid-call, killing the
-  // process before the new container is renamed/started, and a detached
-  // `docker rm -f aethera-app` helper would permanently down the panel on any
-  // post-removal failure. So we stop at "image pulled" in BOTH modes and leave
-  // the actual recreate to the operator (or their compose/run wrapper).
+  // Helper-from-new-image pattern: a process can't cleanly recreate the very
+  // container it runs in, so under AETHERA_SELF_UPDATE we launch a DETACHED
+  // one-shot helper container started FROM THE NEW IMAGE (`aethera-updater`).
+  // That image already ships node + dockerode + `scripts/self-update-finish.js`,
+  // so the helper outlives the old panel and can stop/rename/recreate
+  // `aethera-app`. The finisher does RENAME-BASED ROLLBACK (rename live → -prev,
+  // create+verify new, only then delete -prev; restore -prev on any failure), so
+  // the panel is never left without a running `aethera-app`.
   const selfUpdate = process.env.AETHERA_SELF_UPDATE === "true";
-  const recreateHint = `docker compose -f <your-compose-file> up -d --pull always ${APP_CONTAINER}`;
-  const message = selfUpdate
-    ? `New image pulled. AETHERA_SELF_UPDATE is EXPERIMENTAL and does not auto-recreate the panel: recreate the ${APP_CONTAINER} container to apply (e.g. \`${recreateHint}\`).`
-    : `New image pulled. Recreate the ${APP_CONTAINER} container to apply (e.g. \`${recreateHint}\`).`;
 
-  log("pulled:manual-apply", { imageRef, selfUpdate, recreateHint });
+  if (selfUpdate) {
+    log("self-update:launching-helper", { imageRef });
+
+    // Clear any stale helper from a previous run to avoid a name clash.
+    await docker
+      .getContainer(UPDATER_CONTAINER)
+      .remove({ force: true })
+      .catch(() => {});
+
+    const helper = await docker.createContainer({
+      name: UPDATER_CONTAINER,
+      Image: imageRef,
+      Cmd: ["node", FINISHER_PATH, APP_CONTAINER, imageRef],
+      Labels: { "aethera.role": "updater" },
+      HostConfig: {
+        Binds: ["/var/run/docker.sock:/var/run/docker.sock"],
+        AutoRemove: true,
+        NetworkMode: UPDATER_NETWORK,
+        RestartPolicy: { Name: "no" },
+      },
+    });
+    await helper.start();
+
+    log("self-update:helper-started", { imageRef, container: UPDATER_CONTAINER });
+
+    return {
+      status: "updating",
+      restarting: true,
+      imageTag,
+      message: `New image pulled. The ${APP_CONTAINER} container is being recreated by the detached ${UPDATER_CONTAINER} helper; the panel will restart shortly.`,
+    };
+  }
+
+  // Flag unset: stop at "image pulled" and leave the recreate to the operator.
+  const recreateHint = `docker compose -f <your-compose-file> up -d --pull always ${APP_CONTAINER}`;
+  log("pulled:manual-apply", { imageRef, recreateHint });
 
   return {
     status: "pulled",
     manual: true,
     imageTag,
-    message,
+    message: `New image pulled. Recreate the ${APP_CONTAINER} container to apply (e.g. \`${recreateHint}\`).`,
   };
 }
 

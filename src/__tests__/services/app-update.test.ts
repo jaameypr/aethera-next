@@ -12,14 +12,28 @@ import mongoose from "mongoose";
 
 // ── Mock Docker so no real daemon is ever touched ───────────────────────────
 const mockPullImage = vi.fn().mockResolvedValue(undefined);
+
+// Detached-helper container: dockerode-style createContainer + start spies.
+const mockHelperStart = vi.fn().mockResolvedValue(undefined);
+const mockCreateContainer = vi
+  .fn()
+  .mockResolvedValue({ id: "updater-id", start: mockHelperStart });
+// A pre-existing aethera-updater that runUpdate must force-remove before
+// creating a fresh one (name-clash guard).
+const mockExistingUpdaterRemove = vi.fn().mockResolvedValue(undefined);
+const mockGetContainer = vi.fn().mockReturnValue({
+  remove: mockExistingUpdaterRemove,
+});
+const mockDocker = {
+  getContainer: mockGetContainer,
+  createContainer: mockCreateContainer,
+};
 vi.mock("@/lib/docker/orchestrator", () => ({
   getOrchestrator: vi.fn().mockResolvedValue({ deploy: vi.fn() }),
-  getDockerClient: vi.fn().mockResolvedValue({ getContainer: vi.fn() }),
+  getDockerClient: vi.fn().mockResolvedValue(mockDocker),
 }));
 vi.mock("@pruefertit/docker-orchestrator", () => ({
   pullImage: (...args: unknown[]) => mockPullImage(...args),
-  createContainer: vi.fn().mockResolvedValue("updater-container-id"),
-  startContainer: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Mock the update-check service ───────────────────────────────────────────
@@ -69,6 +83,10 @@ beforeEach(async () => {
   await AsyncJobModel.deleteMany({});
   await InstalledModuleModel.deleteMany({});
   mockPullImage.mockClear();
+  mockCreateContainer.mockClear();
+  mockHelperStart.mockClear();
+  mockGetContainer.mockClear();
+  mockExistingUpdaterRemove.mockClear();
   getUpdateStatus.mockReset();
   getUpdateStatus.mockResolvedValue(UPDATE_AVAILABLE);
   delete process.env.AETHERA_SELF_UPDATE;
@@ -150,32 +168,54 @@ describe("runUpdate", () => {
     expect(mockPullImage).not.toHaveBeenCalled();
   });
 
-  it("pulls the image and returns a status object when nothing is in-flight", async () => {
+  it("pulls the image and returns pulled/manual when AETHERA_SELF_UPDATE is unset", async () => {
     const result = await svc.runUpdate({ wait: false, actorId: "actor-1" });
     expect(mockPullImage).toHaveBeenCalledTimes(1);
     const [, imageRef] = mockPullImage.mock.calls[0];
     expect(imageRef).toBe("ghcr.io/jaameypr/aethera-next:0.3.0");
+    // Without the flag, no detached helper is ever launched.
+    expect(mockCreateContainer).not.toHaveBeenCalled();
     expect(result.status).toBe("pulled");
+    expect(result.manual).toBe(true);
     expect(result.imageTag).toBe("0.3.0");
   });
 
-  it("never removes the app container under AETHERA_SELF_UPDATE — returns pulled/manual", async () => {
-    // The self-update flag is EXPERIMENTAL: it must NOT tear down aethera-app.
-    // It still only pulls and asks the operator to recreate the container.
+  it("launches the detached self-update helper under AETHERA_SELF_UPDATE", async () => {
     process.env.AETHERA_SELF_UPDATE = "true";
-    const { createContainer, startContainer } = await import(
-      "@pruefertit/docker-orchestrator"
-    );
 
-    const result = await svc.runUpdate({ wait: false });
+    const result = await svc.runUpdate({ wait: false, actorId: "actor-1" });
 
+    // Image is pulled first.
     expect(mockPullImage).toHaveBeenCalledTimes(1);
-    // No detached helper container is ever created/started — nothing that could
-    // `docker rm -f aethera-app` without bringing it back.
-    expect(createContainer).not.toHaveBeenCalled();
-    expect(startContainer).not.toHaveBeenCalled();
-    expect(result.status).toBe("pulled");
-    expect(result.manual).toBe(true);
+
+    // Any stale updater is force-removed before a fresh one is created.
+    expect(mockGetContainer).toHaveBeenCalledWith("aethera-updater");
+    expect(mockExistingUpdaterRemove).toHaveBeenCalledWith({ force: true });
+
+    // A detached helper container is created from the NEW image, mounting the
+    // Docker socket and running the finisher against aethera-app.
+    expect(mockCreateContainer).toHaveBeenCalledTimes(1);
+    const arg = mockCreateContainer.mock.calls[0][0];
+    expect(arg.name).toBe("aethera-updater");
+    expect(arg.Image).toBe("ghcr.io/jaameypr/aethera-next:0.3.0");
+    expect(arg.Cmd).toEqual([
+      "node",
+      "/app/scripts/self-update-finish.js",
+      "aethera-app",
+      "ghcr.io/jaameypr/aethera-next:0.3.0",
+    ]);
+    expect(arg.HostConfig.Binds).toContain(
+      "/var/run/docker.sock:/var/run/docker.sock",
+    );
+    expect(arg.HostConfig.AutoRemove).toBe(true);
+    expect(arg.HostConfig.RestartPolicy).toEqual({ Name: "no" });
+    expect(arg.Labels).toMatchObject({ "aethera.role": "updater" });
+
+    // The helper is started.
+    expect(mockHelperStart).toHaveBeenCalledTimes(1);
+
+    expect(result.status).toBe("updating");
+    expect(result.restarting).toBe(true);
     expect(result.imageTag).toBe("0.3.0");
   });
 });
