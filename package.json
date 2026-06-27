@@ -1,6 +1,6 @@
 {
   "name": "aethera",
-  "version": "0.0.2-experimental.10",
+  "version": "0.0.2-experimental.11",
   "private": true,
   "scripts": {
     "dev": "next dev",
