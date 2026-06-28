@@ -8,16 +8,24 @@
  *
  * A process cannot cleanly recreate the very container it runs in: tearing down
  * `aethera-app` mid-call would kill this Node process before the new container
- * could be renamed/started. So when `AETHERA_SELF_UPDATE === "true"` we launch a
- * DETACHED ONE-SHOT HELPER CONTAINER from the NEW image (`aethera-updater`). The
- * new image already ships node + dockerode + `scripts/self-update-finish.js`, so
- * the helper can stop/rename/recreate `aethera-app` and OUTLIVE the old panel.
- * The finisher does RENAME-BASED ROLLBACK (rename live → `-prev`, create+verify
- * new, only then delete `-prev`; on any failure it restores `-prev`), so the
- * panel is never left without a running `aethera-app`. The flag is EXPERIMENTAL.
+ * could be started. So when `AETHERA_SELF_UPDATE === "true"` we launch a
+ * DETACHED ONE-SHOT HELPER CONTAINER (`aethera-updater`, from `docker:cli`) that
+ * OUTLIVES the old panel and DELEGATES the recreate to `docker compose up -d`.
  *
- * With the flag unset (default) we stop at "image pulled" and leave the recreate
- * to the operator (or their compose/run wrapper).
+ * We do NOT hand-recreate the container via dockerode: a hand-built container
+ * loses compose-managed state (network aliases such as `app` that the Cloudflare
+ * tunnel resolves, exact port bindings, the tunnel overlay), leaving the panel
+ * unreachable. Instead we read Compose v2's own labels off `aethera-app`
+ * (`com.docker.compose.project.working_dir`, `…config_files`, `…service`) to
+ * reproduce the exact compose invocation, and let compose apply the full desired
+ * state — it recreates `aethera-app` with correct networking, ports and overlay,
+ * and pulls the new tag. The flag is EXPERIMENTAL.
+ *
+ * If the panel isn't compose-managed (labels missing) we DO NOT hand-recreate —
+ * we fall through to the safe "image pulled, apply manually" return.
+ *
+ * With the flag unset (default) we also stop at "image pulled" and leave the
+ * recreate to the operator (or their compose/run wrapper).
  *
  * Audit trail: there is no system-level audit model (project.service.logAction
  * is scoped to a project key and a typed ProjectLogAction), so each major step
@@ -33,12 +41,8 @@ import { HttpError } from "@/lib/api/errors";
 
 const IMAGE_NAME = "ghcr.io/jaameypr/aethera-next";
 const APP_CONTAINER = "aethera-app";
-/** Detached one-shot helper that recreates the panel container (#20). */
+/** Detached one-shot helper that recreates the panel via docker compose (#20). */
 const UPDATER_CONTAINER = "aethera-updater";
-/** Network the panel + helper share so the finisher can reach the daemon/DNS. */
-const UPDATER_NETWORK = "aethera-net";
-/** Path the finisher script ships at inside the standalone image. */
-const FINISHER_PATH = "/app/scripts/self-update-finish.js";
 
 /** Poll interval used by `drainJobs`. */
 const POLL_INTERVAL_MS = 1000;
@@ -134,11 +138,12 @@ export interface RunUpdateResult {
  *  1. Confirm an update is actually available (force-refresh the check).
  *  2. Refuse (409) — or wait — if jobs are still in flight.
  *  3. Pull the target image.
- *  4. If `AETHERA_SELF_UPDATE === "true"` (EXPERIMENTAL): launch a detached
- *     one-shot helper container from the NEW image that recreates `aethera-app`
- *     (rename-based rollback), and return `{status:"updating", restarting:true}`.
- *     Otherwise return "pulled, apply manually" and leave the recreate to the
- *     operator (or their compose/run wrapper).
+ *  4. If `AETHERA_SELF_UPDATE === "true"` (EXPERIMENTAL) and the panel is
+ *     compose-managed: launch a detached `docker:cli` helper that runs
+ *     `docker compose up -d <service>` (discovered from the panel's compose
+ *     labels) to recreate `aethera-app` with full correct config, and return
+ *     `{status:"updating", restarting:true}`. Otherwise return "pulled, apply
+ *     manually" and leave the recreate to the operator.
  */
 export async function runUpdate(
   opts: RunUpdateOptions = {},
@@ -180,47 +185,92 @@ export async function runUpdate(
 
   // (d) Apply.
   //
-  // Helper-from-new-image pattern: a process can't cleanly recreate the very
+  // Compose-delegation pattern: a process can't cleanly recreate the very
   // container it runs in, so under AETHERA_SELF_UPDATE we launch a DETACHED
-  // one-shot helper container started FROM THE NEW IMAGE (`aethera-updater`).
-  // That image already ships node + dockerode + `scripts/self-update-finish.js`,
-  // so the helper outlives the old panel and can stop/rename/recreate
-  // `aethera-app`. The finisher does RENAME-BASED ROLLBACK (rename live → -prev,
-  // create+verify new, only then delete -prev; restore -prev on any failure), so
-  // the panel is never left without a running `aethera-app`.
+  // one-shot helper container (`aethera-updater`, from `docker:cli`) that
+  // outlives the old panel and runs `docker compose up -d <service>`. We never
+  // hand-recreate via dockerode (that loses compose-managed networking — the
+  // tunnel-resolved `app` alias, port bindings, the tunnel overlay — and leaves
+  // the panel unreachable). Instead we read Compose v2's labels off the live
+  // `aethera-app` container to reproduce its exact compose invocation, and let
+  // compose apply the full desired state (recreate with correct config + pull).
   const selfUpdate = process.env.AETHERA_SELF_UPDATE === "true";
 
   if (selfUpdate) {
-    log("self-update:launching-helper", { imageRef });
+    // Discover how compose manages the panel from the v2 labels it stamps.
+    const info = await docker.getContainer(APP_CONTAINER).inspect();
+    const labels = (info?.Config?.Labels ?? {}) as Record<string, string>;
+    const workingDir = labels["com.docker.compose.project.working_dir"];
+    const configFiles = (labels["com.docker.compose.project.config_files"] ?? "")
+      .split(",")
+      .map((f) => f.trim())
+      .filter(Boolean);
+    const service = labels["com.docker.compose.service"];
 
-    // Clear any stale helper from a previous run to avoid a name clash.
-    await docker
-      .getContainer(UPDATER_CONTAINER)
-      .remove({ force: true })
-      .catch(() => {});
+    if (workingDir && configFiles.length > 0 && service) {
+      log("self-update:compose-helper", {
+        imageRef,
+        workingDir,
+        configFiles,
+        service,
+      });
 
-    const helper = await docker.createContainer({
-      name: UPDATER_CONTAINER,
-      Image: imageRef,
-      Cmd: ["node", FINISHER_PATH, APP_CONTAINER, imageRef],
-      Labels: { "aethera.role": "updater" },
-      HostConfig: {
-        Binds: ["/var/run/docker.sock:/var/run/docker.sock"],
-        AutoRemove: true,
-        NetworkMode: UPDATER_NETWORK,
-        RestartPolicy: { Name: "no" },
-      },
-    });
-    await helper.start();
+      // Clear any stale helper from a previous run to avoid a name clash.
+      await docker
+        .getContainer(UPDATER_CONTAINER)
+        .remove({ force: true })
+        .catch(() => {});
 
-    log("self-update:helper-started", { imageRef, container: UPDATER_CONTAINER });
+      const updaterImage = process.env.AETHERA_UPDATER_IMAGE || "docker:cli";
+      const composeFiles = configFiles.map((f) => `-f '${f}'`).join(" ");
 
-    return {
-      status: "updating",
-      restarting: true,
-      imageTag,
-      message: `New image pulled. The ${APP_CONTAINER} container is being recreated by the detached ${UPDATER_CONTAINER} helper; the panel will restart shortly.`,
-    };
+      const helper = await docker.createContainer({
+        name: UPDATER_CONTAINER,
+        // docker:cli bundles the compose v2 plugin.
+        Image: updaterImage,
+        WorkingDir: workingDir,
+        // APP_TAG fallback so compose deploys the NEW tag even if .env lags.
+        Env: [`APP_TAG=${imageTag}`],
+        Labels: { "aethera.role": "updater" },
+        // Wait for the API response to flush, sync the host .env to the new tag
+        // (for future manual ops), then run the discovered compose command —
+        // compose recreates `aethera-app` with full correct config and pulls.
+        Cmd: [
+          "sh",
+          "-c",
+          `sleep 2; sed -i 's|^APP_TAG=.*|APP_TAG=${imageTag}|' .env 2>/dev/null || true; docker compose ${composeFiles} up -d ${service}`,
+        ],
+        HostConfig: {
+          // Mount the socket + the project dir at its real path so the compose
+          // files and .env resolve exactly as on the host. No NetworkMode needed
+          // — compose handles app networking.
+          Binds: [
+            "/var/run/docker.sock:/var/run/docker.sock",
+            `${workingDir}:${workingDir}`,
+          ],
+          AutoRemove: true,
+          RestartPolicy: { Name: "no" },
+        },
+      });
+      await helper.start();
+
+      log("self-update:helper-started", {
+        imageRef,
+        container: UPDATER_CONTAINER,
+        service,
+      });
+
+      return {
+        status: "updating",
+        restarting: true,
+        imageTag,
+        message: `Recreating ${service} via docker compose; the panel will restart shortly.`,
+      };
+    }
+
+    // Not compose-managed — DO NOT hand-recreate (would break networking).
+    // Fall through to the safe pull-only manual return below.
+    log("self-update:not-compose-managed", { imageRef });
   }
 
   // Flag unset: stop at "image pulled" and leave the recreate to the operator.

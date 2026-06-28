@@ -13,17 +13,33 @@ import mongoose from "mongoose";
 // ── Mock Docker so no real daemon is ever touched ───────────────────────────
 const mockPullImage = vi.fn().mockResolvedValue(undefined);
 
-// Detached-helper container: dockerode-style createContainer + start spies.
+// Detached compose-helper container: dockerode-style createContainer + start.
 const mockHelperStart = vi.fn().mockResolvedValue(undefined);
 const mockCreateContainer = vi
   .fn()
   .mockResolvedValue({ id: "updater-id", start: mockHelperStart });
+// The aethera-app container we inspect to discover its compose labels.
+const COMPOSE_LABELS = {
+  "com.docker.compose.project": "aethera",
+  "com.docker.compose.project.working_dir": "/opt/aethera",
+  "com.docker.compose.project.config_files":
+    "/opt/aethera/docker-compose.prod.yml,/opt/aethera/docker-compose.tunnel.yml",
+  "com.docker.compose.service": "app",
+};
+// inspect() on aethera-app returns compose labels by default; a test may
+// override this to simulate a panel that isn't compose-managed.
+const mockAppInspect = vi
+  .fn()
+  .mockResolvedValue({ Config: { Labels: { ...COMPOSE_LABELS } } });
 // A pre-existing aethera-updater that runUpdate must force-remove before
 // creating a fresh one (name-clash guard).
 const mockExistingUpdaterRemove = vi.fn().mockResolvedValue(undefined);
-const mockGetContainer = vi.fn().mockReturnValue({
+// getContainer is called both for aethera-app (inspect) and aethera-updater
+// (remove). Return a handle that supports both so either name works.
+const mockGetContainer = vi.fn().mockImplementation(() => ({
+  inspect: mockAppInspect,
   remove: mockExistingUpdaterRemove,
-});
+}));
 const mockDocker = {
   getContainer: mockGetContainer,
   createContainer: mockCreateContainer,
@@ -87,6 +103,8 @@ beforeEach(async () => {
   mockHelperStart.mockClear();
   mockGetContainer.mockClear();
   mockExistingUpdaterRemove.mockClear();
+  mockAppInspect.mockClear();
+  mockAppInspect.mockResolvedValue({ Config: { Labels: { ...COMPOSE_LABELS } } });
   getUpdateStatus.mockReset();
   getUpdateStatus.mockResolvedValue(UPDATE_AVAILABLE);
   delete process.env.AETHERA_SELF_UPDATE;
@@ -180,7 +198,7 @@ describe("runUpdate", () => {
     expect(result.imageTag).toBe("0.3.0");
   });
 
-  it("launches the detached self-update helper under AETHERA_SELF_UPDATE", async () => {
+  it("launches a docker compose helper under AETHERA_SELF_UPDATE using the panel's compose labels", async () => {
     process.env.AETHERA_SELF_UPDATE = "true";
 
     const result = await svc.runUpdate({ wait: false, actorId: "actor-1" });
@@ -188,34 +206,56 @@ describe("runUpdate", () => {
     // Image is pulled first.
     expect(mockPullImage).toHaveBeenCalledTimes(1);
 
+    // The panel container is inspected to discover its compose labels.
+    expect(mockAppInspect).toHaveBeenCalled();
+
     // Any stale updater is force-removed before a fresh one is created.
-    expect(mockGetContainer).toHaveBeenCalledWith("aethera-updater");
     expect(mockExistingUpdaterRemove).toHaveBeenCalledWith({ force: true });
 
-    // A detached helper container is created from the NEW image, mounting the
-    // Docker socket and running the finisher against aethera-app.
+    // A detached helper container is created from docker:cli, mounting the
+    // Docker socket + the project working dir, and delegating to docker compose.
     expect(mockCreateContainer).toHaveBeenCalledTimes(1);
     const arg = mockCreateContainer.mock.calls[0][0];
-    expect(arg.name).toBe("aethera-updater");
-    expect(arg.Image).toBe("ghcr.io/jaameypr/aethera-next:0.3.0");
-    expect(arg.Cmd).toEqual([
-      "node",
-      "/app/scripts/self-update-finish.js",
-      "aethera-app",
-      "ghcr.io/jaameypr/aethera-next:0.3.0",
-    ]);
+    expect(arg.Image).toBe("docker:cli");
+    expect(arg.WorkingDir).toBe("/opt/aethera");
     expect(arg.HostConfig.Binds).toContain(
       "/var/run/docker.sock:/var/run/docker.sock",
     );
+    expect(arg.HostConfig.Binds).toContain("/opt/aethera:/opt/aethera");
     expect(arg.HostConfig.AutoRemove).toBe(true);
     expect(arg.HostConfig.RestartPolicy).toEqual({ Name: "no" });
     expect(arg.Labels).toMatchObject({ "aethera.role": "updater" });
+    // The new tag is passed as an env fallback for compose.
+    expect(arg.Env).toContain("APP_TAG=0.3.0");
+    // The Cmd is a shell that runs the discovered compose command.
+    expect(arg.Cmd[0]).toBe("sh");
+    expect(arg.Cmd[1]).toBe("-c");
+    const shellCmd = arg.Cmd[2] as string;
+    expect(shellCmd).toContain(
+      "docker compose -f '/opt/aethera/docker-compose.prod.yml' -f '/opt/aethera/docker-compose.tunnel.yml' up -d app",
+    );
 
     // The helper is started.
     expect(mockHelperStart).toHaveBeenCalledTimes(1);
 
     expect(result.status).toBe("updating");
     expect(result.restarting).toBe(true);
+    expect(result.imageTag).toBe("0.3.0");
+  });
+
+  it("falls back to pulled/manual when the panel is not compose-managed (no compose labels)", async () => {
+    process.env.AETHERA_SELF_UPDATE = "true";
+    mockAppInspect.mockResolvedValue({ Config: { Labels: {} } });
+
+    const result = await svc.runUpdate({ wait: false, actorId: "actor-1" });
+
+    // Image is still pulled.
+    expect(mockPullImage).toHaveBeenCalledTimes(1);
+    // But without compose labels we never hand-recreate / launch a helper.
+    expect(mockCreateContainer).not.toHaveBeenCalled();
+
+    expect(result.status).toBe("pulled");
+    expect(result.manual).toBe(true);
     expect(result.imageTag).toBe("0.3.0");
   });
 });
