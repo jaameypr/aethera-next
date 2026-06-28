@@ -208,6 +208,40 @@ export async function removeOp(serverId: string, name: string): Promise<void> {
   await writeJson(serverId, OPS_FILE, filtered);
 }
 
+/**
+ * Update the level of an existing operator entry in ops.json.
+ *
+ * Vanilla has no command to set a per-player op level live, so this always
+ * edits the file directly regardless of server state. The UI surfaces the
+ * "restart to apply" note when the server is running.
+ */
+export async function setOpLevel(
+  serverId: string,
+  name: string,
+  level: number,
+): Promise<void> {
+  assertValidUsername(name);
+
+  if (!Number.isInteger(level) || level < 1 || level > 4) {
+    throw badRequest("level must be an integer between 1 and 4");
+  }
+
+  await requireServer(serverId);
+
+  const list = await readJsonArray<OpsEntry>(serverId, OPS_FILE);
+  const index = list.findIndex(
+    (e) => e.name?.toLowerCase() === name.toLowerCase(),
+  );
+  if (index === -1) {
+    throw badRequest("Player is not an operator");
+  }
+
+  const updated = list.map((e, i) =>
+    i === index ? { ...e, level } : e,
+  );
+  await writeJson(serverId, OPS_FILE, updated);
+}
+
 // ---------------------------------------------------------------------------
 // Whitelist enabled flag (white-list in server.properties)
 // ---------------------------------------------------------------------------

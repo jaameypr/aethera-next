@@ -597,6 +597,7 @@ export const de = {
       emptyOps: "Noch keine Operatoren.",
       added: "{name} hinzugefügt",
       removed: "{name} entfernt",
+      levelUpdated: "{name} auf Level {level} gesetzt",
       loadError: "Spieler konnten nicht geladen werden",
       actionError: "Aktion fehlgeschlagen",
     },

@@ -288,6 +288,80 @@ describe("removeOp", () => {
 });
 
 // ---------------------------------------------------------------------------
+// setOpLevel
+// ---------------------------------------------------------------------------
+
+describe("setOpLevel", () => {
+  it("updates the matching op's level in ops.json (by exact name)", async () => {
+    const id = await seedServer("stopped");
+    mockReadFile.mockResolvedValue({
+      content: JSON.stringify([
+        { uuid: "u1", name: "Notch", level: 4, bypassesPlayerLimit: false },
+        { uuid: "u2", name: "Jeb", level: 4, bypassesPlayerLimit: false },
+      ]),
+      size: 1,
+    });
+
+    await svc.setOpLevel(id, "Notch", 2);
+
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+    const [, file, content] = mockWriteFile.mock.calls[0];
+    expect(file).toBe("ops.json");
+    const parsed = JSON.parse(content) as { name: string; level: number }[];
+    expect(parsed.find((e) => e.name === "Notch")?.level).toBe(2);
+    // Other entries are untouched.
+    expect(parsed.find((e) => e.name === "Jeb")?.level).toBe(4);
+  });
+
+  it("is case-insensitive when matching the player name", async () => {
+    const id = await seedServer("stopped");
+    mockReadFile.mockResolvedValue({
+      content: JSON.stringify([
+        { uuid: "u1", name: "notch", level: 4, bypassesPlayerLimit: false },
+      ]),
+      size: 1,
+    });
+
+    await svc.setOpLevel(id, "NOTCH", 1);
+
+    const [, , content] = mockWriteFile.mock.calls[0];
+    const parsed = JSON.parse(content) as { name: string; level: number }[];
+    expect(parsed[0].level).toBe(1);
+  });
+
+  it("rejects when the player is not in ops.json", async () => {
+    const id = await seedServer("stopped");
+    mockReadFile.mockResolvedValue({
+      content: JSON.stringify([
+        { uuid: "u1", name: "Notch", level: 4, bypassesPlayerLimit: false },
+      ]),
+      size: 1,
+    });
+
+    await expect(svc.setOpLevel(id, "Unknown", 2)).rejects.toThrow();
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects level 0 (below minimum)", async () => {
+    const id = await seedServer("stopped");
+    await expect(svc.setOpLevel(id, "Notch", 0)).rejects.toThrow();
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects level 5 (above maximum)", async () => {
+    const id = await seedServer("stopped");
+    await expect(svc.setOpLevel(id, "Notch", 5)).rejects.toThrow();
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-integer level (3.5)", async () => {
+    const id = await seedServer("stopped");
+    await expect(svc.setOpLevel(id, "Notch", 3.5)).rejects.toThrow();
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // whitelist enabled
 // ---------------------------------------------------------------------------
 

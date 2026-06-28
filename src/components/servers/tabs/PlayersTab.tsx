@@ -6,7 +6,6 @@ import { Plus, X, Loader2, ShieldCheck, ListChecks, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -86,6 +85,8 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
   const [whitelistBusy, setWhitelistBusy] = useState(false);
   const [opsBusy, setOpsBusy] = useState(false);
   const [toggleBusy, setToggleBusy] = useState(false);
+  // Per-op level-change lock keyed by uuid.
+  const [opLevelBusy, setOpLevelBusy] = useState<Record<string, boolean>>({});
 
   // Add-row form state.
   const [whitelistName, setWhitelistName] = useState("");
@@ -271,6 +272,46 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
       toast.error(t("servers.players.actionError"));
     } finally {
       setOpsBusy(false);
+    }
+  }
+
+  async function handleChangeOpLevel(entry: OpEntry, newLevel: number) {
+    if (opLevelBusy[entry.uuid]) return;
+    const prev = entry.level;
+    // Optimistic update.
+    setData((d) =>
+      d
+        ? { ...d, ops: d.ops.map((o) => (o.uuid === entry.uuid ? { ...o, level: newLevel } : o)) }
+        : d,
+    );
+    setOpLevelBusy((b) => ({ ...b, [entry.uuid]: true }));
+    try {
+      const res = await fetch(
+        `/api/servers/${serverId}/players/ops/${encodeURIComponent(entry.name)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ level: newLevel }),
+        },
+      );
+      if (!res.ok) throw new Error("patch failed");
+      const json = (await res.json()) as PlayersPayload;
+      setData(json);
+      toast.success(t("servers.players.levelUpdated", { name: entry.name, level: String(newLevel) }));
+      if (running) {
+        toast.info(t("servers.players.opLevelRestartNote"));
+      }
+      scheduleReconcile();
+    } catch {
+      // Rollback optimistic update.
+      setData((d) =>
+        d
+          ? { ...d, ops: d.ops.map((o) => (o.uuid === entry.uuid ? { ...o, level: prev } : o)) }
+          : d,
+      );
+      toast.error(t("servers.players.actionError"));
+    } finally {
+      setOpLevelBusy((b) => ({ ...b, [entry.uuid]: false }));
     }
   }
 
@@ -517,9 +558,19 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
                       {entry.uuid}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="shrink-0">
-                    {t("servers.players.level")} {entry.level}
-                  </Badge>
+                  <select
+                    aria-label={t("servers.players.level")}
+                    value={entry.level}
+                    disabled={opLevelBusy[entry.uuid] ?? false}
+                    onChange={(e) => void handleChangeOpLevel(entry, Number(e.target.value))}
+                    className="h-8 shrink-0 rounded-md border border-zinc-300 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-zinc-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:ring-offset-zinc-950 dark:focus:ring-zinc-300"
+                  >
+                    {[1, 2, 3, 4].map((lvl) => (
+                      <option key={lvl} value={lvl}>
+                        {t("servers.players.level")} {lvl}
+                      </option>
+                    ))}
+                  </select>
                   <Button
                     variant="ghost"
                     size="icon"

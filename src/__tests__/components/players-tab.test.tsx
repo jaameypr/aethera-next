@@ -46,18 +46,20 @@ afterEach(() => {
 });
 
 describe("PlayersTab", () => {
-  it("renders whitelist name, op name and op level badge", async () => {
+  it("renders whitelist name, op name and inline level select", async () => {
     render(<PlayersTab serverId="srv1" serverStatus="running" />);
 
     expect(await screen.findByText("Steve")).toBeInTheDocument();
     expect(screen.getByText("Alex")).toBeInTheDocument();
-    // Level badge for the op (level 3) — a <div>, distinct from the <option> in the
-    // level select which carries the same text.
-    const levelBadge = screen
-      .getAllByText("Level 3")
-      .find((el) => el.tagName === "DIV");
-    expect(levelBadge).toBeDefined();
-    expect(levelBadge).toBeInTheDocument();
+    // The op's level is now an inline <select> labelled "Level".
+    const levelSelects = screen.getAllByRole("combobox", { name: /level/i });
+    // There is at least one select in the ops list (the op row for Alex).
+    // The ops-row select should have the current level (3) selected.
+    const opsRowSelect = levelSelects.find(
+      (el) => (el as HTMLSelectElement).value === "3",
+    ) as HTMLSelectElement | undefined;
+    expect(opsRowSelect).toBeDefined();
+    expect(opsRowSelect).toBeInTheDocument();
   });
 
   it("shows the live status note when running", async () => {
