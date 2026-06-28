@@ -203,8 +203,10 @@ describe("runUpdate", () => {
 
     const result = await svc.runUpdate({ wait: false, actorId: "actor-1" });
 
-    // Image is pulled first.
-    expect(mockPullImage).toHaveBeenCalledTimes(1);
+    // Both images are pulled: the new app image, and the docker:cli helper
+    // image (createContainer does not auto-pull, so it must be present locally).
+    expect(mockPullImage).toHaveBeenCalledTimes(2);
+    expect(mockPullImage).toHaveBeenCalledWith(expect.anything(), "docker:cli");
 
     // The panel container is inspected to discover its compose labels.
     expect(mockAppInspect).toHaveBeenCalled();

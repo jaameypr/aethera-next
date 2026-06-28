@@ -224,6 +224,11 @@ export async function runUpdate(
       const updaterImage = process.env.AETHERA_UPDATER_IMAGE || "docker:cli";
       const composeFiles = configFiles.map((f) => `-f '${f}'`).join(" ");
 
+      // createContainer does NOT auto-pull — a missing helper image fails with
+      // 404 "no such image". Pull it first (cached after the first run).
+      log("self-update:pulling-helper-image", { updaterImage });
+      await pullImage(docker, updaterImage);
+
       const helper = await docker.createContainer({
         name: UPDATER_CONTAINER,
         // docker:cli bundles the compose v2 plugin.
