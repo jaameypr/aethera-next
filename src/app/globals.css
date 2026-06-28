@@ -1,25 +1,189 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------ *
+ * Aethera design system
+ * ------------------------------------------------------------------ *
+ * One source of truth. Semantic color tokens, an elevation staircase
+ * and motion tokens are declared here and consumed as Tailwind v4
+ * utilities (bg-card, text-muted-foreground, shadow-z2, animate-shimmer …).
+ * Runtime theming works because every --color-* maps to a plain CSS var
+ * that :root / .dark swap. Never re-hardcode raw palette values in
+ * components — reach for a token so polish propagates everywhere.
+ * ------------------------------------------------------------------ */
+
 @theme inline {
+  /* Surfaces */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* Brand / intent */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* Aethera signal color — "alive / running / online" */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-muted: var(--brand-muted);
+
+  /* Semantic status */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-muted: var(--destructive-muted);
+
+  /* Lines */
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+  /* Radii */
+  --radius-xl: 1rem;
+
+  /* Elevation staircase — referenced via shadow-z1 … shadow-z4 */
+  --shadow-z1: var(--elevation-1);
+  --shadow-z2: var(--elevation-2);
+  --shadow-z3: var(--elevation-3);
+  --shadow-z4: var(--elevation-4);
+  --shadow-glow-brand: var(--elevation-glow-brand);
+
+  /* Motion tokens — shared rhythm for every animation in the app */
   --animate-in: enter 0.2s ease-out;
-  --animate-out: exit 0.2s ease-in;
+  --animate-out: exit 0.15s ease-in;
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-slide-up: slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+  --animate-shake: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  --animate-glow: glow 2s ease-in-out infinite;
 }
 
+/* ---------------------------------------------------------------- */
+/* Light theme (default)                                            */
+/* ---------------------------------------------------------------- */
 :root {
   --background: #ffffff;
   --foreground: #09090b;
+
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --brand: #059669;
+  --brand-foreground: #ffffff;
+  --brand-muted: #d1fae5;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --success-muted: #dcfce7;
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --warning-muted: #fef3c7;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+  --info-muted: #dbeafe;
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+  --destructive-muted: #fee2e2;
+
+  --border: #e4e4e7;
+  --input: #d4d4d8;
+  --ring: #10b981;
+
+  --elevation-1: 0 1px 2px 0 rgb(24 24 27 / 0.06), 0 1px 1px -1px rgb(24 24 27 / 0.04);
+  --elevation-2: 0 4px 12px -2px rgb(24 24 27 / 0.10), 0 2px 4px -2px rgb(24 24 27 / 0.06);
+  --elevation-3: 0 12px 28px -8px rgb(24 24 27 / 0.16), 0 4px 10px -4px rgb(24 24 27 / 0.08);
+  --elevation-4: 0 24px 56px -12px rgb(24 24 27 / 0.24), 0 8px 16px -8px rgb(24 24 27 / 0.12);
+  --elevation-glow-brand: 0 0 0 1px rgb(16 185 129 / 0.30), 0 8px 24px -6px rgb(16 185 129 / 0.35);
+
+  --scrollbar-thumb: #d4d4d8;
+  --scrollbar-thumb-hover: #a1a1aa;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ---------------------------------------------------------------- */
+/* Dark theme                                                       */
+/* ---------------------------------------------------------------- */
 .dark {
   --background: #09090b;
   --foreground: #fafafa;
+
+  --card: #161619;
+  --card-foreground: #fafafa;
+  --popover: #161619;
+  --popover-foreground: #fafafa;
+
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #1f1f23;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+
+  --brand: #10b981;
+  --brand-foreground: #022c22;
+  --brand-muted: #064e3b;
+
+  --success: #22c55e;
+  --success-foreground: #052e16;
+  --success-muted: #064e3b;
+  --warning: #f59e0b;
+  --warning-foreground: #451a03;
+  --warning-muted: #422006;
+  --info: #3b82f6;
+  --info-foreground: #0a1a33;
+  --info-muted: #1e3a8a;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
+  --destructive-muted: #450a0a;
+
+  --border: #27272a;
+  --input: #3f3f46;
+  --ring: #10b981;
+
+  --elevation-1: 0 1px 2px 0 rgb(0 0 0 / 0.40);
+  --elevation-2: 0 4px 14px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.40);
+  --elevation-3: 0 14px 32px -10px rgb(0 0 0 / 0.65), 0 4px 10px -4px rgb(0 0 0 / 0.50);
+  --elevation-4: 0 28px 60px -14px rgb(0 0 0 / 0.75), 0 10px 18px -8px rgb(0 0 0 / 0.55);
+  --elevation-glow-brand: 0 0 0 1px rgb(16 185 129 / 0.40), 0 10px 30px -6px rgb(16 185 129 / 0.45);
+
+  --scrollbar-thumb: #3f3f46;
+  --scrollbar-thumb-hover: #52525b;
 }
 
 body {
@@ -28,10 +192,51 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* Smooth theme cross-fade — enabled only after first paint (see theme-context)
+   so the initial server-rendered theme never animates in. */
+.theme-transitions-enabled,
+.theme-transitions-enabled *,
+.theme-transitions-enabled *::before,
+.theme-transitions-enabled *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Refined scrollbars — premium, unobtrusive. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Tabular figures for live numbers / metrics / timers — kills layout jitter. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- */
+/* Keyframes                                                        */
+/* ---------------------------------------------------------------- */
 @keyframes enter {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
@@ -46,6 +251,105 @@ body {
   }
   to {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 150% 0;
+  }
+}
+
+/* Concentric "alive" ring for running status. */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-3px);
+  }
+  40%,
+  60% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Accessibility — honor reduced-motion everywhere                  */
+/* ---------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

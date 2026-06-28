@@ -6,7 +6,8 @@ import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Save, Trash2, AlertTriangle } from "lucide-react";
+import { Save, Trash2, AlertTriangle, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,6 +91,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [javaVersion, setJavaVersion] = useState(server.javaVersion ?? "21");
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const editable = server.status === "stopped" || server.status === "error";
 
@@ -97,7 +99,8 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
     register,
     handleSubmit,
     control,
-    formState: { errors },
+    reset,
+    formState: { errors, isDirty },
   } = useForm<SettingsForm>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
@@ -137,6 +140,9 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? t("servers.settings.saveFailed"));
       }
+      reset(data);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2000);
       toast.success(t("servers.settings.saved"));
       router.refresh();
     } catch (err) {
@@ -169,12 +175,14 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
     <div className="space-y-6">
       {/* Hinweis wenn nicht editierbar */}
       {!editable && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
+        <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning-muted p-3 text-sm text-warning">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           {t("servers.settings.mustBeStopped")}
         </div>
       )}
       {server.status === "error" && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive-muted p-3 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           {t("servers.settings.inErrorState")}
         </div>
       )}
@@ -183,7 +191,20 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
       <Card>
         <form onSubmit={handleSubmit(onSave)}>
           <CardHeader>
-            <CardTitle className="text-base">{t("servers.settings.cardTitle")}</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              {t("servers.settings.cardTitle")}
+              {savedFlash ? (
+                <span className="flex animate-fade-in items-center gap-1 text-xs font-medium text-brand">
+                  <Check className="h-3.5 w-3.5" />
+                  {t("servers.settings.saved")}
+                </span>
+              ) : isDirty ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-warning">
+                  <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse-soft" />
+                  {t("servers.settings.unsavedChanges")}
+                </span>
+              ) : null}
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -227,11 +248,34 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
             {/* Version */}
             <div className="space-y-1">
               <Label htmlFor="s-version">{t("servers.settings.version")}</Label>
-              <Input
-                id="s-version"
-                placeholder="latest"
-                disabled={!editable}
-                {...register("version")}
+              <Controller
+                name="version"
+                control={control}
+                render={({ field }) => (
+                  <div className="space-y-1.5">
+                    <Input
+                      id="s-version"
+                      placeholder="latest"
+                      disabled={!editable || field.value === "latest"}
+                      value={field.value === "latest" ? "" : (field.value ?? "")}
+                      onChange={field.onChange}
+                    />
+                    <button
+                      type="button"
+                      disabled={!editable}
+                      aria-pressed={field.value === "latest"}
+                      onClick={() => field.onChange(field.value === "latest" ? "" : "latest")}
+                      className={cn(
+                        "rounded-md border px-2.5 py-1 text-xs transition-colors disabled:opacity-50",
+                        field.value === "latest"
+                          ? "border-brand bg-brand-muted text-foreground ring-1 ring-brand/40"
+                          : "border-border text-foreground/70 hover:border-brand/40",
+                      )}
+                    >
+                      {t("servers.create.latestRelease")}
+                    </button>
+                  </div>
+                )}
               />
             </div>
 
@@ -292,7 +336,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
             </div>
 
             {/* Auto-Start */}
-            <div className="flex items-center gap-3 sm:col-span-2">
+            <div className="flex items-center gap-3 rounded-lg border border-border p-4 sm:col-span-2">
               <Controller
                 name="autoStart"
                 control={control}
@@ -305,14 +349,27 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                   />
                 )}
               />
-              <Label htmlFor="s-autoStart">{t("servers.settings.autoStart")}</Label>
+              <Label htmlFor="s-autoStart" className="cursor-pointer">{t("servers.settings.autoStart")}</Label>
             </div>
           </CardContent>
 
           <CardFooter>
-            <Button type="submit" disabled={saving || !editable}>
-              <Save className="mr-1.5 h-4 w-4" />
-              {saving ? t("servers.settings.saving") : t("servers.settings.save")}
+            <Button
+              type="submit"
+              variant={savedFlash ? "brand" : "default"}
+              disabled={saving || !editable}
+              className="transition-colors"
+            >
+              {savedFlash ? (
+                <Check className="mr-1.5 h-4 w-4" />
+              ) : (
+                <Save className="mr-1.5 h-4 w-4" />
+              )}
+              {saving
+                ? t("servers.settings.saving")
+                : savedFlash
+                  ? t("servers.settings.saved")
+                  : t("servers.settings.save")}
             </Button>
           </CardFooter>
         </form>
@@ -371,7 +428,7 @@ export function SettingsTab({ server, projectKey }: SettingsTabProps) {
                   className={deleteConfirm.trim() === server.name.trim() && deleteConfirm.length > 0 ? "border-red-500 pr-8" : ""}
                 />
                 {deleteConfirm.trim() === server.name.trim() && deleteConfirm.length > 0 && (
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-500 text-xs font-medium">✓</span>
+                  <Check className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-fade-in text-destructive" />
                 )}
               </div>
               <DialogFooter>

@@ -196,7 +196,7 @@ On first run, the setup wizard will guide you through creating the admin account
 | `AETHERA_MINECRAFT_IMAGE` | Docker image for Minecraft servers (default: `itzg/minecraft-server`) |
 | `DISCORD_BOT_TOKEN` | *(Optional)* Enable Discord integration |
 | `CURSEFORGE_API_KEY` | *(Optional)* Enable CurseForge pack support |
-| `MODULE_REGISTRY_URL` | *(Optional)* Remote URL for the module registry |
+| `MODULE_REGISTRY_URL` | *(Optional)* Hub base URL for the module registry (panel appends `/{version}`). Legacy Paperview `/shares/{id}` URLs still work. |
 
 See `.env.example` for the full list.
 

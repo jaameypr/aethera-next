@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Save, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -55,6 +56,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
   const [rawProperties, setRawProperties] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const editable = serverStatus === "stopped" || serverStatus === "error";
 
@@ -63,7 +65,7 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
     handleSubmit,
     control,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ConfigForm>({
     resolver: zodResolver(configSchema),
     defaultValues: {
@@ -134,6 +136,9 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
 
         await writePropertiesAction({ serverId, properties: merged });
         setRawProperties(merged);
+        reset(data);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
         toast.success(t("servers.configuration.saved"));
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("servers.configuration.saveFailed"));
@@ -142,13 +147,29 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-500">{t("servers.configuration.loading")}</p>;
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-48" />
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <span className="sr-only">{t("servers.configuration.loading")}</span>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className={i === 0 ? "space-y-2 sm:col-span-2" : "space-y-2"}>
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <div className="space-y-6">
       {!editable && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
+        <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning-muted p-3 text-sm text-warning">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           {t("servers.configuration.mustBeStopped")}
         </div>
       )}
@@ -156,7 +177,20 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
       <Card>
         <form onSubmit={handleSubmit(onSave)}>
           <CardHeader>
-            <CardTitle className="text-base">{t("servers.configuration.cardTitle")}</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              {t("servers.configuration.cardTitle")}
+              {savedFlash ? (
+                <span className="flex animate-fade-in items-center gap-1 text-xs font-medium text-brand">
+                  <Check className="h-3.5 w-3.5" />
+                  {t("servers.configuration.saved")}
+                </span>
+              ) : isDirty ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-warning">
+                  <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse-soft" />
+                  {t("servers.settings.unsavedChanges")}
+                </span>
+              ) : null}
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -241,8 +275,11 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
               />
             </div>
 
-            {/* Toggles */}
-            <div className="space-y-3 sm:col-span-2">
+            {/* Toggles — grouped gameplay rules */}
+            <fieldset className="space-y-3 rounded-lg border border-border p-4 sm:col-span-2">
+              <legend className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {t("servers.configuration.cardTitle")}
+              </legend>
               {(
                 [
                   { name: "white-list" as const, label: t("servers.configuration.whitelist") },
@@ -252,7 +289,10 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
                   { name: "hardcore" as const, label: t("servers.configuration.hardcore") },
                 ]
               ).map(({ name, label }) => (
-                <div key={name} className="flex items-center gap-3">
+                <div
+                  key={name}
+                  className="flex items-center gap-3 rounded-md px-1 py-0.5 transition-colors hover:bg-accent/50"
+                >
                   <Controller
                     name={name}
                     control={control}
@@ -265,16 +305,29 @@ export function ConfigurationTab({ serverId, serverStatus }: ConfigurationTabPro
                       />
                     )}
                   />
-                  <Label htmlFor={`cfg-${name}`}>{label}</Label>
+                  <Label htmlFor={`cfg-${name}`} className="cursor-pointer">{label}</Label>
                 </div>
               ))}
-            </div>
+            </fieldset>
           </CardContent>
 
           <CardFooter>
-            <Button type="submit" disabled={isPending || !editable}>
-              <Save className="mr-1.5 h-4 w-4" />
-              {isPending ? t("servers.configuration.saving") : t("servers.configuration.save")}
+            <Button
+              type="submit"
+              variant={savedFlash ? "brand" : "default"}
+              disabled={isPending || !editable}
+              className="transition-colors"
+            >
+              {savedFlash ? (
+                <Check className="mr-1.5 h-4 w-4" />
+              ) : (
+                <Save className="mr-1.5 h-4 w-4" />
+              )}
+              {isPending
+                ? t("servers.configuration.saving")
+                : savedFlash
+                  ? t("servers.configuration.saved")
+                  : t("servers.configuration.save")}
             </Button>
           </CardFooter>
         </form>

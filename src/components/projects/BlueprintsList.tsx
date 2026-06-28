@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Zap, MemoryStick } from "lucide-react";
+import { Plus, Trash2, Zap, MemoryStick, Layers } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Dialog,
   DialogContent,
@@ -85,32 +86,34 @@ export function BlueprintsList({
       </div>
 
       {blueprints.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-zinc-500">
-            {t("projects.servers.noBlueprints")}
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<Layers className="h-6 w-6" />}
+          title={t("projects.servers.noBlueprints")}
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {blueprints.map((bp) => (
             <Card
               key={bp._id}
-              className={bp.status === "claimed" ? "opacity-60" : ""}
+              className={`border-dashed ${bp.status === "claimed" ? "opacity-60" : ""}`}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">{bp.name}</CardTitle>
-                    <CardDescription className="flex items-center gap-1 mt-0.5">
-                      <MemoryStick className="h-3.5 w-3.5" />
-                      Max. {ramLabel(bp.maxRam)}
-                    </CardDescription>
+                  <div className="flex items-start gap-2 min-w-0">
+                    <Layers className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <CardTitle className="truncate text-base">{bp.name}</CardTitle>
+                      <CardDescription className="flex items-center gap-1 mt-0.5">
+                        <MemoryStick className="h-3.5 w-3.5" />
+                        Max. {ramLabel(bp.maxRam)}
+                      </CardDescription>
+                    </div>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                       bp.status === "available"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                        : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                        ? "bg-brand-muted text-brand"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {bp.status === "available" ? t("projects.servers.blueprintAvailable") : t("projects.servers.blueprintClaimed")}
@@ -121,6 +124,7 @@ export function BlueprintsList({
                 {canInitialize && bp.status === "available" && (
                   <Button
                     size="sm"
+                    variant="brand"
                     className="flex-1"
                     onClick={() => setInitTarget(bp)}
                   >
@@ -132,7 +136,7 @@ export function BlueprintsList({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive-muted"
                     onClick={() => setDeleteTarget(bp)}
                   >
                     <Trash2 className="h-4 w-4" />

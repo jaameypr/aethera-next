@@ -43,11 +43,11 @@ export default async function ProjectDetailPage({ params }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <p className="text-sm text-zinc-500">{t("projects.detail.projectLabel")}</p>
+      <div className="animate-fade-in">
+        <p className="text-sm text-muted-foreground">{t("projects.detail.projectLabel")}</p>
         <h1 className="text-2xl font-bold">{project.name}</h1>
-        <p className="text-sm text-zinc-400">
-          {project.key} · {t("projects.detail.serversRunning", {
+        <p className="text-sm text-muted-foreground">
+          <span className="font-mono">{project.key}</span> · {t("projects.detail.serversRunning", {
             servers: servers.length,
             running: running.length,
           })}

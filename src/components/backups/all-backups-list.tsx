@@ -19,11 +19,11 @@ import { Button } from "@/components/ui/button";
 import { copyToClipboard } from "@/lib/utils";
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ImportBackupDialog } from "@/components/backups/import-backup-dialog";
 import { useLocale } from "@/context/locale-context";
 
@@ -59,25 +59,25 @@ function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case "pending":
       return (
-        <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-300">
+        <Badge variant="outline" className="gap-1 border-warning/40 text-warning">
           <Clock className="h-3 w-3" /> {t("servers.backups.statusPending")}
         </Badge>
       );
     case "in_progress":
       return (
-        <Badge variant="outline" className="gap-1 text-blue-600 border-blue-300">
+        <Badge variant="outline" className="gap-1 border-info/40 text-info">
           <Loader2 className="h-3 w-3 animate-spin" /> {t("servers.backups.statusInProgress")}
         </Badge>
       );
     case "failed":
       return (
-        <Badge variant="outline" className="gap-1 text-red-600 border-red-300">
+        <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
           <XCircle className="h-3 w-3" /> {t("servers.backups.statusFailed")}
         </Badge>
       );
     default:
       return (
-        <Badge variant="outline" className="gap-1 text-green-600 border-green-300">
+        <Badge variant="outline" className="gap-1 border-brand/40 text-brand">
           <CheckCircle2 className="h-3 w-3" /> {t("servers.backups.statusCompleted")}
         </Badge>
       );
@@ -148,9 +148,20 @@ export function AllBackupsList({ backups: initial, currentUserId }: { backups: B
         </Button>
       </div>
 
+      {backups.length === 0 ? (
+        <EmptyState
+          icon={<HardDrive className="h-6 w-6" />}
+          title={t("verzeichnis.backups.noBackupsTitle")}
+          description={t("verzeichnis.backups.noBackupsDesc")}
+        />
+      ) : (
       <div className="space-y-2">
         {backups.map((backup) => (
-          <Card key={backup._id}>
+          <Card
+            key={backup._id}
+            interactive
+            className="animate-fade-in overflow-hidden"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -162,7 +173,7 @@ export function AllBackupsList({ backups: initial, currentUserId }: { backups: B
                     <Badge variant="secondary" className="text-xs">{t("servers.backups.asyncLabel")}</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 mt-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                   <Server className="h-3 w-3" />
                   <span>{backup.serverName}</span>
                   <span>·</span>
@@ -176,17 +187,22 @@ export function AllBackupsList({ backups: initial, currentUserId }: { backups: B
                   <span>·</span>
                   <span>{backup.components.join(", ")}</span>
                 </div>
+                {backup.status === "in_progress" && (
+                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-info-muted">
+                    <div className="h-full w-1/3 animate-shimmer rounded-full bg-gradient-to-r from-info/30 via-info to-info/30 bg-[length:200%_100%]" />
+                  </div>
+                )}
                 {backup.errorMessage && (
-                  <p className="text-xs text-red-500 mt-0.5">{backup.errorMessage}</p>
+                  <p className="text-xs text-destructive mt-0.5">{backup.errorMessage}</p>
                 )}
                 {backup.shareUrl && (
                   <div className="flex items-center gap-1 mt-1">
-                    <ExternalLink className="h-3 w-3 text-zinc-400" />
+                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
                     <a
                       href={backup.shareUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-blue-500 hover:underline truncate max-w-[300px]"
+                      className="text-xs text-info hover:underline truncate max-w-[300px]"
                     >
                       {backup.shareUrl}
                     </a>
@@ -243,6 +259,7 @@ export function AllBackupsList({ backups: initial, currentUserId }: { backups: B
           </Card>
         ))}
       </div>
+      )}
 
       <ImportBackupDialog
         open={importDialogOpen}

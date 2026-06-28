@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { Toaster } from "sonner";
 import { LocaleProvider } from "@/context/locale-context";
 import { ThemeProvider, type Theme } from "@/context/theme-context";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { resolveLocale } from "@/lib/i18n/index";
 import "./globals.css";
 
@@ -48,8 +49,20 @@ export default async function RootLayout({
       >
         <ThemeProvider initialTheme={theme}>
           <LocaleProvider initialLocale={locale}>
-            {children}
-            <Toaster position="bottom-right" richColors />
+            <TooltipProvider delayDuration={300}>
+              {children}
+            </TooltipProvider>
+            <Toaster
+              position="bottom-right"
+              richColors
+              closeButton
+              theme={theme}
+              toastOptions={{
+                style: {
+                  borderRadius: "0.625rem",
+                },
+              }}
+            />
           </LocaleProvider>
         </ThemeProvider>
       </body>

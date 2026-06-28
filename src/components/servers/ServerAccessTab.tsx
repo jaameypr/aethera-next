@@ -3,9 +3,11 @@
 import { useState, useEffect, useTransition } from "react";
 import { useLocale } from "@/context/locale-context";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, Search, Shield, Check } from "lucide-react";
+import { Plus, Trash2, Loader2, Search, Shield, Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Card,
   CardContent,
@@ -148,9 +150,9 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
   return (
     <div className="space-y-6">
       {/* Invite with configurable permissions */}
-      <Card className="border-blue-200 dark:border-blue-900">
+      <Card className="border-info/30">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base text-blue-700 dark:text-blue-400">
+          <CardTitle className="flex items-center gap-2 text-base text-info">
             <Shield className="h-4 w-4" />
             {t("servers.access.cardTitle")}
           </CardTitle>
@@ -203,13 +205,15 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
                     key={opt.value}
                     type="button"
                     onClick={() => toggleNewPerm(opt.value)}
-                    className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    aria-pressed={active}
+                    className={cn(
+                      "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-[background-color,color,transform] duration-150 active:scale-95",
                       active
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                        : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500"
-                    }`}
+                        ? "bg-info-muted text-info"
+                        : "bg-secondary text-muted-foreground hover:bg-accent",
+                    )}
                   >
-                    {active && <Check className="h-3 w-3" />}
+                    {active && <Check className="h-3 w-3 animate-fade-in" />}
                     {opt.label}
                   </button>
                 );
@@ -230,13 +234,14 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
 
       {/* Members list */}
       {entries.length === 0 ? (
-        <p className="text-sm text-zinc-500">
-          {t("servers.access.noAccess")}
-        </p>
+        <EmptyState
+          icon={<Users className="h-6 w-6" />}
+          title={t("servers.access.noAccess")}
+        />
       ) : (
         <div className="space-y-2">
           {entries.map((entry) => (
-            <Card key={entry.userId}>
+            <Card key={entry.userId} interactive className="animate-fade-in">
               <CardContent className="flex items-center justify-between py-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -253,13 +258,15 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
                           key={opt.value}
                           disabled={isPending}
                           onClick={() => handleTogglePermission(entry.userId, opt.value)}
-                          className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                          aria-pressed={active}
+                          className={cn(
+                            "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-[background-color,color,transform] duration-150 active:scale-95 disabled:opacity-60",
                             active
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                              : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500"
-                          }`}
+                              ? "bg-brand-muted text-brand"
+                              : "bg-secondary text-muted-foreground hover:bg-accent",
+                          )}
                         >
-                          {active && <Check className="h-2.5 w-2.5" />}
+                          {active && <Check className="h-2.5 w-2.5 animate-fade-in" />}
                           {opt.label}
                         </button>
                       );
@@ -272,7 +279,7 @@ export function ServerAccessTab({ serverId, access }: ServerAccessTabProps) {
                   disabled={isPending}
                   onClick={() => handleRemove(entry.userId)}
                 >
-                  <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-500" />
+                  <Trash2 className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
                 </Button>
               </CardContent>
             </Card>

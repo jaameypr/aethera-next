@@ -254,7 +254,7 @@ export function ImportBackupDialog({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <CheckCircle2 className="h-5 w-5 text-brand" />
               {t("backupDialogs.import.resultTitle")}
             </DialogTitle>
             <DialogDescription>
@@ -263,22 +263,22 @@ export function ImportBackupDialog({
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
+            <div className="rounded-lg border border-border p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <FileArchive className="h-4 w-4 text-zinc-500" />
+                <FileArchive className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium truncate">
                   {result.filename}
                 </span>
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-muted-foreground">
                   {formatSize(result.size)}
                 </span>
               </div>
 
               <div>
-                <p className="text-xs text-zinc-500 mb-2">{t("backupDialogs.import.detectedContents")}</p>
+                <p className="text-xs text-muted-foreground mb-2">{t("backupDialogs.import.detectedContents")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {result.components.length === 0 ? (
-                    <div className="flex items-center gap-1 text-xs text-amber-600">
+                    <div className="flex items-center gap-1 text-xs text-warning">
                       <AlertCircle className="h-3 w-3" />
                       {t("backupDialogs.import.noComponents")}
                     </div>
@@ -339,12 +339,12 @@ export function ImportBackupDialog({
 
           <TabsContent value="upload">
             <div
-              className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-colors cursor-pointer ${
+              className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-[border-color,background-color,box-shadow] duration-200 cursor-pointer ${
                 dragOver
-                  ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-900"
+                  ? "border-brand bg-brand-muted/40 ring-2 ring-brand/40"
                   : file
-                    ? "border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20"
-                    : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600"
+                    ? "border-brand/60 bg-brand-muted/20"
+                    : "border-input hover:border-zinc-400 dark:hover:border-zinc-600"
               }`}
               onClick={() => fileRef.current?.click()}
               onDragOver={(e) => {
@@ -367,9 +367,9 @@ export function ImportBackupDialog({
 
               {file ? (
                 <div className="space-y-2">
-                  <FileArchive className="mx-auto h-8 w-8 text-green-500" />
+                  <FileArchive className="mx-auto h-8 w-8 text-brand" />
                   <p className="text-sm font-medium">{file.name}</p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-muted-foreground">
                     {formatSize(file.size)}
                   </p>
                   <Button
@@ -386,11 +386,15 @@ export function ImportBackupDialog({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Upload className="mx-auto h-8 w-8 text-zinc-400" />
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <Upload
+                    className={`mx-auto h-8 w-8 transition-colors ${
+                      dragOver ? "text-brand" : "text-muted-foreground"
+                    }`}
+                  />
+                  <p className="text-sm text-foreground">
                     {t("backupDialogs.import.dropZone")}
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-muted-foreground">
                     {t("backupDialogs.import.fileTypes")}
                   </p>
                 </div>
@@ -408,7 +412,7 @@ export function ImportBackupDialog({
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                 />
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   {t("backupDialogs.import.urlHelper")}
                 </p>
               </div>
@@ -418,13 +422,13 @@ export function ImportBackupDialog({
 
         {progress && (
           <div className="space-y-1.5">
-            <div className="h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+            <div className="h-2 rounded-full bg-secondary overflow-hidden">
               <div
-                className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 ease-out"
+                className="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
-            <p className="text-xs text-zinc-500 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               {formatSize(progress.loaded)} / {formatSize(progress.total)} ({progress.percent}%)
             </p>
           </div>

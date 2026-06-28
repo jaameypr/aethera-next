@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { HardDrive, ArrowLeft } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { connectDB } from "@/lib/db/connection";
 import { BackupModel } from "@/lib/db/models/backup";
 import { ServerModel } from "@/lib/db/models/server";
@@ -59,29 +53,23 @@ export default async function BackupsPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">{t("verzeichnis.backups.title")}</h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted-foreground">
             {t("verzeichnis.backups.allBackups", { count: serialized.length })}
           </p>
         </div>
       </div>
 
       {serialized.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
-              <HardDrive className="h-5 w-5 text-zinc-500" />
-            </div>
-            <CardTitle className="text-base">{t("verzeichnis.backups.noBackupsTitle")}</CardTitle>
-            <CardDescription>
-              {t("verzeichnis.backups.noBackupsDesc")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <EmptyState
+          icon={<HardDrive className="h-6 w-6" />}
+          title={t("verzeichnis.backups.noBackupsTitle")}
+          description={t("verzeichnis.backups.noBackupsDesc")}
+          action={
             <Button asChild variant="outline" size="sm">
               <Link href="/projects">{t("verzeichnis.backups.toProjects")}</Link>
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <AllBackupsList backups={serialized} currentUserId={session.userId} />
       )}

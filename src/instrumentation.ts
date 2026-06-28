@@ -21,5 +21,17 @@ export async function register() {
     } catch (error) {
       console.error("[instrumentation] startEventListener failed:", error);
     }
+
+    try {
+      const { getUpdateStatus } = await import("@/lib/services/app-version.service");
+      const s = await getUpdateStatus();
+      if (s.updateAvailable) {
+        console.warn(`[aethera] ⬆ Update available: ${s.current} → ${s.latest} (${s.channel}). Update via Admin → System.`);
+      } else {
+        console.log(`[aethera] Version ${s.current} is up to date.`);
+      }
+    } catch (error) {
+      console.error("[instrumentation] version check failed:", error);
+    }
   }
 }

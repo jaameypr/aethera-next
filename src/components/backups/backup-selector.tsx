@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/context/locale-context";
 
 type ComponentId = "world" | "config" | "mods" | "plugins" | "datapacks";
@@ -116,15 +117,15 @@ export function BackupSelector({
           </Button>
         </div>
 
-        <div className="rounded-lg border border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20 p-3">
+        <div className="rounded-lg border border-brand/30 bg-brand-muted/30 p-3">
           <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <CheckCircle2 className="h-4 w-4 text-brand" />
             <span className="text-sm font-medium truncate">
               {selection.backupName}
             </span>
           </div>
 
-          <p className="text-xs text-zinc-500 mb-2">
+          <p className="text-xs text-muted-foreground mb-2">
             {t("backupsShared.selector.selectComponents")}
           </p>
           <div className="grid grid-cols-2 gap-1.5">
@@ -135,12 +136,12 @@ export function BackupSelector({
               return (
                 <div
                   key={comp.id}
-                  className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                  className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-[border-color,background-color,color] duration-150 ${
                     !available
-                      ? "border-zinc-100 opacity-40 dark:border-zinc-900"
+                      ? "border-border opacity-40"
                       : checked
-                        ? "border-zinc-900 bg-zinc-900 text-white cursor-pointer dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                        : "border-zinc-200 cursor-pointer hover:border-zinc-300 dark:border-zinc-700"
+                        ? "border-brand bg-brand text-brand-foreground cursor-pointer"
+                        : "border-border cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-600"
                   }`}
                   onClick={() => available && toggleComponent(comp.id)}
                 >
@@ -173,22 +174,22 @@ export function BackupSelector({
           <button
             type="button"
             onClick={() => setMode("existing")}
-            className="flex flex-col items-center gap-2 rounded-lg border border-zinc-200 p-4 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
+            className="group flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-center transition-[border-color,background-color] duration-150 hover:border-brand/50 hover:bg-brand-muted/30"
           >
-            <HardDrive className="h-6 w-6 text-zinc-400" />
+            <HardDrive className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-brand" />
             <span className="text-xs font-medium">{t("backupsShared.selector.existingBackup")}</span>
           </button>
           <a
             href="/verzeichnis/backups"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center gap-2 rounded-lg border border-zinc-200 p-4 text-center transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
+            className="group flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-center transition-[border-color,background-color] duration-150 hover:border-brand/50 hover:bg-brand-muted/30"
           >
-            <ExternalLink className="h-6 w-6 text-zinc-400" />
+            <ExternalLink className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-brand" />
             <span className="text-xs font-medium">{t("backupsShared.selector.importBackup")}</span>
           </a>
         </div>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           {t("backupsShared.selector.importHint")}
         </p>
       </div>
@@ -214,7 +215,7 @@ export function BackupSelector({
 
       {backups.length > 3 && (
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder={t("backupsShared.selector.searchPlaceholder")}
             value={search}
@@ -224,16 +225,26 @@ export function BackupSelector({
         </div>
       )}
 
-      <div className="max-h-[200px] overflow-y-auto space-y-1 rounded-lg border border-zinc-200 dark:border-zinc-800 p-1">
+      <div className="max-h-[200px] overflow-y-auto space-y-1 rounded-lg border border-border p-1">
         {loadingBackups ? (
-          <div className="flex items-center justify-center py-6 text-zinc-500">
-            <HardDrive className="h-4 w-4 mr-2 animate-pulse" />
-            <span className="text-xs">{t("backupsShared.selector.loading")}</span>
+          <div className="space-y-1 p-1">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2.5 rounded-md px-2.5 py-2"
+              >
+                <Skeleton className="h-4 w-4 shrink-0 rounded" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-3 w-2/3" />
+                  <Skeleton className="h-2.5 w-1/2" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-6">
-            <HardDrive className="mx-auto h-6 w-6 text-zinc-300 mb-1" />
-            <p className="text-xs text-zinc-500">
+            <HardDrive className="mx-auto h-6 w-6 text-muted-foreground/50 mb-1" />
+            <p className="text-xs text-muted-foreground">
               {backups.length === 0 ? t("backupsShared.selector.noBackupsFound") : t("backupsShared.selector.noResults")}
             </p>
           </div>
@@ -243,12 +254,12 @@ export function BackupSelector({
               key={backup._id}
               type="button"
               onClick={() => selectBackup(backup)}
-              className="flex items-center gap-2.5 w-full rounded-md px-2.5 py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="group flex items-center gap-2.5 w-full rounded-md px-2.5 py-2 text-left transition-colors hover:bg-brand-muted/40"
             >
-              <FileArchive className="h-4 w-4 text-zinc-400 shrink-0" />
+              <FileArchive className="h-4 w-4 text-muted-foreground shrink-0 transition-colors group-hover:text-brand" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium truncate">{backup.filename}</p>
-                <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <span>{formatSize(backup.size)}</span>
                   <span>·</span>
                   <span>{new Date(backup.createdAt).toLocaleDateString()}</span>

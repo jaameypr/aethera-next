@@ -15,6 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import SystemMetricsCharts from "@/components/admin/SystemMetricsCharts";
@@ -114,22 +116,29 @@ function StatCard({
   value,
   subtitle,
   icon: Icon,
+  accent,
 }: {
   title: string;
-  value: string;
+  value: React.ReactNode;
   subtitle?: string;
   icon: React.ComponentType<{ className?: string }>;
+  accent?: boolean;
 }) {
   return (
-    <Card>
+    <Card interactive className="group animate-slide-up">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-zinc-500">
           {title}
         </CardTitle>
-        <Icon className="h-4 w-4 text-zinc-400" />
+        <Icon
+          className={cn(
+            "h-4 w-4 text-zinc-400 transition-colors group-hover:text-zinc-500",
+            accent && "text-brand group-hover:text-brand",
+          )}
+        />
       </CardHeader>
       <CardContent>
-        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-2xl font-bold tabular-nums">{value}</p>
         {subtitle && (
           <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>
         )}
@@ -167,9 +176,11 @@ function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
   const { t } = useLocale();
   if (containers.length === 0) {
     return (
-      <p className="py-4 text-center text-sm text-zinc-500">
-        {t("admin.dashboard.noContainers")}
-      </p>
+      <EmptyState
+        icon={<Server className="h-6 w-6" />}
+        title={t("admin.dashboard.noContainers")}
+        className="border-0 py-8"
+      />
     );
   }
 
@@ -190,7 +201,7 @@ function ContainerTable({ containers }: { containers: ContainerInfo[] }) {
           {containers.map((c) => (
             <tr
               key={c.id}
-              className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
+              className="border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/40"
             >
               <td className="px-3 py-2 font-mono text-xs">{c.name}</td>
               <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{c.image}</td>
@@ -275,23 +286,31 @@ export function AdminDashboardClient({ data }: { data: SystemData }) {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           title={t("admin.dashboard.container")}
-          value={`${systemData.containerCount.running} / ${systemData.containerCount.total}`}
+          value={
+            <span className="inline-flex items-baseline gap-1">
+              <AnimatedCounter value={systemData.containerCount.running} />
+              <span className="text-zinc-400">/</span>
+              <AnimatedCounter value={systemData.containerCount.total} />
+            </span>
+          }
           subtitle={t("admin.dashboard.runningTotal")}
           icon={Server}
+          accent={systemData.containerCount.running > 0}
         />
         <StatCard
           title={t("admin.dashboard.dockerDaemon")}
           value={systemData.docker?.daemon ?? t("common.unknown")}
           subtitle={
             systemData.docker
-              ? `Circuit: ${systemData.docker.circuit}`
+              ? `${t("admin.dashboard.circuitLabel")}: ${systemData.docker.circuit}`
               : undefined
           }
           icon={Activity}
+          accent={systemData.docker?.daemon === "connected"}
         />
         <StatCard
           title={t("admin.dashboard.activeStreams")}
-          value={String(systemData.docker?.activeStreams ?? 0)}
+          value={<AnimatedCounter value={systemData.docker?.activeStreams ?? 0} />}
           subtitle={`${systemData.docker?.pendingOperations ?? 0} ${t("admin.dashboard.pendingOps")}`}
           icon={HardDrive}
         />

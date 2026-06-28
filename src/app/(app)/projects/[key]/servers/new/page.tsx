@@ -13,9 +13,9 @@ export default async function NewServerPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t("servers.create.pageTitle")}</h1>
-        <p className="text-sm text-zinc-500">{t("servers.create.projectLabel", { key })}</p>
+      <div className="animate-slide-up">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("servers.create.pageTitle")}</h1>
+        <p className="text-sm text-muted-foreground">{t("servers.create.projectLabel", { key })}</p>
       </div>
       <CreateServerWizard projectKey={key} />
     </div>

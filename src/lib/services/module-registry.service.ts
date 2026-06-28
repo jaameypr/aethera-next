@@ -8,6 +8,8 @@ import type {
 } from "@/lib/api/types";
 import { connectDB } from "@/lib/db/connection";
 import { InstalledModuleModel } from "@/lib/db/models/installed-module";
+import { APP_VERSION } from "@/lib/version";
+import { isValid, withinRange, compareDesc } from "@/lib/utils/semver";
 
 /* ------------------------------------------------------------------ */
 /*  Cache                                                              */
@@ -18,25 +20,93 @@ let _cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /* ------------------------------------------------------------------ */
-/*  Registry URL                                                       */
+/*  Registry URL helpers                                               */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Returns true when the URL targets a legacy Paperview share endpoint.
+ * These contain "/shares/" in their path.
+ */
+export function isLegacyShareUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.includes("/shares/");
+  } catch {
+    return url.includes("/shares/");
+  }
+}
 
 function getRegistryUrl(): string {
   const raw = process.env.MODULE_REGISTRY_URL;
   if (!raw) throw new Error("MODULE_REGISTRY_URL not configured");
 
-  // Normalise: accept both /shares/{id} and /api/shares/{id}
-  try {
-    const parsed = new URL(raw);
-    if (parsed.pathname.match(/^\/shares\//) && !parsed.pathname.startsWith("/api/")) {
-      parsed.pathname = `/api${parsed.pathname}`;
-      console.log("[module-registry] Normalized URL: added /api prefix →", parsed.href);
-      return parsed.href;
+  if (isLegacyShareUrl(raw)) {
+    // Normalise: accept both /shares/{id} and /api/shares/{id}
+    try {
+      const parsed = new URL(raw);
+      if (parsed.pathname.match(/^\/shares\//) && !parsed.pathname.startsWith("/api/")) {
+        parsed.pathname = `/api${parsed.pathname}`;
+        console.log("[module-registry] Normalized URL: added /api prefix →", parsed.href);
+        return parsed.href;
+      }
+    } catch {
+      // fall through and return raw
     }
-    return raw;
-  } catch {
-    return raw;
   }
+
+  return raw;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Version gating                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Filter each module's versions to those compatible with the running
+ * panel version (APP_VERSION), then drop modules with zero remaining
+ * versions.
+ *
+ * A version is compatible when:
+ *  - minAetheraVersion is a valid semver string, AND
+ *  - withinRange(APP_VERSION, minAetheraVersion, maxAetheraVersion?) is true.
+ *
+ * If minAetheraVersion is missing or invalid, the version is excluded.
+ * Per-version errors are swallowed so a bad entry never breaks the whole registry.
+ *
+ * Surviving versions are sorted newest-first (semver-descending) so the panel
+ * is self-consistent regardless of source ordering. The Hub already returns
+ * newest-first, but a legacy/dumb registry may not — and `getModuleCatalog`
+ * trusts `versions[0]` as the latest version for the "update available" badge.
+ */
+function gateRegistry(data: ModuleRegistry): ModuleRegistry {
+  const gatedModules = data.modules
+    .map((mod) => {
+      const compatibleVersions = mod.versions.filter((v) => {
+        try {
+          if (!v.minAetheraVersion || !isValid(v.minAetheraVersion)) return false;
+          if (v.maxAetheraVersion && !isValid(v.maxAetheraVersion)) return false;
+          return withinRange(APP_VERSION, v.minAetheraVersion, v.maxAetheraVersion);
+        } catch {
+          return false;
+        }
+      });
+
+      // Newest-first. Guard against an invalid `version` string (rcompare
+      // throws on bad semver): sort valid versions ahead of invalid ones, and
+      // leave invalid pairs in their original relative order.
+      compatibleVersions.sort((a, b) => {
+        const aValid = isValid(a.version);
+        const bValid = isValid(b.version);
+        if (aValid && bValid) return compareDesc(a.version, b.version);
+        if (aValid) return -1;
+        if (bValid) return 1;
+        return 0;
+      });
+
+      return { ...mod, versions: compatibleVersions };
+    })
+    .filter((mod) => mod.versions.length > 0);
+
+  return { ...data, modules: gatedModules };
 }
 
 /* ------------------------------------------------------------------ */
@@ -46,10 +116,15 @@ function getRegistryUrl(): string {
 /**
  * Fetch the remote registry (cached for 5 min).
  *
- * The registry JSON is hosted as a Paperview share. The URL points to
- * a share endpoint (e.g. /api/shares/{id}) which returns metadata
- * including version info. We then fetch the current version's content
- * which contains the actual registry JSON as a string.
+ * Hub mode (default): MODULE_REGISTRY_URL is the Hub base URL
+ * (e.g. https://modules.getaethera.de/api/registry). The panel appends
+ * /{APP_VERSION} and receives a pre-gated ModuleRegistry in one hop.
+ *
+ * Legacy mode: MODULE_REGISTRY_URL contains "/shares/" → Paperview
+ * 3-hop fetch (share metadata → currentVersionId → version content → JSON.parse).
+ *
+ * After obtaining the registry in either mode, version gating is applied
+ * locally via gateRegistry() to ensure only compatible versions are shown.
  */
 export async function fetchRegistry(
   forceRefresh = false,
@@ -59,66 +134,98 @@ export async function fetchRegistry(
     return _cache;
   }
 
-  const shareUrl = getRegistryUrl();
-  console.log("[module-registry] Fetching share metadata from:", shareUrl);
-
-  // Step 1: Fetch share metadata to get the current version ID
-  const shareRes = await fetch(shareUrl, { next: { revalidate: 0 } });
-  console.log("[module-registry] Share response status:", shareRes.status);
-  if (!shareRes.ok) {
-    const body = await shareRes.text();
-    console.error("[module-registry] Share fetch failed:", shareRes.status, body.slice(0, 300));
-    throw new Error(`Failed to fetch registry share: ${shareRes.status}`);
-  }
-
-  const shareJson = await shareRes.json();
-  console.log("[module-registry] Share response keys:", Object.keys(shareJson));
-  const { share, versions } = shareJson;
-  console.log("[module-registry] share.currentVersionId:", share?.currentVersionId, "| versions count:", versions?.length);
-
-  const versionId: string = share?.currentVersionId ?? versions?.[0]?._id;
-  if (!versionId) {
-    console.error("[module-registry] No versionId found. Full response:", JSON.stringify(shareJson).slice(0, 500));
-    throw new Error("Registry share has no versions");
-  }
-
-  // Step 2: Fetch the raw content of the current version
-  const contentUrl = `${shareUrl}/versions/${versionId}/content`;
-  console.log("[module-registry] Fetching version content from:", contentUrl);
-
-  const contentRes = await fetch(contentUrl, { next: { revalidate: 0 } });
-  console.log("[module-registry] Content response status:", contentRes.status);
-  if (!contentRes.ok) {
-    const body = await contentRes.text();
-    console.error("[module-registry] Content fetch failed:", contentRes.status, body.slice(0, 300));
-    throw new Error(`Failed to fetch registry content: ${contentRes.status}`);
-  }
-
-  const contentJson = await contentRes.json();
-  console.log("[module-registry] Content response keys:", Object.keys(contentJson));
-  const { content } = contentJson;
-
-  if (typeof content !== "string") {
-    console.error("[module-registry] Content is not a string, type:", typeof content, "value:", JSON.stringify(contentJson).slice(0, 300));
-    throw new Error("Registry share content is not a string");
-  }
-  console.log("[module-registry] Content length:", content.length, "| preview:", content.slice(0, 100));
-
-  // Step 3: Parse the inner JSON string into a ModuleRegistry
+  const registryUrl = getRegistryUrl();
   let data: ModuleRegistry;
-  try {
-    data = JSON.parse(content);
-  } catch (err) {
-    console.error("[module-registry] JSON parse failed:", err, "| content:", content.slice(0, 200));
-    throw new Error(
-      `Registry content is not valid JSON: ${content.slice(0, 120)}`,
-    );
+
+  if (isLegacyShareUrl(registryUrl)) {
+    // ----------------------------------------------------------------
+    // Legacy path: 3-hop Paperview share fetch (unchanged)
+    // ----------------------------------------------------------------
+    const shareUrl = registryUrl;
+    console.log("[module-registry] Fetching share metadata from:", shareUrl);
+
+    // Step 1: Fetch share metadata to get the current version ID
+    const shareRes = await fetch(shareUrl, { next: { revalidate: 0 } });
+    console.log("[module-registry] Share response status:", shareRes.status);
+    if (!shareRes.ok) {
+      const body = await shareRes.text();
+      console.error("[module-registry] Share fetch failed:", shareRes.status, body.slice(0, 300));
+      throw new Error(`Failed to fetch registry share: ${shareRes.status}`);
+    }
+
+    const shareJson = await shareRes.json();
+    console.log("[module-registry] Share response keys:", Object.keys(shareJson));
+    const { share, versions } = shareJson;
+    console.log("[module-registry] share.currentVersionId:", share?.currentVersionId, "| versions count:", versions?.length);
+
+    const versionId: string = share?.currentVersionId ?? versions?.[0]?._id;
+    if (!versionId) {
+      console.error("[module-registry] No versionId found. Full response:", JSON.stringify(shareJson).slice(0, 500));
+      throw new Error("Registry share has no versions");
+    }
+
+    // Step 2: Fetch the raw content of the current version
+    const contentUrl = `${shareUrl}/versions/${versionId}/content`;
+    console.log("[module-registry] Fetching version content from:", contentUrl);
+
+    const contentRes = await fetch(contentUrl, { next: { revalidate: 0 } });
+    console.log("[module-registry] Content response status:", contentRes.status);
+    if (!contentRes.ok) {
+      const body = await contentRes.text();
+      console.error("[module-registry] Content fetch failed:", contentRes.status, body.slice(0, 300));
+      throw new Error(`Failed to fetch registry content: ${contentRes.status}`);
+    }
+
+    const contentJson = await contentRes.json();
+    console.log("[module-registry] Content response keys:", Object.keys(contentJson));
+    const { content } = contentJson;
+
+    if (typeof content !== "string") {
+      console.error("[module-registry] Content is not a string, type:", typeof content, "value:", JSON.stringify(contentJson).slice(0, 300));
+      throw new Error("Registry share content is not a string");
+    }
+    console.log("[module-registry] Content length:", content.length, "| preview:", content.slice(0, 100));
+
+    // Step 3: Parse the inner JSON string into a ModuleRegistry
+    try {
+      data = JSON.parse(content);
+    } catch (err) {
+      console.error("[module-registry] JSON parse failed:", err, "| content:", content.slice(0, 200));
+      throw new Error(
+        `Registry content is not valid JSON: ${content.slice(0, 120)}`,
+      );
+    }
+
+    if (!data.modules || !Array.isArray(data.modules)) {
+      console.error("[module-registry] Invalid format, keys:", Object.keys(data));
+      throw new Error("Invalid module registry format");
+    }
+  } else {
+    // ----------------------------------------------------------------
+    // Hub mode: single GET to versioned endpoint
+    // ----------------------------------------------------------------
+    const base = registryUrl.replace(/\/$/, "");
+    const hubUrl = `${base}/${APP_VERSION}`;
+    console.log("[module-registry] Fetching hub registry from:", hubUrl);
+
+    const hubRes = await fetch(hubUrl, { next: { revalidate: 0 } });
+    console.log("[module-registry] Hub response status:", hubRes.status);
+    if (!hubRes.ok) {
+      const body = await hubRes.text();
+      console.error("[module-registry] Hub fetch failed:", hubRes.status, body.slice(0, 300));
+      throw new Error(`Failed to fetch hub registry: ${hubRes.status}`);
+    }
+
+    data = await hubRes.json() as ModuleRegistry;
+
+    if (!data.modules || !Array.isArray(data.modules)) {
+      console.error("[module-registry] Hub response invalid format, keys:", Object.keys(data as object));
+      throw new Error("Invalid module registry format from hub");
+    }
   }
 
-  if (!data.modules || !Array.isArray(data.modules)) {
-    console.error("[module-registry] Invalid format, keys:", Object.keys(data));
-    throw new Error("Invalid module registry format");
-  }
+  // Apply local version gating in both modes
+  data = gateRegistry(data);
 
   console.log("[module-registry] Successfully loaded", data.modules.length, "modules from registry");
   _cache = data;

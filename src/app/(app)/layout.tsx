@@ -8,7 +8,7 @@ import { getModuleSidebarItems } from "@/lib/services/module-manager.service";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { TokenRefresher } from "@/components/auth/token-refresher";
-import { hasAnyPermission } from "@/lib/permissions";
+import { hasAnyPermission, hasPermission } from "@/lib/permissions";
 import type { CurrentUserResponse, PermissionEntry } from "@/lib/api/types";
 
 export default async function AppLayout({
@@ -33,6 +33,11 @@ export default async function AppLayout({
     "admin.system",
     "admin.mail",
   ]);
+  const canViewAuditLog = hasPermission(
+    user.permissions,
+    rolePermissions,
+    "admin.system",
+  );
 
   const moduleSidebar = isAdmin ? await getModuleSidebarItems().catch(() => []) : [];
   const projects = projectDocs.map((p) => ({
@@ -65,6 +70,7 @@ export default async function AppLayout({
       projects={projects}
       moduleItems={moduleSidebar}
       isAdmin={isAdmin}
+      canViewAuditLog={canViewAuditLog}
     >
       <TokenRefresher />
       {children}

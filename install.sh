@@ -6,23 +6,150 @@ set -euo pipefail
 #
 #   curl -fsSL https://raw.githubusercontent.com/jaameypr/aethera-next/master/install.sh | bash
 #
+# Interactive when run on a terminal (even via curl | bash): asks for an
+# optional CurseForge API key and how to reach the panel — published on the
+# host port, bound to localhost only (for a local reverse proxy like Caddy),
+# or exposed through a Cloudflare tunnel. Falls back to a non-interactive
+# install when there is no terminal (CI), honouring env vars instead.
+#
 # Environment overrides:
-#   AETHERA_DIR   Target directory (default: ./aethera)
-#   AETHERA_TAG   Image tag to deploy   (default: latest)
+#   AETHERA_DIR        Target directory      (default: ./aethera)
+#   AETHERA_TAG        Image tag to deploy   (default: latest)
+#   AETHERA_REF        Git ref to fetch companion files from (default: master).
+#                      MUST match the branch/tag this installer came from, e.g.
+#                      AETHERA_REF=experimental when fetched from experimental.
+#   CURSEFORGE_API_KEY Preset CurseForge key (skips the prompt)
+#   TUNNEL_TOKEN +     Preset Cloudflare tunnel token and...
+#   APP_PUBLIC_URL     ...public URL → enables the tunnel non-interactively
+#   AETHERA_BIND       loopback|public — bind the panel to 127.0.0.1 (for a
+#                      local reverse proxy like Caddy) instead of publishing it.
+#                      Honoured non-interactively; ignored when a tunnel is set.
+#                      With loopback, set APP_PUBLIC_URL too for correct links.
 # ─────────────────────────────────────────────
 
-RAW_BASE="https://raw.githubusercontent.com/jaameypr/aethera-next/master"
+# Companion files (compose, env template, cloudflared script) are pulled from
+# the SAME ref this installer was fetched from — otherwise a new installer can
+# drag in stale siblings from master. Override with AETHERA_REF.
+AETHERA_REF="${AETHERA_REF:-master}"
+RAW_BASE="https://raw.githubusercontent.com/jaameypr/aethera-next/${AETHERA_REF}"
 COMPOSE_FILE="docker-compose.prod.yml"
+CF_SETUP="cloudflared-setup.sh"
 
 # Colours
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 info()  { echo -e "${GREEN}[aethera]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[aethera]${NC} $*"; }
 err()   { echo -e "${RED}[aethera]${NC} $*" >&2; }
+step()  { echo -e "${BLUE}»${NC} $*"; }
+
+# ── tty-aware prompts (work even when this script is piped via curl|bash) ──
+have_tty() { (exec </dev/tty) 2>/dev/null; }
+ask() { # ask VAR "prompt"
+  local __v="$1" __p="$2" __a=""
+  have_tty || return 1
+  printf '%b' "$__p" >/dev/tty
+  IFS= read -r __a </dev/tty || true
+  printf -v "$__v" '%s' "$__a"
+}
+ask_secret() { # ask_secret VAR "prompt"
+  local __v="$1" __p="$2" __a=""
+  have_tty || return 1
+  printf '%b' "$__p" >/dev/tty
+  IFS= read -rs __a </dev/tty || true
+  printf '\n' >/dev/tty
+  printf -v "$__v" '%s' "$__a"
+}
+ask_yn() { # ask_yn "prompt" DEFAULT(Y|N) -> 0 = yes
+  local __p="$1" __d="${2:-N}" __a=""
+  if ! have_tty; then [ "$__d" = "Y" ]; return; fi
+  printf '%b' "$__p" >/dev/tty
+  IFS= read -r __a </dev/tty || true
+  __a="${__a:-$__d}"
+  case "$__a" in [Yy]*) return 0 ;; *) return 1 ;; esac
+}
+
+# set_env KEY VALUE — upsert a key in .env. Writes the value verbatim (no sed
+# replacement metacharacters), preserving position when the key exists.
+set_env() {
+  local k="$1" v="$2" tmp
+  tmp="$(mktemp)"
+  if grep -q "^${k}=" .env 2>/dev/null; then
+    VAL="$v" awk -v key="$k" 'index($0, key "=")==1 { print key "=" ENVIRON["VAL"]; next } { print }' .env > "$tmp"
+  else
+    cp .env "$tmp"
+    printf '%s=%s\n' "$k" "$v" >> "$tmp"
+  fi
+  mv "$tmp" .env
+}
+read_env() { grep -E "^$1=" .env 2>/dev/null | head -n1 | cut -d= -f2- || true; }
+
+# sync_env_keys — additive .env migration. Appends any KEY present in
+# .env.example but MISSING from .env (verbatim default value); never touches an
+# existing value. Records the added keys in ENV_KEYS_ADDED so the admin can be
+# told to review them. This is how new config (e.g. AETHERA_CHANNEL,
+# AETHERA_HUB_URL) reaches an .env created by an older installer.
+ENV_KEYS_ADDED=""
+sync_env_keys() {
+  [ -f .env.example ] || return 0
+  local added=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|\#*) continue ;; esac   # skip blanks + comments
+    case "$line" in *=*) : ;; *) continue ;; esac
+    local key="${line%%=*}"
+    if ! grep -q "^${key}=" .env 2>/dev/null; then
+      printf '%s\n' "$line" >> .env
+      added="${added:+$added }${key}"
+    fi
+  done < .env.example
+  ENV_KEYS_ADDED="$added"
+  if [ -n "$added" ]; then
+    warn "Added new key(s) from .env.example to your .env — review them:"
+    for k in $added; do warn "    + ${k}=$(read_env "$k")"; done
+  fi
+}
+
+# Generate the cloudflared overlay and bring the stack up with the tunnel.
+# Done INLINE (no child-script handoff) so it works reliably under curl|bash.
+# Expects TUNNEL_TOKEN + APP_PUBLIC_URL already in .env.
+setup_tunnel_inline() {
+  local host ver maj rest min close_block
+  host="$(read_env APP_PUBLIC_URL)"; host="${host#https://}"; host="${host#http://}"; host="${host%/}"
+  ver="$(docker compose version --short 2>/dev/null | tr -d 'v ' || echo '0.0.0')"
+  maj="${ver%%.*}"; rest="${ver#*.}"; min="${rest%%.*}"
+  if { [ "${maj:-0}" -gt 2 ]; } 2>/dev/null || { [ "${maj:-0}" -eq 2 ] && [ "${min:-0}" -ge 24 ]; } 2>/dev/null; then
+    close_block='    ports: !reset []          # panel host port fully closed'
+    set_env APP_BIND 0.0.0.0
+  else
+    close_block='    # compose < 2.24: panel bound to loopback via APP_BIND=127.0.0.1'
+    set_env APP_BIND 127.0.0.1
+  fi
+  cat > docker-compose.tunnel.yml <<YAML
+# GENERATED by install.sh — remove with ./cloudflared-setup.sh --remove
+services:
+  app:
+${close_block}
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: aethera-cloudflared
+    restart: unless-stopped
+    profiles: [tunnel]
+    command: tunnel --no-autoupdate run --token \${TUNNEL_TOKEN}
+    networks:
+      - aethera-net
+    depends_on:
+      - app
+YAML
+  info "Wrote docker-compose.tunnel.yml"
+  info "Starting app + mongo + cloudflared..."
+  docker compose -f "$COMPOSE_FILE" -f docker-compose.tunnel.yml --profile tunnel up -d </dev/null
+  info "Tunnel route to finish in Cloudflare: Public Hostname → Type HTTP → URL app:3000"
+}
 
 # ── Pre-flight checks ───────────────────────
 
@@ -56,6 +183,9 @@ curl -fsSL "${RAW_BASE}/${COMPOSE_FILE}" -o "$COMPOSE_FILE"
 info "Downloading .env.example ..."
 curl -fsSL "${RAW_BASE}/.env.example" -o .env.example
 
+info "Downloading $CF_SETUP ..."
+curl -fsSL "${RAW_BASE}/${CF_SETUP}" -o "$CF_SETUP" && chmod +x "$CF_SETUP"
+
 # ── .env setup ───────────────────────────────
 
 if [ ! -f .env ]; then
@@ -71,39 +201,229 @@ if [ ! -f .env ]; then
   sed -i "s|<random-32-char-hex>|${MONGO_PASS}|" .env
 
   info "Generated JWT_SECRET and MONGO_PASS in .env"
-  warn "Review .env and set ADMIN_PASSWORD before first run!"
+  warn "Review .env and set ADMIN_PASSWORD before exposing the panel!"
 else
   info ".env already exists — keeping your existing configuration"
 fi
 
+# ── Migrate: pull any new keys from .env.example into the existing .env ──
+# Additive only (existing values untouched), so upgrades gain new config.
+sync_env_keys
+
+# ── Module registry sanity check ─────────────
+# The existing .env is intentionally kept on upgrades. But warn loudly if the
+# module registry isn't the Aethera Hub — a stale Paperview /shares URL or an
+# empty value means the module catalog won't load.
+REGISTRY_WARN=""
+REG_URL="$(read_env MODULE_REGISTRY_URL)"
+if [ -z "$REG_URL" ]; then
+  REGISTRY_WARN="MODULE_REGISTRY_URL is empty — the module catalog will be unavailable."
+elif ! printf '%s' "$REG_URL" | grep -q "modules\.getaethera\.de"; then
+  REGISTRY_WARN="MODULE_REGISTRY_URL does not point at the Aethera Hub (modules.getaethera.de) — modules may not load."
+fi
+if [ -n "$REGISTRY_WARN" ]; then
+  warn "⚠  $REGISTRY_WARN"
+  warn "     current:  ${REG_URL:-<unset>}"
+  warn "     expected: MODULE_REGISTRY_URL=https://modules.getaethera.de/api/registry"
+fi
+
+# Pin the chosen image tag into .env so compose + cloudflared-setup.sh agree.
+export AETHERA_TAG="${AETHERA_TAG:-latest}"
+set_env AETHERA_TAG "$AETHERA_TAG"
+
+# ── Optional configuration ───────────────────
+# Interactive when a terminal is available; otherwise honour env vars.
+
+WANT_TUNNEL=0
+
+if have_tty; then
+  echo ""
+  step "Optional configuration (press Enter to skip)"
+
+  # CurseForge API key — only ask if not already set.
+  if [ -z "$(read_env CURSEFORGE_API_KEY)" ]; then
+    echo ""
+    info "CurseForge API key — only needed to deploy CurseForge modpacks."
+    echo "  Get one at https://console.curseforge.com/  →  API Keys."
+    ask CF_KEY "  CurseForge API key (blank to skip): " || true
+    if [ -n "${CF_KEY:-}" ]; then
+      set_env CURSEFORGE_API_KEY "$CF_KEY"
+      info "Saved CURSEFORGE_API_KEY to .env"
+    fi
+  fi
+
+  # Panel exposure — published (default), localhost-only (for a local reverse
+  # proxy like Caddy), or a Cloudflare tunnel. Tunnel token + hostname are
+  # collected HERE (visible prompts on /dev/tty) and the tunnel is brought up
+  # inline later — no child-script handoff, so it can't dead-end under curl|bash.
+  # A saved token / existing overlay means "bring it up", never "silently skip".
+  if [ -f docker-compose.tunnel.yml ] || [ -n "$(read_env TUNNEL_TOKEN)" ]; then
+    info "Cloudflare tunnel already configured — it will be (re)started with the stack."
+    WANT_TUNNEL=1
+  else
+    EXPOSE_PORT="$(read_env APP_PORT)"; EXPOSE_PORT="${EXPOSE_PORT:-3000}"
+    echo ""
+    info "How do you want to reach the panel?"
+    echo "    1) Published on this host  (http://host:${EXPOSE_PORT})        [default]"
+    echo "    2) Localhost only          (127.0.0.1 — behind Caddy/nginx)"
+    echo "    3) Cloudflare Tunnel       (HTTPS, no open port)"
+    ask EXPOSE_CHOICE "  Choice [1]: " || true
+    case "${EXPOSE_CHOICE:-1}" in
+      2)
+        set_env APP_BIND 127.0.0.1
+        info "Panel will bind to 127.0.0.1 — front it with your own reverse proxy."
+        echo "  Optional: the public URL your proxy will serve (for correct links/cookies)."
+        ask RP_URL "  Public URL (e.g. https://panel.example.com, blank to skip): " || true
+        if [ -n "${RP_URL:-}" ]; then
+          RP_URL="${RP_URL#https://}"; RP_URL="${RP_URL#http://}"; RP_URL="${RP_URL%/}"
+          set_env APP_PUBLIC_URL "https://${RP_URL}"
+          info "Saved APP_PUBLIC_URL=https://${RP_URL}"
+        fi
+        ;;
+      3)
+        echo "  Cloudflare dashboard: Zero Trust → Networks → Tunnels → Create → Cloudflared."
+        echo "  Copy the long token after '--token' in the install command it shows."
+        ask CF_TOKEN "  Paste tunnel token: " || true
+        ask CF_HOST  "  Public panel hostname (e.g. panel.example.com): " || true
+        if [ -n "${CF_TOKEN:-}" ] && [ -n "${CF_HOST:-}" ]; then
+          CF_HOST="${CF_HOST#https://}"; CF_HOST="${CF_HOST#http://}"; CF_HOST="${CF_HOST%/}"
+          set_env TUNNEL_TOKEN "$CF_TOKEN"
+          set_env APP_PUBLIC_URL "https://${CF_HOST}"
+          WANT_TUNNEL=1
+          info "Saved tunnel token + public URL to .env"
+        else
+          warn "Token or hostname blank — skipping the tunnel (starting with the published port)."
+        fi
+        ;;
+      *)
+        # Published (default). Reset APP_BIND in case a prior run set loopback.
+        set_env APP_BIND 0.0.0.0
+        info "Panel will be published on the host port."
+        ;;
+    esac
+  fi
+else
+  # Non-interactive: honour preset env vars / existing config.
+  [ -n "${CURSEFORGE_API_KEY:-}" ] && set_env CURSEFORGE_API_KEY "$CURSEFORGE_API_KEY"
+  if [ -n "${TUNNEL_TOKEN:-}" ] && [ -n "${APP_PUBLIC_URL:-}" ]; then
+    set_env TUNNEL_TOKEN "$TUNNEL_TOKEN"
+    set_env APP_PUBLIC_URL "$APP_PUBLIC_URL"
+    WANT_TUNNEL=1
+    info "Cloudflare tunnel configured from environment."
+  elif [ -f docker-compose.tunnel.yml ] || [ -n "$(read_env TUNNEL_TOKEN)" ]; then
+    WANT_TUNNEL=1
+  else
+    # No tunnel — honour AETHERA_BIND for headless loopback selection.
+    case "${AETHERA_BIND:-}" in
+      loopback|127.0.0.1)
+        set_env APP_BIND 127.0.0.1
+        [ -n "${APP_PUBLIC_URL:-}" ] && set_env APP_PUBLIC_URL "$APP_PUBLIC_URL"
+        info "AETHERA_BIND=${AETHERA_BIND} — panel bound to 127.0.0.1 (front it with a reverse proxy)."
+        ;;
+      public|0.0.0.0)
+        set_env APP_BIND 0.0.0.0
+        ;;
+    esac
+  fi
+fi
+
 # ── Load config for data dirs + port ─────────
+# NEVER `source .env`: values like the CurseForge key contain `$` sequences
+# which, under `set -u`, expand as unbound variables and fatally kill the
+# script (not catchable by `|| true`). Read only the keys we need, verbatim.
 
-source .env 2>/dev/null || true
-
-DATA_DIR="${AETHERA_DATA_DIR:-./.aethera/run}"
-BACKUP_DIR="${AETHERA_BACKUP_DIR:-./.aethera/backup}"
-UPLOAD_DIR="${AETHERA_WORLD_UPLOAD_DIR:-./.aethera/world_upload}"
+DATA_DIR="$(read_env AETHERA_DATA_DIR)";          DATA_DIR="${DATA_DIR:-./.aethera/run}"
+BACKUP_DIR="$(read_env AETHERA_BACKUP_DIR)";      BACKUP_DIR="${BACKUP_DIR:-./.aethera/backup}"
+UPLOAD_DIR="$(read_env AETHERA_WORLD_UPLOAD_DIR)"; UPLOAD_DIR="${UPLOAD_DIR:-./.aethera/world_upload}"
+APP_PORT="$(read_env APP_PORT)";                  APP_PORT="${APP_PORT:-3000}"
 
 mkdir -p "$DATA_DIR" "$BACKUP_DIR" "$UPLOAD_DIR"
 info "Data directories ready"
 
 # ── Pull + start ─────────────────────────────
 
-export AETHERA_TAG="${AETHERA_TAG:-latest}"
 info "Using image tag: ghcr.io/jaameypr/aethera-next:${AETHERA_TAG}"
-
 info "Pulling images..."
-docker compose -f "$COMPOSE_FILE" pull
+docker compose -f "$COMPOSE_FILE" pull </dev/null
 
-info "Starting Aethera (app + mongo)..."
-docker compose -f "$COMPOSE_FILE" up -d
+# Safety net: if the tunnel was requested but the token/URL aren't in .env yet
+# (e.g. an overlay flag from a prior partial run), collect them now.
+if [ "$WANT_TUNNEL" = "1" ] && { [ -z "$(read_env TUNNEL_TOKEN)" ] || [ -z "$(read_env APP_PUBLIC_URL)" ]; }; then
+  if have_tty; then
+    echo ""
+    info "Cloudflare tunnel needs a token + hostname:"
+    ask CF_TOKEN "  Paste tunnel token: " || true
+    ask CF_HOST  "  Public panel hostname (e.g. panel.example.com): " || true
+    if [ -n "${CF_TOKEN:-}" ] && [ -n "${CF_HOST:-}" ]; then
+      CF_HOST="${CF_HOST#https://}"; CF_HOST="${CF_HOST#http://}"; CF_HOST="${CF_HOST%/}"
+      set_env TUNNEL_TOKEN "$CF_TOKEN"; set_env APP_PUBLIC_URL "https://${CF_HOST}"
+    else
+      warn "Token/hostname missing — starting without the tunnel."
+      WANT_TUNNEL=0
+    fi
+  else
+    warn "Tunnel requested but TUNNEL_TOKEN/APP_PUBLIC_URL not set — starting without it."
+    WANT_TUNNEL=0
+  fi
+fi
+
+if [ "$WANT_TUNNEL" = "1" ]; then
+  echo ""
+  step "Setting up the Cloudflare tunnel..."
+  setup_tunnel_inline
+else
+  info "Starting Aethera (app + mongo)..."
+  docker compose -f "$COMPOSE_FILE" up -d </dev/null
+fi
 
 # ── Done ─────────────────────────────────────
 
 echo ""
-info "✅  Aethera is running at http://localhost:${APP_PORT:-3000}"
+APP_BIND_NOW="$(read_env APP_BIND)"
+if [ "$WANT_TUNNEL" = "1" ]; then
+  info "✅  Aethera is running behind your Cloudflare tunnel."
+  info "    Public URL:  $(read_env APP_PUBLIC_URL)"
+  warn "    Finish the route in the Cloudflare dashboard (see the steps above)."
+elif [ "$APP_BIND_NOW" = "127.0.0.1" ]; then
+  info "✅  Aethera is running on http://127.0.0.1:${APP_PORT:-3000} (localhost only)."
+  info "    Point your reverse proxy (Caddy/nginx) at 127.0.0.1:${APP_PORT:-3000}."
+  PUB_URL="$(read_env APP_PUBLIC_URL)"
+  if [ -n "$PUB_URL" ]; then
+    info "    Public URL:  ${PUB_URL}"
+  else
+    warn "    Tip: set APP_PUBLIC_URL in .env to the address your proxy serves (correct links/cookies)."
+  fi
+  warn "First run: set ADMIN_PASSWORD in .env, or complete the /setup wizard via your proxy."
+else
+  info "✅  Aethera is running at http://localhost:${APP_PORT:-3000}"
+  warn "First run: set ADMIN_PASSWORD in .env, or complete the /setup wizard:"
+  warn "    http://localhost:${APP_PORT:-3000}/setup"
+fi
+
 echo ""
-warn "First run: set ADMIN_PASSWORD in .env, or complete the /setup wizard:"
-warn "    http://localhost:${APP_PORT:-3000}/setup"
-echo ""
+if [ -z "$(read_env CURSEFORGE_API_KEY)" ]; then
+  step "CurseForge modpacks need an API key. To add one later:"
+  echo "    1. Edit $(pwd)/.env  →  set  CURSEFORGE_API_KEY=<your key>"
+  echo "    2. Apply it:  docker compose -f ${COMPOSE_FILE} up -d   (recreates the app with the new key)"
+  echo ""
+fi
+
 info "Manage with:  docker compose -f ${COMPOSE_FILE} [logs -f | down | pull]"
+if [ "$WANT_TUNNEL" = "1" ] || [ -f docker-compose.tunnel.yml ]; then
+  info "Tunnel:       ./${CF_SETUP} --remove   (reopen the host port + drop the tunnel)"
+fi
+
+# Re-surface migration + registry notices at the very end — under curl | bash
+# the early output scrolls past, so repeat where the admin will actually see it.
+if [ -n "$ENV_KEYS_ADDED" ]; then
+  echo ""
+  warn "New .env keys were added from .env.example — review their values:"
+  for k in $ENV_KEYS_ADDED; do warn "    + ${k}=$(read_env "$k")"; done
+  warn "     (e.g. on a preview install set AETHERA_CHANNEL=experimental, then 'up -d')"
+fi
+if [ -n "$REGISTRY_WARN" ]; then
+  echo ""
+  warn "⚠  Module registry: $REGISTRY_WARN"
+  warn "     Edit .env → MODULE_REGISTRY_URL=https://modules.getaethera.de/api/registry, then:"
+  warn "       docker compose -f ${COMPOSE_FILE} up -d"
+fi
