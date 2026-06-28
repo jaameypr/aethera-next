@@ -14,6 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -87,6 +95,10 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
   const [toggleBusy, setToggleBusy] = useState(false);
   // Per-op level-change lock keyed by uuid.
   const [opLevelBusy, setOpLevelBusy] = useState<Record<string, boolean>>({});
+
+  // Confirmation dialog state — null means closed.
+  const [confirm, setConfirm] = useState<{ kind: "whitelist"; entry: WhitelistEntry } | { kind: "op"; entry: OpEntry } | null>(null);
+  const [confirmPending, setConfirmPending] = useState(false);
 
   // Add-row form state.
   const [whitelistName, setWhitelistName] = useState("");
@@ -212,11 +224,8 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
     }
   }
 
-  async function handleRemoveWhitelist(entry: WhitelistEntry) {
-    if (whitelistBusy) return;
-    if (!window.confirm(t("servers.players.removeWhitelistConfirm", { name: entry.name }))) {
-      return;
-    }
+  async function execRemoveWhitelist(entry: WhitelistEntry) {
+    setConfirmPending(true);
     setWhitelistBusy(true);
     const snapshot = data;
     setData((d) =>
@@ -237,7 +246,14 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
       toast.error(t("servers.players.actionError"));
     } finally {
       setWhitelistBusy(false);
+      setConfirmPending(false);
+      setConfirm(null);
     }
+  }
+
+  function handleRemoveWhitelist(entry: WhitelistEntry) {
+    if (whitelistBusy) return;
+    setConfirm({ kind: "whitelist", entry });
   }
 
   async function handleAddOp() {
@@ -315,11 +331,8 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
     }
   }
 
-  async function handleRemoveOp(entry: OpEntry) {
-    if (opsBusy) return;
-    if (!window.confirm(t("servers.players.removeOpConfirm", { name: entry.name }))) {
-      return;
-    }
+  async function execRemoveOp(entry: OpEntry) {
+    setConfirmPending(true);
     setOpsBusy(true);
     const snapshot = data;
     setData((d) =>
@@ -340,7 +353,14 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
       toast.error(t("servers.players.actionError"));
     } finally {
       setOpsBusy(false);
+      setConfirmPending(false);
+      setConfirm(null);
     }
+  }
+
+  function handleRemoveOp(entry: OpEntry) {
+    if (opsBusy) return;
+    setConfirm({ kind: "op", entry });
   }
 
   if (loading) {
@@ -468,7 +488,7 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
                     size="icon"
                     aria-label={t("servers.players.remove")}
                     disabled={whitelistBusy}
-                    onClick={() => void handleRemoveWhitelist(entry)}
+                    onClick={() => handleRemoveWhitelist(entry)}
                   >
                     <X className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
                   </Button>
@@ -576,7 +596,7 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
                     size="icon"
                     aria-label={t("servers.players.remove")}
                     disabled={opsBusy}
-                    onClick={() => void handleRemoveOp(entry)}
+                    onClick={() => handleRemoveOp(entry)}
                   >
                     <X className="h-4 w-4 text-muted-foreground transition-colors hover:text-destructive" />
                   </Button>
@@ -586,6 +606,55 @@ export function PlayersTab({ serverId, serverStatus }: PlayersTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm removal dialog — shared for whitelist and ops */}
+      <Dialog
+        open={confirm !== null}
+        onOpenChange={(open) => {
+          if (!open && !confirmPending) setConfirm(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirm?.kind === "whitelist"
+                ? t("servers.players.removeWhitelistTitle")
+                : t("servers.players.removeOpTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {confirm?.kind === "whitelist"
+                ? t("servers.players.removeWhitelistConfirm", { name: confirm.entry.name })
+                : confirm?.kind === "op"
+                  ? t("servers.players.removeOpConfirm", { name: confirm.entry.name })
+                  : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={confirmPending}
+              onClick={() => setConfirm(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={confirmPending}
+              onClick={() => {
+                if (!confirm) return;
+                if (confirm.kind === "whitelist") {
+                  void execRemoveWhitelist(confirm.entry);
+                } else {
+                  void execRemoveOp(confirm.entry);
+                }
+              }}
+            >
+              {confirmPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              {t("servers.players.confirmRemove")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
