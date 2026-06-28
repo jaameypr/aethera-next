@@ -241,8 +241,10 @@ export async function runUpdate(
         // docker:cli bundles the compose v2 plugin.
         Image: updaterImage,
         WorkingDir: workingDir,
-        // APP_TAG fallback so compose deploys the NEW tag even if .env lags.
-        Env: [`APP_TAG=${imageTag}`],
+        // Tag fallback so compose deploys the NEW tag even if .env lags. The
+        // PANEL compose interpolates ${AETHERA_TAG}; APP_TAG is set too so this
+        // also works for stacks using the playbook's APP_TAG convention.
+        Env: [`AETHERA_TAG=${imageTag}`, `APP_TAG=${imageTag}`],
         Labels: { "aethera.role": "updater" },
         // Wait for the API response to flush, sync the host .env to the new tag
         // (for future manual ops), then run the discovered compose command —
@@ -252,7 +254,7 @@ export async function runUpdate(
           "-c",
           `echo "=== aethera self-update $(date -u 2>/dev/null) -> ${imageTag} ===" >> ${logFile}; ` +
             `sleep 2; ` +
-            `sed -i 's|^APP_TAG=.*|APP_TAG=${imageTag}|' .env 2>/dev/null || true; ` +
+            `sed -i -e 's|^AETHERA_TAG=.*|AETHERA_TAG=${imageTag}|' -e 's|^APP_TAG=.*|APP_TAG=${imageTag}|' .env 2>/dev/null || true; ` +
             `echo "+ docker compose ${projectFlag} ${composeFiles} up -d ${service}" >> ${logFile}; ` +
             `docker compose ${projectFlag} ${composeFiles} up -d ${service} >> ${logFile} 2>&1; ` +
             `code=$?; echo "=== exit $code ===" >> ${logFile}; exit $code`,

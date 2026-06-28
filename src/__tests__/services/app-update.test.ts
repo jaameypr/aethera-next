@@ -228,7 +228,9 @@ describe("runUpdate", () => {
     expect(arg.HostConfig.AutoRemove).toBe(false);
     expect(arg.HostConfig.RestartPolicy).toEqual({ Name: "no" });
     expect(arg.Labels).toMatchObject({ "aethera.role": "updater" });
-    // The new tag is passed as an env fallback for compose.
+    // The new tag is passed as an env fallback for compose — the panel compose
+    // interpolates AETHERA_TAG (APP_TAG is also set for playbook-style stacks).
+    expect(arg.Env).toContain("AETHERA_TAG=0.3.0");
     expect(arg.Env).toContain("APP_TAG=0.3.0");
     // The Cmd is a shell that runs the discovered compose command.
     expect(arg.Cmd[0]).toBe("sh");
