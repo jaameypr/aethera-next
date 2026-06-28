@@ -75,7 +75,14 @@ export function VersionAvailableAlert({ canUpdate }: VersionAvailableAlertProps)
         toast.error(t("admin.update.error"));
         return;
       }
-      toast.success(t("admin.update.success"));
+      const data = await res.json().catch(() => ({}));
+      if (data?.restarting) {
+        toast.success(t("admin.update.success"));
+      } else {
+        // Pull-only mode (AETHERA_SELF_UPDATE not enabled): the image was
+        // pulled but the container was NOT recreated — tell the admin how.
+        toast.info(t("admin.update.pulledManual"));
+      }
     } catch {
       toast.error(t("admin.update.error"));
     } finally {

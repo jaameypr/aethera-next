@@ -276,6 +276,8 @@ export const en = {
       updating: "Updating…",
       busy: "Cannot update while jobs are running. Try again once they finish.",
       success: "Update started. The panel will restart shortly.",
+      pulledManual:
+        "New image pulled, but auto-restart is off. Recreate the container to apply, or set AETHERA_SELF_UPDATE=true for hands-off updates.",
       error: "Update failed. Check the server logs for details.",
     },
   },

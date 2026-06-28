@@ -279,6 +279,8 @@ export const de = {
       updating: "Wird aktualisiert…",
       busy: "Aktualisierung nicht möglich, während Aufgaben laufen. Bitte erneut versuchen, sobald sie abgeschlossen sind.",
       success: "Aktualisierung gestartet. Das Panel wird in Kürze neu gestartet.",
+      pulledManual:
+        "Neues Image geladen, aber Auto-Neustart ist aus. Container neu erstellen zum Anwenden, oder AETHERA_SELF_UPDATE=true setzen für automatische Updates.",
       error: "Aktualisierung fehlgeschlagen. Details in den Server-Logs.",
     },
   },
