@@ -224,7 +224,8 @@ describe("runUpdate", () => {
       "/var/run/docker.sock:/var/run/docker.sock",
     );
     expect(arg.HostConfig.Binds).toContain("/opt/aethera:/opt/aethera");
-    expect(arg.HostConfig.AutoRemove).toBe(true);
+    // Helper is kept after exit so its logs are inspectable.
+    expect(arg.HostConfig.AutoRemove).toBe(false);
     expect(arg.HostConfig.RestartPolicy).toEqual({ Name: "no" });
     expect(arg.Labels).toMatchObject({ "aethera.role": "updater" });
     // The new tag is passed as an env fallback for compose.
@@ -233,9 +234,11 @@ describe("runUpdate", () => {
     expect(arg.Cmd[0]).toBe("sh");
     expect(arg.Cmd[1]).toBe("-c");
     const shellCmd = arg.Cmd[2] as string;
+    // Targets the exact stack by project name, and logs to an inspectable file.
     expect(shellCmd).toContain(
-      "docker compose -f '/opt/aethera/docker-compose.prod.yml' -f '/opt/aethera/docker-compose.tunnel.yml' up -d app",
+      "docker compose -p 'aethera' -f '/opt/aethera/docker-compose.prod.yml' -f '/opt/aethera/docker-compose.tunnel.yml' up -d app",
     );
+    expect(shellCmd).toContain(".aethera-update.log");
 
     // The helper is started.
     expect(mockHelperStart).toHaveBeenCalledTimes(1);

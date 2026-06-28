@@ -206,6 +206,7 @@ export async function runUpdate(
       .map((f) => f.trim())
       .filter(Boolean);
     const service = labels["com.docker.compose.service"];
+    const project = labels["com.docker.compose.project"];
 
     if (workingDir && configFiles.length > 0 && service) {
       log("self-update:compose-helper", {
@@ -223,6 +224,12 @@ export async function runUpdate(
 
       const updaterImage = process.env.AETHERA_UPDATER_IMAGE || "docker:cli";
       const composeFiles = configFiles.map((f) => `-f '${f}'`).join(" ");
+      // Target the EXACT existing compose stack by project name (compose
+      // otherwise derives it from the dir basename, which can mismatch).
+      const projectFlag = project ? `-p '${project}'` : "";
+      // Persistent, inspectable log on the host so a failed recreate is never
+      // silent: `cat <workingDir>/.aethera-update.log`.
+      const logFile = ".aethera-update.log";
 
       // createContainer does NOT auto-pull — a missing helper image fails with
       // 404 "no such image". Pull it first (cached after the first run).
@@ -243,7 +250,12 @@ export async function runUpdate(
         Cmd: [
           "sh",
           "-c",
-          `sleep 2; sed -i 's|^APP_TAG=.*|APP_TAG=${imageTag}|' .env 2>/dev/null || true; docker compose ${composeFiles} up -d ${service}`,
+          `echo "=== aethera self-update $(date -u 2>/dev/null) -> ${imageTag} ===" >> ${logFile}; ` +
+            `sleep 2; ` +
+            `sed -i 's|^APP_TAG=.*|APP_TAG=${imageTag}|' .env 2>/dev/null || true; ` +
+            `echo "+ docker compose ${projectFlag} ${composeFiles} up -d ${service}" >> ${logFile}; ` +
+            `docker compose ${projectFlag} ${composeFiles} up -d ${service} >> ${logFile} 2>&1; ` +
+            `code=$?; echo "=== exit $code ===" >> ${logFile}; exit $code`,
         ],
         HostConfig: {
           // Mount the socket + the project dir at its real path so the compose
@@ -253,7 +265,10 @@ export async function runUpdate(
             "/var/run/docker.sock:/var/run/docker.sock",
             `${workingDir}:${workingDir}`,
           ],
-          AutoRemove: true,
+          // Keep the helper after it exits so its logs are inspectable
+          // (`docker logs aethera-updater`); the next run force-removes the
+          // stale one. Failures must never be silent again.
+          AutoRemove: false,
           RestartPolicy: { Name: "no" },
         },
       });
@@ -269,7 +284,7 @@ export async function runUpdate(
         status: "updating",
         restarting: true,
         imageTag,
-        message: `Recreating ${service} via docker compose; the panel will restart shortly.`,
+        message: `Recreating ${service} via docker compose; the panel will restart shortly. If it doesn't, see ${workingDir}/${logFile} (or \`docker logs ${UPDATER_CONTAINER}\`).`,
       };
     }
 
